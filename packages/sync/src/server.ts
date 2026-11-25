@@ -1,10 +1,11 @@
 import {
   isClockSuspect,
   clockSkewMs,
+  type ActionTarget,
   type PermissionRegistry,
   type UserContext,
 } from "@eu/core";
-import { auditLog, changeLog, syncConflicts, syncMutations, SYNC_MANAGED_KEYS, type Db } from "@eu/db";
+import { auditLog, changeLog, sites, syncConflicts, syncMutations, SYNC_MANAGED_KEYS, type Db } from "@eu/db";
 import { and, asc, eq, getTableColumns, gt, inArray, sql } from "drizzle-orm";
 import type { EntityDef, EntityRegistry } from "./entity";
 import {
@@ -98,13 +99,15 @@ async function decide(tx: AnyDb, ctx: SyncContext, m: Mutation, now: Date, clock
   const table = entity.table as AnyDb;
   const cols = getTableColumns(entity.table) as Record<string, AnyDb>;
   const [existing] = (await tx.select().from(table).where(eq(cols.id, m.recordId)).for("update")) as Row[];
-  const target = { stream: entity.stream, siteId: existing ? String(existing.scopeId) : m.scopeId };
+  const target = writeTarget(entity, existing ? String(existing.scopeId) : m.scopeId);
   const deviceTime = new Date(m.deviceTime);
 
   if (m.op === "insert") {
     const needed = entity.policy === "server_authoritative" ? (entity.actions.configure ?? entity.actions.write) : entity.actions.write;
     if (!ctx.permissions.can(ctx.user, needed, target)) return reject("forbidden");
     if (existing) return reject("id_exists");
+    const scopeProblem = await checkScope(tx, entity, m.scopeId);
+    if (scopeProblem) return reject(scopeProblem);
     const parsed = parseFields(entity, cols, m.fields ?? {}, "insert");
     if (!parsed.ok) return reject(parsed.reason);
     const fieldVersions: Record<string, number> = {};
@@ -234,7 +237,7 @@ async function currentRecord(tx: AnyDb, ctx: SyncContext, entity: EntityDef, id:
   const cols = getTableColumns(entity.table) as Record<string, AnyDb>;
   const [row] = (await tx.select().from(entity.table).where(eq(cols.id, id))) as Row[];
   if (!row) return undefined;
-  if (!ctx.permissions.can(ctx.user, entity.actions.read, { stream: entity.stream, siteId: String(row.scopeId) })) return undefined;
+  if (!ctx.permissions.can(ctx.user, entity.actions.read, readTarget(entity, String(row.scopeId)))) return undefined;
   return toWire(row);
 }
 
@@ -300,7 +303,7 @@ export async function handlePull(ctx: SyncContext, req: PullRequest): Promise<Pu
   for (const c of batch) {
     const entity = ctx.entities.get(c.entity);
     if (!entity) continue;
-    if (!ctx.permissions.can(ctx.user, entity.actions.read, { stream: entity.stream, siteId: c.scopeId })) continue;
+    if (!ctx.permissions.can(ctx.user, entity.actions.read, readTarget(entity, c.scopeId))) continue;
     if (!wanted.has(c.entity)) wanted.set(c.entity, new Set());
     wanted.get(c.entity)!.add(c.recordId);
   }
@@ -336,4 +339,24 @@ function pick(row: Row, keys: string[]): Row {
 function sameValue(a: unknown, b: unknown): boolean {
   const norm = (x: unknown) => (x instanceof Date ? x.toISOString() : x);
   return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+}
+
+/** Writes to a stream-wide record need a stream or global role, so the target has no site. */
+function writeTarget(entity: EntityDef, scopeId: string): ActionTarget {
+  return scopeId === entity.stream ? { stream: entity.stream, siteId: null } : { stream: entity.stream, siteId: scopeId };
+}
+
+function readTarget(entity: EntityDef, scopeId: string): ActionTarget {
+  return scopeId === entity.stream ? { stream: entity.stream, siteId: null, streamWide: true } : { stream: entity.stream, siteId: scopeId };
+}
+
+/** A new record's scope must be the entity's own stream, or an active site of that stream (and of an allowed kind). */
+async function checkScope(tx: AnyDb, entity: EntityDef, scopeId: string): Promise<string | undefined> {
+  if (scopeId === entity.stream) return undefined;
+  const [site] = (await tx.select().from(sites).where(eq(sites.id, scopeId))) as { stream: string; kind: string; active: boolean }[];
+  if (!site) return "unknown_scope";
+  if (site.stream !== entity.stream) return "scope_wrong_stream";
+  if (!site.active) return "scope_inactive";
+  if (entity.siteKinds && !entity.siteKinds.includes(site.kind)) return "scope_wrong_kind";
+  return undefined;
 }
