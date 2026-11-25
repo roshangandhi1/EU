@@ -20,6 +20,7 @@ export const fr: Dictionary = {
     failed: "Échec de la synchronisation. Nouvel essai bientôt.",
     clockSuspect: "L'horloge de ce téléphone semble incorrecte. Veuillez corriger la date et l'heure.",
     deviceRevoked: "Ce téléphone a été retiré du système.",
+    photosWaiting: "Photos en attente d'envoi ({count})",
     syncNow: "Synchroniser",
     syncing: "Synchronisation…",
     offline: "Pas de connexion. Votre travail est enregistré sur ce téléphone.",

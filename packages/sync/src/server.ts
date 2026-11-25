@@ -342,7 +342,7 @@ function sameValue(a: unknown, b: unknown): boolean {
 }
 
 /** Writes to a stream-wide record need a stream or global role, so the target has no site. */
-function writeTarget(entity: EntityDef, scopeId: string): ActionTarget {
+export function writeTarget(entity: EntityDef, scopeId: string): ActionTarget {
   return scopeId === entity.stream ? { stream: entity.stream, siteId: null } : { stream: entity.stream, siteId: scopeId };
 }
 
@@ -351,7 +351,7 @@ function readTarget(entity: EntityDef, scopeId: string): ActionTarget {
 }
 
 /** A new record's scope must be the entity's own stream, or an active site of that stream (and of an allowed kind). */
-async function checkScope(tx: AnyDb, entity: EntityDef, scopeId: string): Promise<string | undefined> {
+export async function checkScope(tx: AnyDb, entity: EntityDef, scopeId: string): Promise<string | undefined> {
   if (scopeId === entity.stream) return undefined;
   const [site] = (await tx.select().from(sites).where(eq(sites.id, scopeId))) as { stream: string; kind: string; active: boolean }[];
   if (!site) return "unknown_scope";

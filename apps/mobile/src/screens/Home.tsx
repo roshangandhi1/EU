@@ -27,6 +27,7 @@ export function Home({ session }: { session: Session }) {
 
       <View style={{ gap: 6 }}>
         {st.pending > 0 ? <Body tone="warning">{t("sync.waiting", { count: st.pending })}</Body> : <Body tone="good">{t("sync.synced")}</Body>}
+        {st.photosPending > 0 && <Body tone="warning">{t("sync.photosWaiting", { count: st.photosPending })}</Body>}
         <Body tone="muted">{when ? t("sync.lastSync", { time: when }) : t("sync.never")}</Body>
         {st.offline && <Body tone="muted">{t("sync.offline")}</Body>}
         {st.last && !st.last.ok && !st.offline && <Body tone="critical">{t("sync.failed")}</Body>}

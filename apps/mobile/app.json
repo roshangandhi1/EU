@@ -8,12 +8,14 @@
     "android": {
       "package": "cd.gocongo.eu",
       "versionCode": 1,
-      "permissions": []
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "plugins": [
       ["expo-sqlite", { "useSQLCipher": true }],
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      ["expo-image-picker", { "cameraPermission": "GoCongo uses the camera to take evidence photos." }],
+      ["expo-location", { "locationWhenInUsePermission": "GoCongo records where evidence photos are taken." }]
     ],
     "extra": {
       "apiBase": "https://eu2-roan.vercel.app"
