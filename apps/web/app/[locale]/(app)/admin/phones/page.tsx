@@ -2,7 +2,7 @@ import { CLOCK_SKEW_LIMIT_MS } from "@eu/core";
 import { Icon } from "@/components/icons";
 import { devices, users } from "@eu/db";
 import { desc, eq } from "drizzle-orm";
-import { Button, Check, Form, Notice, PageHeader, Table } from "@/components/ui";
+import { Check, FormFooter, Notice, PageHeader, RowMenu, SubmitButton, Table } from "@/components/ui";
 import { formatLocal, requireAction } from "@/lib/admin";
 import { db } from "@/lib/http";
 import { revokeAction } from "../actions";
@@ -28,8 +28,9 @@ export default async function PhonesPage({ params, searchParams }: { params: Pro
         rows={rows}
         rowKey={(r) => r.d.id}
         empty={tr("none")}
+        emptyIcon="phone"
         columns={[
-          { key: "user", header: tr("user"), render: (r) => r.userName },
+          { key: "user", header: tr("user"), render: (r) => <strong>{r.userName}</strong> },
           { key: "phone", header: tr("phone"), render: (r) => `${r.d.name}${r.d.appVersion ? ` · v${r.d.appVersion}` : ""}` },
           { key: "seen", header: tr("lastSync"), render: (r) => formatLocal(r.d.lastSeenAt, locale) },
           {
@@ -46,23 +47,25 @@ export default async function PhonesPage({ params, searchParams }: { params: Pro
           {
             key: "action",
             header: "",
+            shrink: true,
             render: (r) =>
               r.d.revokedAt ? (
-                tr("revoked")
+                <span className="pill bad">{tr("revoked")}</span>
               ) : (
-                <Form action={revokeAction}>
-                  <input type="hidden" name="locale" value={locale} />
-                  <input type="hidden" name="deviceId" value={r.d.id} />
-                  <p>
-                    {r.d.statusAt
-                      ? tr("revokeWarn", { changes: r.d.pendingChanges ?? 0, photos: r.d.pendingPhotos ?? 0, when: formatLocal(r.d.statusAt, locale) })
-                      : tr("revokeUnknown")}
-                  </p>
-                  <Check name="confirm" value="yes" label={tr("revokeConfirm")} required />
-                  <Button variant="danger" small>
-                    {tr("revoke")}
-                  </Button>
-                </Form>
+                <RowMenu label={tr("revoke")} icon="x" tone="danger" wide>
+                  <form action={revokeAction}>
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="deviceId" value={r.d.id} />
+                    <p style={{ margin: "0 0 4px", color: "var(--text)", fontWeight: 650 }}>{r.userName} · {r.d.name}</p>
+                    <p style={{ margin: "0 0 8px" }}>
+                      {r.d.statusAt
+                        ? tr("revokeWarn", { changes: r.d.pendingChanges ?? 0, photos: r.d.pendingPhotos ?? 0, when: formatLocal(r.d.statusAt, locale) })
+                        : tr("revokeUnknown")}
+                    </p>
+                    <Check name="confirm" value="yes" label={tr("revokeConfirm")} required />
+                    <FormFooter><SubmitButton variant="danger" small>{tr("revoke")}</SubmitButton></FormFooter>
+                  </form>
+                </RowMenu>
               ),
           },
         ]}

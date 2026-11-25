@@ -121,3 +121,13 @@ export async function schoolDevices(siteId: string): Promise<{ id: string; name:
     .where(and(eq(roleAssignments.scopeType, "site"), eq(roleAssignments.scopeValue, siteId), isNull(devices.revokedAt)));
   return rows;
 }
+
+/** Display names for user ids (e.g. a receipt book held by programme staff, who have no site role). */
+export async function userNames(ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const { users } = await import("@eu/db");
+  const { inArray } = await import("drizzle-orm");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: { id: string; name: string }[] = await (db() as any).select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, [...new Set(ids)]));
+  return new Map(rows.map((r) => [r.id, r.name]));
+}

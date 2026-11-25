@@ -11,7 +11,7 @@ import { BoreholesView } from "./boreholes-view";
 import { NewBoreholeForm } from "./new-borehole";
 import { PublishButton } from "@/components/publish-button";
 import { canPublish } from "@/lib/public-map";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, Section } from "@/components/ui";
 import { Icon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -49,15 +49,15 @@ export default async function BoreholesPage({ params, searchParams }: {
           {canPublish(me.user, "boreholes") && <PublishButton layer="boreholes" locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
         </>}
       />
-      <form className="asat" method="get">
-        <label>{t(locale, "boreholes.as_at")}<input type="date" name="asAt" defaultValue={asAt} /></label>
-        <label>
-          <select name="mode" defaultValue={mode}>
+      <form className="filterbar" method="get">
+        <label className="tb-field">{t(locale, "boreholes.as_at")}<input className="ctl" type="date" name="asAt" defaultValue={asAt} /></label>
+        <label className="tb-field">{t(locale, "ui.form.mode")}
+          <select className="ctl" name="mode" defaultValue={mode}>
             <option value="captured">{t(locale, "forestry.mode.captured")}</option>
             <option value="evidence">{t(locale, "forestry.mode.evidence")}</option>
           </select>
         </label>
-        <button className="btn" type="submit">{t(locale, "boreholes.update")}</button>
+        <button className="btn secondary" type="submit">{t(locale, "boreholes.update")}</button>
       </form>
       <div className="indicator">
         <p className="ind-title">{t(locale, "boreholes.indicator.111")}</p>
@@ -82,15 +82,15 @@ export default async function BoreholesPage({ params, searchParams }: {
         />
       )}
       {canWrite && (
-        <details className="panel">
-          <summary>{t(locale, "boreholes.new")}</summary>
+        <Section id="new" icon="plus" title={t(locale, "boreholes.new")}>
           <NewBoreholeForm locale={locale} labels={{
             code: t(locale, "boreholes.code"), village: t(locale, "boreholes.village"), lat: t(locale, "boreholes.lat"), lng: t(locale, "boreholes.lng"),
             pump: t(locale, "boreholes.pump_kw"), stage: t(locale, "boreholes.lifecycle_label"), create: t(locale, "boreholes.create"),
-            created: t(locale, "boreholes.created"), error: t(locale, "boreholes.error"),
+            created: t(locale, "boreholes.created"), error: t(locale, "boreholes.error"), optional: t(locale, "ui.form.optional"), saving: t(locale, "ui.form.saving"),
+            latLngHint: t(locale, "ui.form.latLngHint"), coordsError: t(locale, "ui.form.coordsError"),
             lifecycle: Object.fromEntries(LIFECYCLE.map((k) => [k, t(locale, `boreholes.lifecycle.${k}`)])),
           }} />
-        </details>
+        </Section>
       )}
     </section>
   );

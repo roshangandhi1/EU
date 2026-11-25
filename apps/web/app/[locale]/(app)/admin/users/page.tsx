@@ -5,7 +5,7 @@ import { currentPrincipal } from "@/lib/session";
 import { permissions } from "@/lib/registry";
 import { db } from "@/lib/http";
 import { assignableSites, listUsers, ROLE_SCOPES } from "@/lib/users";
-import { Notice, PageHeader } from "@/components/ui";
+import { ConfirmButton, Field, Fields, FormFooter, Notice, PageHeader, RowMenu, Section, SubmitButton } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import { usersAction } from "./actions";
 
@@ -37,8 +37,9 @@ export default async function UsersPage({ params, searchParams }: { params: Prom
     if (rule.kinds.includes("site")) for (const s of siteList.filter((x) => rule.siteKinds?.includes(x.kind))) opts.push({ value: `site:${s.id}`, label: s.name });
     return { role, opts };
   }).filter((g) => g.opts.length > 0);
+  const f = (k: string) => t(locale, `ui.form.${k}`);
   const RolePicker = () => (
-    <label>{u("users.role")} · {u("users.scope")}
+    <Field span={12} label={`${u("users.role")} · ${u("users.scope")}`}>
       <select name="roleScope" required defaultValue="">
         <option value="" disabled>—</option>
         {options.map((g) => (
@@ -47,7 +48,7 @@ export default async function UsersPage({ params, searchParams }: { params: Prom
           </optgroup>
         ))}
       </select>
-    </label>
+    </Field>
   );
 
   return (
@@ -74,7 +75,7 @@ export default async function UsersPage({ params, searchParams }: { params: Prom
                           <span className="pill info">{roleLabel(ra.role)}</span> <span className="small">{scopeLabel(ra)}</span>
                           <form action={usersAction} className="inline">
                             <input type="hidden" name="locale" value={locale} /><input type="hidden" name="op" value="removeRole" /><input type="hidden" name="assignmentId" value={ra.id} />
-                            <button className="linkish" type="submit" aria-label={`${u("users.remove")} ${roleLabel(ra.role)}`}>{u("users.remove")}</button>
+                            <ConfirmButton icon="x" label={`${u("users.remove")} ${roleLabel(ra.role)}`} confirm={f("removeConfirm")} yes={f("yesRemove")} no={f("keep")} />
                           </form>
                         </li>
                       ))}
@@ -82,26 +83,23 @@ export default async function UsersPage({ params, searchParams }: { params: Prom
                   </td>
                   <td>{r.active ? <span className="pill good">{u("users.active")}</span> : <span className="pill bad">{u("users.inactive")}</span>}</td>
                   <td>
-                    <details className="row-menu">
-                      <summary className="btn secondary sm">…</summary>
-                      <div className="row-menu-body">
-                        <form action={addRoleAction(locale, r.id)} className="form">
-                          <RolePicker />
-                          <button className="btn sm" type="submit"><Icon name="plus" size={14} />{u("users.addRole")}</button>
+                    <RowMenu label={f("more")} wide>
+                      <form action={addRoleAction(locale, r.id)}>
+                        <Fields><RolePicker /></Fields>
+                        <FormFooter><SubmitButton small icon="plus" pending={f("saving")}>{u("users.addRole")}</SubmitButton></FormFooter>
+                      </form>
+                      <form action={usersAction}>
+                        <input type="hidden" name="locale" value={locale} /><input type="hidden" name="op" value="reset" /><input type="hidden" name="userId" value={r.id} />
+                        <Fields><Field span={12} label={u("users.newPassword")} hint={u("users.passwordHint")}><input name="password" type="text" minLength={10} required autoComplete="off" /></Field></Fields>
+                        <FormFooter><SubmitButton small variant="secondary" pending={f("saving")}>{u("users.resetPassword")}</SubmitButton></FormFooter>
+                      </form>
+                      {r.id !== me.user.id && (
+                        <form action={usersAction}>
+                          <input type="hidden" name="locale" value={locale} /><input type="hidden" name="op" value={r.active ? "deactivate" : "reactivate"} /><input type="hidden" name="userId" value={r.id} />
+                          <SubmitButton small variant={r.active ? "danger" : "primary"}>{u(r.active ? "users.deactivate" : "users.reactivate")}</SubmitButton>
                         </form>
-                        <form action={usersAction} className="form">
-                          <input type="hidden" name="locale" value={locale} /><input type="hidden" name="op" value="reset" /><input type="hidden" name="userId" value={r.id} />
-                          <label>{u("users.newPassword")}<input name="password" type="text" minLength={10} required autoComplete="off" /></label>
-                          <button className="btn secondary sm" type="submit">{u("users.resetPassword")}</button>
-                        </form>
-                        {r.id !== me.user.id && (
-                          <form action={usersAction}>
-                            <input type="hidden" name="locale" value={locale} /><input type="hidden" name="op" value={r.active ? "deactivate" : "reactivate"} /><input type="hidden" name="userId" value={r.id} />
-                            <button className={r.active ? "btn danger sm" : "btn sm"} type="submit">{u(r.active ? "users.deactivate" : "users.reactivate")}</button>
-                          </form>
-                        )}
-                      </div>
-                    </details>
+                      )}
+                    </RowMenu>
                   </td>
                 </tr>
               ))}
@@ -109,17 +107,20 @@ export default async function UsersPage({ params, searchParams }: { params: Prom
           </table>
         </div>
 
-        <form action={createAction(locale)} className="card form">
-          <h2>{u("users.add")}</h2>
-          <label>{u("users.name")}<input name="name" required minLength={2} autoComplete="off" /></label>
-          <label>{u("users.email")}<input name="email" type="email" required autoComplete="off" /></label>
-          <label>{u("users.password")}<input name="password" type="text" minLength={10} required autoComplete="off" /><small className="muted">{u("users.passwordHint")}</small></label>
-          <RolePicker />
-          <label>{t(locale, "common.language")}
-            <select name="userLocale" defaultValue="fr"><option value="fr">Français</option><option value="en">English</option></select>
-          </label>
-          <button className="btn" type="submit"><Icon name="plus" size={16} />{u("users.create")}</button>
-        </form>
+        <Section icon="plus" title={u("users.add")} className="user-add">
+          <form action={createAction(locale)}>
+            <Fields>
+              <Field span={12} label={u("users.name")}><input name="name" required minLength={2} autoComplete="off" /></Field>
+              <Field span={12} label={u("users.email")}><input name="email" type="email" required autoComplete="off" placeholder="nom@gocongo.cd" /></Field>
+              <Field span={12} label={u("users.password")} hint={u("users.passwordHint")}><input name="password" type="text" minLength={10} required autoComplete="off" /></Field>
+              <RolePicker />
+              <Field span={12} label={t(locale, "common.language")}>
+                <select name="userLocale" defaultValue="fr"><option value="fr">Français</option><option value="en">English</option></select>
+              </Field>
+            </Fields>
+            <FormFooter><SubmitButton icon="plus" pending={f("saving")}>{u("users.create")}</SubmitButton></FormFooter>
+          </form>
+        </Section>
       </div>
     </div>
   );

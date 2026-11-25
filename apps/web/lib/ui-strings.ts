@@ -3,6 +3,11 @@ export const uiStrings = {
   en: {
     brandSub: "EU programme · Haut-Lomami, DRC",
     auth: { title: "Schools, water and forests across Haut-Lomami, in one record.", body: "The working system for the GoCongo programme funded by the European Union. Sign in with the account your administrator gave you." },
+    form: {
+      saving: "Saving…", cancel: "Cancel", close: "Close", remove: "Remove", removeConfirm: "Remove?", yesRemove: "Remove", keep: "Keep",
+      unsaved: "Unsaved changes", noChanges: "No unsaved changes", optional: "optional", update: "Update", search: "Search",
+      actions: "Actions", more: "More actions", invalidShort: "Check this value", required: "Required", mode: "Records counted", show: "Show", latLngHint: "Decimal degrees, e.g. -7.912", coordsError: "Must be inside the DRC.", nDays: "Days between", nMonths: "Months between", taskN: "Task {n}", tasks: "{n} tasks", savedAll: "All changes saved", keyHint: "Internal id; lower case and _", step1: "Choose the file", step2: "Check the plots", step3: "Describe and import", fileHint: "A .kmz or .kml exported from Google Earth or a GPS app. Nothing is saved until you import.", backTo: "Back to the plots", selected: "{n} of {total} selected", plotsFound: "Plots found", whatFollows: "The plots ticked above are created with these details.", none: "None",
+    },
     menu: "Menu",
     closeMenu: "Close menu",
     signOut: "Sign out",
@@ -125,6 +130,11 @@ export const uiStrings = {
   fr: {
     brandSub: "Programme UE · Haut-Lomami, RDC",
     auth: { title: "Écoles, eau et forêts du Haut-Lomami, dans un seul registre.", body: "Le système de travail du programme GoCongo financé par l'Union européenne. Connectez-vous avec le compte fourni par votre administrateur." },
+    form: {
+      saving: "Enregistrement…", cancel: "Annuler", close: "Fermer", remove: "Supprimer", removeConfirm: "Supprimer ?", yesRemove: "Supprimer", keep: "Garder",
+      unsaved: "Modifications non enregistrées", noChanges: "Aucune modification en attente", optional: "facultatif", update: "Mettre à jour", search: "Rechercher",
+      actions: "Actions", more: "Autres actions", invalidShort: "Vérifiez cette valeur", required: "Obligatoire", mode: "Enregistrements comptés", show: "Afficher", latLngHint: "Degrés décimaux, ex. -7,912", coordsError: "Doit être en RDC.", nDays: "Jours entre deux", nMonths: "Mois entre deux", taskN: "Tâche {n}", tasks: "{n} tâches", savedAll: "Toutes les modifications sont enregistrées", keyHint: "Identifiant interne ; minuscules et _", step1: "Choisir le fichier", step2: "Vérifier les parcelles", step3: "Décrire et importer", fileHint: "Un .kmz ou .kml exporté de Google Earth ou d'une application GPS. Rien n'est enregistré avant l'import.", backTo: "Retour aux parcelles", selected: "{n} sur {total} sélectionnées", plotsFound: "Parcelles trouvées", whatFollows: "Les parcelles cochées ci-dessus sont créées avec ces informations.", none: "Aucun",
+    },
     menu: "Menu",
     closeMenu: "Fermer le menu",
     signOut: "Déconnexion",

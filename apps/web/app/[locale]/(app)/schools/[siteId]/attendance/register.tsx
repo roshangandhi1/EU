@@ -1,0 +1,64 @@
+"use client";
+import { useState } from "react";
+import { Icon } from "@/components/icons";
+import { SubmitButton } from "@/components/ui";
+
+export interface RegisterPupil { id: string; name: string; number: string; absent: boolean; reason: string }
+
+/**
+ * The register as a list of pupils, each one tap from present to absent (as on the phone).
+ * Absent pupils get reason chips; the save bar keeps the count in view.
+ */
+export function Register({ pupils, reasons, hidden, l }: {
+  pupils: RegisterPupil[];
+  reasons: { key: string; label: string }[];
+  hidden: Record<string, string>;
+  l: { present: string; absent: string; reason: string; save: string; saving: string; count: string; allPresent: string; markAll: string; hint: string; unsaved: string };
+}) {
+  const [absent, setAbsent] = useState(() => new Map(pupils.filter((p) => p.absent).map((p) => [p.id, p.reason])));
+  const [dirty, setDirty] = useState(false);
+  const toggle = (id: string) => {
+    const next = new Map(absent);
+    if (next.has(id)) next.delete(id); else next.set(id, "unknown");
+    setAbsent(next); setDirty(true);
+  };
+  const setReason = (id: string, r: string) => { const next = new Map(absent); next.set(id, r); setAbsent(next); setDirty(true); };
+  const nAbsent = absent.size;
+  return (
+    <>
+      {Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+      <p className="muted small" style={{ margin: "0 20px 12px" }}>{l.hint}</p>
+      <ul className="register">
+        {pupils.map((p) => {
+          const isAbsent = absent.has(p.id);
+          return (
+            <li key={p.id} className={isAbsent ? "absent" : undefined}>
+              <button type="button" className="reg-toggle" aria-pressed={isAbsent} onClick={() => toggle(p.id)}>
+                <span className="reg-mark" aria-hidden><Icon name={isAbsent ? "x" : "check"} size={18} /></span>
+                <span className="reg-name"><strong>{p.name}</strong><span>{p.number}</span></span>
+                <span className="reg-state">{isAbsent ? l.absent : l.present}</span>
+              </button>
+              {isAbsent && (
+                <span className="reg-reasons" role="radiogroup" aria-label={`${l.reason}: ${p.name}`}>
+                  {reasons.map((r) => (
+                    <button key={r.key} type="button" role="radio" aria-checked={absent.get(p.id) === r.key} className="reason-chip" onClick={() => setReason(p.id, r.key)}>{r.label}</button>
+                  ))}
+                </span>
+              )}
+              {isAbsent && <><input type="hidden" name="absent" value={p.id} /><input type="hidden" name={`reason-${p.id}`} value={absent.get(p.id)} /></>}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="savebar" data-dirty={dirty}>
+        <span className="savebar-status"><span className="savebar-dot" aria-hidden />
+          <span>{nAbsent === 0 ? l.allPresent : l.count.replace("{absent}", String(nAbsent)).replace("{present}", String(pupils.length - nAbsent))}{dirty && <span className="muted-on-dark"> · {l.unsaved}</span>}</span>
+        </span>
+        <span className="savebar-actions">
+          {nAbsent > 0 && <button type="button" className="btn ghost" onClick={() => { setAbsent(new Map()); setDirty(true); }}>{l.markAll}</button>}
+          <SubmitButton variant="lime" icon="check" pending={l.saving}>{l.save}</SubmitButton>
+        </span>
+      </div>
+    </>
+  );
+}

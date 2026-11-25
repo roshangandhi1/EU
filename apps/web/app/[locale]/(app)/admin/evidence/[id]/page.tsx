@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Button, ButtonLink, Field, Form, Notice, PageHeader, Table } from "@/components/ui";
+import { ButtonLink, Field, Fields, Notice, PageHeader, RowMenu, SubmitButton, Table } from "@/components/ui";
 import { formatLocal, requireAction } from "@/lib/admin";
 import { getCutoff, lateRecords, summarise, type LateRecord } from "@/lib/evidence";
 import { db } from "@/lib/http";
@@ -58,27 +58,27 @@ export default async function CutoffPage({
           {
             key: "decision",
             header: tr("decision"),
+            shrink: true,
             render: (r) => (
-              <Form action={decideAction}>
-                <input type="hidden" name="locale" value={locale} />
-                <input type="hidden" name="cutoffId" value={cutoff.id} />
-                <input type="hidden" name="entity" value={r.entity} />
-                <input type="hidden" name="recordId" value={r.recordId} />
-                {r.decision && (
-                  <p>
-                    <strong>{r.decision === "admitted" ? tr("lateAdmitted") : tr("lateExcluded")}</strong>: {r.reason}
-                  </p>
-                )}
-                <Field label={tr("reason")}>
-                  <input name="reason" required minLength={3} />
-                </Field>
-                <Button small name="decision" value="admitted">
-                  {tr("admit")}
-                </Button>{" "}
-                <Button small variant="secondary" name="decision" value="excluded">
-                  {tr("exclude")}
-                </Button>
-              </Form>
+              <span className="decide">
+                {r.decision && <span className={r.decision === "admitted" ? "pill good" : "pill bad"} title={r.reason ?? ""}>{r.decision === "admitted" ? tr("lateAdmitted") : tr("lateExcluded")}</span>}
+                <RowMenu label={tr("decision")} icon="check">
+                  <form action={decideAction}>
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="cutoffId" value={cutoff.id} />
+                    <input type="hidden" name="entity" value={r.entity} />
+                    <input type="hidden" name="recordId" value={r.recordId} />
+                    {r.decision && <p style={{ margin: "0 0 8px" }}><strong>{r.decision === "admitted" ? tr("lateAdmitted") : tr("lateExcluded")}</strong>: {r.reason}</p>}
+                    <Fields>
+                      <Field span={12} label={tr("reason")}><input name="reason" required minLength={3} /></Field>
+                    </Fields>
+                    <div className="ffoot"><div className="ffoot-actions">
+                      <SubmitButton small variant="secondary" name="decision" value="excluded">{tr("exclude")}</SubmitButton>
+                      <SubmitButton small name="decision" value="admitted">{tr("admit")}</SubmitButton>
+                    </div></div>
+                  </form>
+                </RowMenu>
+              </span>
             ),
           },
         ]}

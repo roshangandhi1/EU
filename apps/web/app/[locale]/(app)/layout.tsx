@@ -1,3 +1,4 @@
+import { FormValidation } from "@/components/ui/validation";
 import { redirect } from "next/navigation";
 import { isLocale, t, type Locale } from "@eu/core/i18n";
 import { AppShell, type NavGroup } from "@/components/shell/app-shell";
@@ -68,6 +69,7 @@ export default async function AppLayout({ children, params }: { children: React.
           </div>
         )}
         {children}
+        <FormValidation />
       </main>
     </AppShell>
   );

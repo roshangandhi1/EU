@@ -35,30 +35,15 @@ export function ButtonLink({ href, children, variant = "primary", small }: { hre
   );
 }
 
-/** A grid of fields that submits to a server action. */
-export function Form({ action, children }: { action: (fd: FormData) => void | Promise<void>; children: ReactNode }) {
-  return (
-    <form action={action} className={s.form}>
-      {children}
-    </form>
-  );
-}
-
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <label className={s.field}>
-      {label}
-      {children}
-      {hint && <small>{hint}</small>}
-    </label>
-  );
-}
+export { Section, Fields, Field, ChoiceGroup, Chip, FormFooter, EmptyRow, Toolbar, type Span } from "./layout";
+export { SubmitButton, Adder, RowMenu, ConfirmButton } from "./form";
+import { EmptyRow } from "./layout";
 
 export function Check({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return (
-    <label className={s.check}>
+    <label className="check-row">
       <input type="checkbox" {...props} />
-      {label}
+      <span>{label}</span>
     </label>
   );
 }
@@ -67,18 +52,22 @@ export interface Column<R> {
   key: string;
   header: string;
   numeric?: boolean;
+  /** Fit the column to its content (action buttons). */
+  shrink?: boolean;
   render: (row: R) => ReactNode;
 }
 
-export function Table<R>({ columns, rows, rowKey, empty }: { columns: Column<R>[]; rows: readonly R[]; rowKey: (r: R) => string; empty: string }) {
-  if (rows.length === 0) return <p className={s.empty}>{empty}</p>;
+export function Table<R>({ columns, rows, rowKey, empty, emptyHint, emptyIcon, flush, rowClass }: {
+  columns: Column<R>[]; rows: readonly R[]; rowKey: (r: R) => string; empty: string; emptyHint?: ReactNode; emptyIcon?: string; flush?: boolean; rowClass?: (r: R) => string | undefined;
+}) {
+  if (rows.length === 0) return flush ? <EmptyRow icon={emptyIcon} title={empty}>{emptyHint}</EmptyRow> : <div className={s.empty}><EmptyRow icon={emptyIcon} title={empty}>{emptyHint}</EmptyRow></div>;
   return (
-    <div className={s.tableWrap}>
-      <table className={s.table}>
+    <div className={cx(s.tableWrap, flush && s.flush)}>
+      <table className={cx(s.table, s.stackable)}>
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} className={c.numeric ? s.num : undefined} scope="col">
+              <th key={c.key} className={cx(c.numeric && s.num, c.shrink && s.shrink)} scope="col">
                 {c.header}
               </th>
             ))}
@@ -86,9 +75,9 @@ export function Table<R>({ columns, rows, rowKey, empty }: { columns: Column<R>[
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={rowKey(r)}>
+            <tr key={rowKey(r)} className={rowClass?.(r)}>
               {columns.map((c) => (
-                <td key={c.key} className={c.numeric ? s.num : undefined}>
+                <td key={c.key} className={cx(c.numeric && s.num, c.shrink && s.shrink)} data-label={c.header || undefined}>
                   {c.render(r)}
                 </td>
               ))}
