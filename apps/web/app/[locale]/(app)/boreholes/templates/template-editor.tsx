@@ -2,13 +2,20 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/icons";
-import { Field, Fields, Notice } from "@/components/ui";
+import { ChoiceGroup, Chip, Field, Fields, Notice } from "@/components/ui";
+import { useLeaveGuard } from "@/components/ui/form";
+import { plural } from "@/lib/format";
 import type { MaintenanceTaskDef } from "./types";
+import { fillLabels, serverIssue, validateTasks, type TemplateIssue } from "./validate";
 
 type L = Record<"task" | "label_en" | "label_fr" | "frequency" | "proof" | "applies" | "fail_fault" | "add" | "remove" | "save" | "saved" | "builtin" | "all" | "pumps" | "unit" | "min" | "max" | "n" | "day" | "month" | "key" | "error"
-  | "nDays" | "nMonths" | "taskN" | "tasks" | "unsaved" | "savedAll" | "saving" | "keyHint" | "optional", string> & {
-  freq: Record<string, string>; proofs: Record<string, string>;
+  | "nDays" | "nMonths" | "taskN" | "tasks" | "tasks_one" | "unsaved" | "savedAll" | "saving" | "keyHint" | "optional"
+  | "remove_confirm" | "advanced" | "label_hint" | "pumps_all" | "pumps_some" | "pumps_hint" | "cancel" | "leave" | "network", string> & {
+  freq: Record<string, string>; proofs: Record<string, string>; months: string[]; errors: Record<TemplateIssue["code"], string>;
 };
+
+/** Pump sizes in use on the programme; any other size already in a template is offered too. */
+const PUMPS_KW = [0.75, 1.1, 2.2];
 
 const blank = (i: number): MaintenanceTaskDef => ({
   key: `task_${i}`, label: { en: "", fr: "" }, frequency: { kind: "every_n_months", n: 1, day: 1 }, appliesTo: { all: true }, proof: { kind: "tick" }, failOpensFault: true,
@@ -18,11 +25,13 @@ const blank = (i: number): MaintenanceTaskDef => ({
  * One maintenance template: each task is its own card on the shared field grid; the save bar
  * stays at the bottom of the screen and says whether there is anything to save.
  */
-export function TemplateEditor({ locale, template, versionLabel, labels }: {
+export function TemplateEditor({ locale, template, versionLabel, labels, pumps = [] }: {
   locale: string;
   template: { templateKey: string; name: { en: string; fr: string }; tasks: MaintenanceTaskDef[] };
   versionLabel: string;
   labels: L;
+  /** Pump ratings of the registered boreholes. */
+  pumps?: number[];
 }) {
   const router = useRouter();
   const [tasks, setTasksRaw] = useState<MaintenanceTaskDef[]>(template.tasks);
@@ -32,16 +41,28 @@ export function TemplateEditor({ locale, template, versionLabel, labels }: {
   const setTasks = (t: MaintenanceTaskDef[]) => { setTasksRaw(t); setDirty(true); setMsg(null); };
   const set = (i: number, patch: Partial<MaintenanceTaskDef>) => setTasks(tasks.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   const num = (v: string, d: number) => (v === "" || Number.isNaN(Number(v)) ? d : Number(v));
+  useLeaveGuard(dirty, labels.leave);
+  const kwOptions = [...new Set([...PUMPS_KW, ...pumps, ...template.tasks.flatMap((t) => ("all" in t.appliesTo ? [] : t.appliesTo.pumpRatingsKw ?? []))])].filter((n) => n > 0).sort((a, b) => a - b);
+  const kwLabel = (kw: number) => `${kw.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} kW`;
+  const issueText = (x: TemplateIssue) => labels.errors[x.code].replace("{n}", String(x.n ?? ""));
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    const issues = validateTasks(tasks);
+    if (issues.length) return setMsg({ ok: false, text: issues.map(issueText).join(" ") });
     setBusy(true); setMsg(null);
-    const res = await fetch("/api/boreholes/templates", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ templateKey: template.templateKey, name: template.name, tasks }) });
-    const body = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (res.ok && body.ok) { setMsg({ ok: true, text: labels.saved }); setDirty(false); router.refresh(); }
-    else setMsg({ ok: false, text: labels.error.replace("{reason}", (body.issues ?? [body.reason ?? body.error ?? res.status]).join("; ")) });
+    try {
+      const res = await fetch("/api/boreholes/templates", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ templateKey: template.templateKey, name: template.name, tasks: fillLabels(tasks) }) });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body.ok) { setMsg({ ok: true, text: labels.saved }); setDirty(false); router.refresh(); }
+      else if (Array.isArray(body.issues)) setMsg({ ok: false, text: [...new Set((body.issues as string[]).map((x) => issueText(serverIssue(x))))].join(" ") });
+      else setMsg({ ok: false, text: labels.error.replace("{reason}", String(body.reason ?? body.error ?? res.status)) });
+    } catch {
+      setMsg({ ok: false, text: labels.network });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -49,7 +70,7 @@ export function TemplateEditor({ locale, template, versionLabel, labels }: {
       <div className="tpl-head">
         <h2>{template.name[locale as "en" | "fr"] ?? template.name.en}</h2>
         <span className="pill">{versionLabel}</span>
-        <span className="muted small">{labels.tasks.replace("{n}", String(tasks.length))}</span>
+        <span className="muted small">{plural(locale, tasks.length, { one: labels.tasks_one, other: labels.tasks })}</span>
       </div>
       {msg && <Notice tone={msg.ok ? "success" : "error"}>{msg.text}</Notice>}
       <ol className="tpl-tasks">
@@ -58,13 +79,12 @@ export function TemplateEditor({ locale, template, versionLabel, labels }: {
             <header className="fsec-head">
               <span className="tpl-n" aria-hidden>{i + 1}</span>
               <div className="fsec-titles"><h3>{t.label[locale as "en" | "fr"] || t.label.en || labels.taskN.replace("{n}", String(i + 1))}</h3></div>
-              <button type="button" className="icon-btn danger-hover" aria-label={`${labels.remove}: ${t.label.en || i + 1}`} title={labels.remove} onClick={() => setTasks(tasks.filter((_, j) => j !== i))}><Icon name="trash" size={17} /></button>
+              <RemoveTask label={`${labels.remove}: ${t.label[locale as "en" | "fr"] || t.label.en || i + 1}`} labels={labels} onRemove={() => setTasks(tasks.filter((_, j) => j !== i))} />
             </header>
             <div className="fsec-body">
               <Fields>
-                <Field span={5} label={labels.label_en}><input value={t.label.en} onChange={(e) => set(i, { label: { ...t.label, en: e.target.value } })} required /></Field>
-                <Field span={5} label={labels.label_fr}><input value={t.label.fr} onChange={(e) => set(i, { label: { ...t.label, fr: e.target.value } })} required /></Field>
-                <Field span={2} label={labels.key} hint={labels.keyHint}><input value={t.key} pattern="[a-z0-9_]{2,40}" required onChange={(e) => set(i, { key: e.target.value })} spellCheck={false} /></Field>
+                <Field span={6} label={labels.label_fr} hint={i === 0 ? labels.label_hint : undefined}><input value={t.label.fr} lang="fr" onChange={(e) => set(i, { label: { ...t.label, fr: e.target.value } })} /></Field>
+                <Field span={6} label={labels.label_en}><input value={t.label.en} lang="en" onChange={(e) => set(i, { label: { ...t.label, en: e.target.value } })} /></Field>
 
                 <Field span={4} label={labels.frequency}>
                   <select value={t.frequency.kind} onChange={(e) => {
@@ -80,17 +100,27 @@ export function TemplateEditor({ locale, template, versionLabel, labels }: {
                   <Field span={2} label={labels.day}><input type="number" min={1} max={28} value={t.frequency.day} onChange={(e) => set(i, { frequency: { ...(t.frequency as { kind: "every_n_months"; n: number; day: number }), day: num(e.target.value, 1) } })} /></Field>
                 </>}
                 {t.frequency.kind === "yearly" && <>
-                  <Field span={2} label={labels.month}><input type="number" min={1} max={12} value={t.frequency.month} onChange={(e) => set(i, { frequency: { ...(t.frequency as { kind: "yearly"; month: number; day: number }), month: num(e.target.value, 1) } })} /></Field>
+                  <Field span={2} label={labels.month}>
+                    <select value={t.frequency.month} onChange={(e) => set(i, { frequency: { ...(t.frequency as { kind: "yearly"; month: number; day: number }), month: Number(e.target.value) } })}>
+                      {labels.months.map((m, k) => <option key={k} value={k + 1}>{m}</option>)}
+                    </select>
+                  </Field>
                   <Field span={2} label={labels.day}><input type="number" min={1} max={31} value={t.frequency.day} onChange={(e) => set(i, { frequency: { ...(t.frequency as { kind: "yearly"; month: number; day: number }), day: num(e.target.value, 1) } })} /></Field>
                 </>}
                 {t.frequency.kind === "each_visit" && <span className="fld s4" aria-hidden />}
-                <Field span={4} label={labels.pumps} optional={labels.optional}>
-                  <input placeholder={labels.all} value={"all" in t.appliesTo ? "" : (t.appliesTo.pumpRatingsKw ?? []).join(", ")}
-                    onChange={(e) => {
-                      const kw = e.target.value.split(",").map((s) => Number(s.trim())).filter((n) => n > 0);
-                      set(i, { appliesTo: kw.length ? { pumpRatingsKw: kw } : { all: true } });
-                    }} />
-                </Field>
+                <ChoiceGroup span={4} legend={labels.applies} hint={labels.pumps_hint}>
+                  <div className="chips">
+                    {kwOptions.map((kw) => {
+                      const on = !("all" in t.appliesTo) && (t.appliesTo.pumpRatingsKw ?? []).includes(kw);
+                      return <Chip key={kw} label={kwLabel(kw)} checked={on} onChange={() => {
+                        const cur = "all" in t.appliesTo ? [] : t.appliesTo.pumpRatingsKw ?? [];
+                        const next = on ? cur.filter((x) => x !== kw) : [...cur, kw].sort((a, b) => a - b);
+                        set(i, { appliesTo: next.length ? { pumpRatingsKw: next } : { all: true } });
+                      }} />;
+                    })}
+                  </div>
+                  <span className="muted small">{"all" in t.appliesTo ? labels.pumps_all : `${labels.pumps_some} ${(t.appliesTo.pumpRatingsKw ?? []).map(kwLabel).join(", ")}`}</span>
+                </ChoiceGroup>
 
                 <Field span={3} label={labels.proof}>
                   <select value={t.proof.kind} onChange={(e) => set(i, { proof: e.target.value === "reading" ? { kind: "reading", unit: "L/min" } : { kind: e.target.value as "tick" | "photo" } })}>
@@ -110,6 +140,12 @@ export function TemplateEditor({ locale, template, versionLabel, labels }: {
                   <span />
                 </div>
               </Fields>
+              <details className="tpl-adv">
+                <summary>{labels.advanced}</summary>
+                <Fields>
+                  <Field span={4} label={labels.key} hint={labels.keyHint}><input value={t.key} pattern="[a-z0-9_]{2,40}" required onChange={(e) => set(i, { key: e.target.value })} spellCheck={false} /></Field>
+                </Fields>
+              </details>
             </div>
           </li>
         ))}
@@ -122,5 +158,18 @@ export function TemplateEditor({ locale, template, versionLabel, labels }: {
         </span>
       </div>
     </form>
+  );
+}
+
+/** The bin button asks first; an unsaved template is only one click away from losing a task. */
+function RemoveTask({ label, labels, onRemove }: { label: string; labels: L; onRemove: () => void }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) return <button type="button" className="icon-btn danger-hover" aria-label={label} title={labels.remove} onClick={() => setAsking(true)}><Icon name="trash" size={17} /></button>;
+  return (
+    <span className="confirm-inline" role="alertdialog" aria-label={labels.remove_confirm}>
+      <span className="confirm-q">{labels.remove_confirm}</span>
+      <button type="button" className="btn sm ghost" onClick={() => setAsking(false)} autoFocus>{labels.cancel}</button>
+      <button type="button" className="btn sm danger" onClick={() => { setAsking(false); onRemove(); }}>{labels.remove}</button>
+    </span>
   );
 }

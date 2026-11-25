@@ -7,6 +7,6 @@ export function opsMapLabels(locale: Locale): OpsMapLabels {
     aria: u("title"),
     layers: { bamboo: u("bamboo"), miombo: u("miombo"), boreholes: u("boreholes"), schools: u("schools") },
     area: t(locale, "forestry.area_ha"), operational: u("operational"), notOperational: u("notOperational"), open: u("open"),
-    selectHint: u("selectHint"), pupils: u("pupils"), people: u("people"), village: u("village"), lastVisit: u("lastVisit"),
+    selectHint: u("selectHint"), pupils: u("pupils"), people: u("people"), village: u("village"), lastVisit: u("lastVisit"), close: t(locale, "ui.form.close"),
   };
 }

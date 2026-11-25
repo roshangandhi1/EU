@@ -13,8 +13,14 @@ import { PublishButton } from "@/components/publish-button";
 import { canPublish } from "@/lib/public-map";
 import { PageHeader, Section } from "@/components/ui";
 import { Icon } from "@/components/icons";
+import { NoAccess } from "@/components/no-access";
+import { boreholeExtras } from "@/lib/borehole-detail";
+import { publishLabels } from "@/lib/publish-labels";
+import { fmtEur, fmtNum } from "@/lib/format";
+import { titled } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
+export const generateMetadata = titled("boreholes.title");
 
 const LIFECYCLE = ["planned", "drilled", "equipped", "commissioned", "handed_over", "operational", "needs_repair", "non_functional"];
 const DUE = ["ok", "due_soon", "due", "overdue"];
@@ -28,15 +34,16 @@ export default async function BoreholesPage({ params, searchParams }: {
   if (!isLocale(locale)) notFound();
   const me = await currentPrincipal();
   if (!me) redirect(`/${locale}/login`);
-  if (!permissions.can(me.user, "boreholes.read", { stream: "boreholes" })) return <p className="error">{t(locale, "boreholes.forbidden")}</p>;
+  if (!permissions.can(me.user, "boreholes.read", { stream: "boreholes" })) return <NoAccess locale={locale} reason={t(locale, "boreholes.forbidden")} />;
   const sp = await searchParams;
   const today = todayDrc();
   const asAt = isIsoDate(sp.asAt) ? sp.asAt : today;
   const mode = sp.mode === "evidence" ? "evidence" : "captured";
-  const { rows, counted } = await loadBoreholes(db(), asAt, mode, today);
+  const [{ rows, counted }, extras] = await Promise.all([loadBoreholes(db(), asAt, mode, today), boreholeExtras()]);
   const canWrite = permissions.can(me.user, "boreholes.write", { stream: "boreholes" });
   const canTemplates = permissions.can(me.user, "boreholes.template.write", { stream: "boreholes" });
-  const fmt = (n: number) => n.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB");
+  const pub = canPublish(me.user, "boreholes") ? await publishLabels(locale, "boreholes") : null;
+  const errors = Object.fromEntries(["already_exists", "invalid_request", "forbidden", "network", "unknown", "coords"].map((k) => [k, t(locale, `boreholes.err.${k}`)]));
 
   return (
     <section className="module" data-stream="boreholes">
@@ -46,7 +53,7 @@ export default async function BoreholesPage({ params, searchParams }: {
         subtitle={t(locale, "ui.home.boreholes.sub")}
         actions={<>
           {canTemplates && <Link className="btn secondary" href={`/${locale}/boreholes/templates`}><Icon name="wrench" size={16} />{t(locale, "boreholes.template.edit")}</Link>}
-          {canPublish(me.user, "boreholes") && <PublishButton layer="boreholes" locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
+          {pub && <PublishButton layer="boreholes" locale={locale} labels={pub} />}
         </>}
       />
       <form className="filterbar" method="get">
@@ -63,15 +70,20 @@ export default async function BoreholesPage({ params, searchParams }: {
         <p className="ind-title">{t(locale, "boreholes.indicator.111")}</p>
         <dl>
           <div><dt>{t(locale, "boreholes.counted")}</dt><dd className="big">{counted}</dd></div>
-          <div><dt>{t(locale, "boreholes.value_eur")}</dt><dd>{fmt(counted * UNIT_EUR_111)}</dd></div>
-          <div><dt>{t(locale, "boreholes.target_2027")}</dt><dd>30</dd></div>
-          <div><dt>{t(locale, "boreholes.target_2030")}</dt><dd>140</dd></div>
+          <div><dt>{t(locale, "boreholes.value_eur")}</dt><dd>{fmtEur(counted * UNIT_EUR_111, locale)}</dd></div>
+          <div><dt>{t(locale, "boreholes.target_2027")}</dt><dd>{fmtNum(30, locale)}</dd></div>
+          <div><dt>{t(locale, "boreholes.target_2030")}</dt><dd>{fmtNum(140, locale)}</dd></div>
         </dl>
       </div>
       {rows.length === 0 ? <div className="empty-state"><div className="es-icon"><Icon name="drop" size={28} /></div><p>{t(locale, "boreholes.no_boreholes")}</p></div> : (
         <BoreholesView
-          rows={rows.map((r) => ({ siteId: r.siteId, code: r.code, village: r.village, lifecycle: r.lifecycle, lat: r.lat, lng: r.lng, lastVisitOn: r.lastVisitOn, worstDue: r.worstDue, openFaults: r.openFaults, counted: r.indicator.counted, fails: r.indicator.fails }))}
+          locale={locale}
+          rows={rows.map((r) => ({ siteId: r.siteId, code: r.code, village: r.village, lifecycle: r.lifecycle, lat: r.lat, lng: r.lng, lastVisitOn: r.lastVisitOn, worstDue: r.worstDue, openFaults: r.openFaults, counted: r.indicator.counted, fails: r.indicator.fails,
+            population: extras.get(r.siteId)?.population ?? null, flowLpm: extras.get(r.siteId)?.flowLpm ?? null }))}
           labels={{
+            people: t(locale, "boreholes.people"), flow: t(locale, "boreholes.flow"), lpm: t(locale, "boreholes.lpm"), search: t(locale, "boreholes.search"),
+            noMatch: t(locale, "boreholes.no_match"), shown: t(locale, "boreholes.shown"), open: t(locale, "boreholes.open"),
+            filters: { all: t(locale, "boreholes.filter.all"), overdue: t(locale, "boreholes.filter.overdue"), faults: t(locale, "boreholes.filter.faults"), not_counted: t(locale, "boreholes.filter.not_counted") },
             code: t(locale, "boreholes.code"), village: t(locale, "boreholes.village"), stage: t(locale, "boreholes.lifecycle_label"),
             lastVisit: t(locale, "boreholes.last_visit"), maintenance: t(locale, "boreholes.maintenance"), faults: t(locale, "boreholes.faults_open"),
             status: t(locale, "boreholes.status_111"), counts: t(locale, "boreholes.counts"), none: t(locale, "boreholes.none"),
@@ -86,7 +98,7 @@ export default async function BoreholesPage({ params, searchParams }: {
           <NewBoreholeForm locale={locale} labels={{
             code: t(locale, "boreholes.code"), village: t(locale, "boreholes.village"), lat: t(locale, "boreholes.lat"), lng: t(locale, "boreholes.lng"),
             pump: t(locale, "boreholes.pump_kw"), stage: t(locale, "boreholes.lifecycle_label"), create: t(locale, "boreholes.create"),
-            created: t(locale, "boreholes.created"), error: t(locale, "boreholes.error"), optional: t(locale, "ui.form.optional"), saving: t(locale, "ui.form.saving"),
+            created: t(locale, "boreholes.created_named"), open: t(locale, "boreholes.open"), errors, optional: t(locale, "ui.form.optional"), saving: t(locale, "ui.form.saving"),
             latLngHint: t(locale, "ui.form.latLngHint"), coordsError: t(locale, "ui.form.coordsError"),
             lifecycle: Object.fromEntries(LIFECYCLE.map((k) => [k, t(locale, `boreholes.lifecycle.${k}`)])),
           }} />

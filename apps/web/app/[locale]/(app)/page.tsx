@@ -8,8 +8,10 @@ import { todayDrc } from "@/lib/dates";
 import { Icon } from "@/components/icons";
 import { OpsMap } from "@/components/ops-map";
 import { opsMapLabels } from "./operations-map/labels";
+import { titled } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
+export const generateMetadata = titled("ui.nav.overview");
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: l } = await params;

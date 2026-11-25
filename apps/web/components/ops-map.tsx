@@ -4,11 +4,12 @@ import Link from "next/link";
 import type { FeatureCollection } from "geojson";
 import type { OverlayLayer, RasterLayer } from "@eu/maps";
 import { MapView } from "@eu/maps/web";
+import { fmtDate, fmtNum } from "@/lib/format";
 
 type LayerKey = "bamboo" | "miombo" | "boreholes" | "schools";
 export interface OpsMapLabels {
   aria: string; layers: Record<LayerKey, string>; area: string; operational: string; notOperational: string; open: string; selectHint: string;
-  pupils: string; people: string; village: string; lastVisit: string;
+  pupils: string; people: string; village: string; lastVisit: string; close: string;
 }
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
@@ -45,9 +46,10 @@ export function OpsMap({ locale, data, labels, height = 560, compact = false }: 
   );
   const feature = sel ? data[sel.layer].features.find((f) => f.properties?._id === sel.id) : null;
   const p = (feature?.properties ?? {}) as Record<string, string | number | boolean>;
-  const fmt = (n: number, d = 2) => n.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB", { maximumFractionDigits: d });
+  const fmt = (n: number, d = 2) => fmtNum(n, locale, d);
+  // "Open" goes to the item itself, not to its list.
   const href = (k: LayerKey) =>
-    k === "schools" ? `/${locale}/schools/${sel?.id}` : k === "boreholes" ? `/${locale}/boreholes` : `/${locale}/forestry/${k}`;
+    k === "schools" ? `/${locale}/schools/${sel?.id}` : k === "boreholes" ? `/${locale}/boreholes/${sel?.id}` : `/${locale}/forestry/${k}/${sel?.id}`;
 
   return (
     <div className={compact ? "opsmap compact" : "opsmap"}>
@@ -68,7 +70,7 @@ export function OpsMap({ locale, data, labels, height = 560, compact = false }: 
       </div>
       {feature && sel && (
         <div className="opsmap-card" role="dialog" aria-label={String(p.code ?? p.name ?? "")}>
-          <button type="button" className="close" onClick={() => setSel(null)} aria-label="×">×</button>
+          <button type="button" className="close" onClick={() => setSel(null)} aria-label={labels.close} title={labels.close}>×</button>
           <div className="muted small">{labels.layers[sel.layer]}</div>
           <div className="opsmap-title">{String(p.name ?? p.code ?? "")}</div>
           <dl>
@@ -77,7 +79,7 @@ export function OpsMap({ locale, data, labels, height = 560, compact = false }: 
             {p.species ? <><dt>&nbsp;</dt><dd><i>{String(p.species)}</i></dd></> : null}
             {sel.layer === "boreholes" && <><dt>{labels.operational}</dt><dd>{p.counted ? "✓" : labels.notOperational}</dd></>}
             {typeof p.people === "number" && p.people > 0 && <><dt>{labels.people}</dt><dd>{fmt(p.people, 0)}</dd></>}
-            {p.lastVisit ? <><dt>{labels.lastVisit}</dt><dd>{String(p.lastVisit)}</dd></> : null}
+            {p.lastVisit ? <><dt>{labels.lastVisit}</dt><dd>{fmtDate(String(p.lastVisit), locale)}</dd></> : null}
             {typeof p.pupils === "number" && <><dt>{labels.pupils}</dt><dd>{fmt(p.pupils, 0)}</dd></>}
           </dl>
           <Link className="btn secondary sm" href={href(sel.layer)}>{labels.open}</Link>
