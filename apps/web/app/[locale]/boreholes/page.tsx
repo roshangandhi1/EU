@@ -9,6 +9,8 @@ import { permissions } from "@/lib/registry";
 import { isIsoDate, todayDrc } from "@/lib/dates";
 import { BoreholesView } from "./boreholes-view";
 import { NewBoreholeForm } from "./new-borehole";
+import { PublishButton } from "@/components/publish-button";
+import { canPublish } from "@/lib/public-map";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,7 @@ export default async function BoreholesPage({ params, searchParams }: {
       <div className="module-head">
         <h1>{t(locale, "boreholes.title")}</h1>
         {canTemplates && <Link className="btn secondary" href={`/${locale}/boreholes/templates`}>{t(locale, "boreholes.template.edit")}</Link>}
+        {canPublish(me.user, "boreholes") && <PublishButton layer="boreholes" locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
       </div>
       <form className="asat" method="get">
         <label>{t(locale, "boreholes.as_at")}<input type="date" name="asAt" defaultValue={asAt} /></label>

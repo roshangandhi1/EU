@@ -52,3 +52,25 @@ describe("KMZ import commit", () => {
     expect(await db.select().from(sites)).toHaveLength(0);
   });
 });
+
+import { plots } from "../src/db/schema";
+import { buildPublicLayer, PUBLIC_PLOT_PROPS } from "../src/server";
+describe("public layer", () => {
+  it("includes only public plots with an approved boundary, rounded", async () => {
+    const preview = await previewKmzOrKml("kiabukwa.kml", KML);
+    const ok = preview.candidates.filter((c) => c.problems.length === 0);
+    await commitImport(ctx(lead), ok, { stream: "bamboo", village: "Kiabukwa", sourceName: "k.kml", status: "planted", species: ["bambusa_vulgaris"], approveFrom: "2026-10-11" });
+    expect((await buildPublicLayer(db, "bamboo", "2026-11-25")).data.features).toHaveLength(0);
+    const [first] = await db.select().from(plots).limit(1);
+    await db.update(plots).set({ publicVisible: true }).where((await import("drizzle-orm")).eq(plots.id, first.id));
+    const layer = await buildPublicLayer(db, "bamboo", "2026-11-25");
+    expect(layer.data.features).toHaveLength(1);
+    const f = layer.data.features[0]!;
+    expect(Object.keys(f.properties!).every((k) => PUBLIC_PLOT_PROPS.includes(k))).toBe(true);
+    const [x] = (f.geometry as any).coordinates[0][0][0];
+    expect(Math.round(x * 1e4)).toBeCloseTo(x * 1e4, 6);
+    expect(layer.summary.plots).toBe(1);
+    // Before the boundary was approved it is not public.
+    expect((await buildPublicLayer(db, "bamboo", "2026-10-01")).data.features).toHaveLength(0);
+  });
+});
