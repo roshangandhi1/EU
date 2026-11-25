@@ -1,6 +1,7 @@
 import { sites, type Db } from "@eu/db";
 import type { Mutation } from "@eu/sync";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import type * as mk from "./marks";
 import type * as m from "./model";
 import * as t from "./db/schema";
 
@@ -41,6 +42,10 @@ export interface SchoolData {
   receiptBooks: m.Synced<m.ReceiptBook>[];
   deviceTags: m.Synced<m.DeviceTag>[];
   payments: m.Synced<m.Payment>[];
+  /** Marks: this school's schemes and subjects plus the programme-wide ones (scope "schools"). */
+  gradingSchemes: m.Synced<mk.GradingScheme>[];
+  subjects: m.Synced<mk.Subject>[];
+  marks: m.Synced<mk.Mark>[];
 }
 
 export async function listSchoolSites(db: Db): Promise<SchoolSite[]> {
@@ -61,6 +66,8 @@ export async function loadSchool(db: Db, siteId: string): Promise<SchoolData | n
   if (!site) return null;
   const all = async <T>(table: any): Promise<m.Synced<T>[]> =>
     ((await d.select().from(table).where(eq(table.scopeId, siteId))) as Record<string, unknown>[]).map((r) => toRecord<T>(r));
+  const withProgramme = async <T>(table: any): Promise<m.Synced<T>[]> =>
+    ((await d.select().from(table).where(inArray(table.scopeId, [siteId, "schools"]))) as Record<string, unknown>[]).map((r) => toRecord<T>(r));
   const [school] = await all<m.School>(t.schoolSchools);
   return {
     site: { id: site.id, name: site.name, active: site.active },
@@ -78,6 +85,9 @@ export async function loadSchool(db: Db, siteId: string): Promise<SchoolData | n
     receiptBooks: await all(t.schoolReceiptBooks),
     deviceTags: await all(t.schoolDeviceTags),
     payments: await all(t.schoolPayments),
+    gradingSchemes: await withProgramme(t.schoolGradingSchemes),
+    subjects: await withProgramme(t.schoolSubjects),
+    marks: await all(t.schoolMarks),
   };
 }
 

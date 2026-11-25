@@ -1,6 +1,7 @@
 import { defineEntity } from "@eu/sync";
 import * as m from "./model";
 import * as t from "./db/schema";
+import * as mk from "./marks";
 
 const config = { read: "school.read", write: "school.configure", configure: "school.configure" } as const;
 
@@ -23,4 +24,8 @@ export const schoolsEntities = [
   defineEntity({ name: "school.absence", stream: "schools", table: t.schoolAbsences, schema: m.absence, policy: "lww_history", actions: { read: "school.read", write: "attendance.write" }, label: { en: "Absence", fr: "Absence" } }),
   defineEntity({ name: "school.register", stream: "schools", table: t.schoolRegisters, schema: m.registerTaken, policy: "lww_history", actions: { read: "school.read", write: "attendance.write" }, label: { en: "Register taken", fr: "Appel fait" } }),
   defineEntity({ name: "school.payment", stream: "schools", table: t.schoolPayments, schema: m.payment, policy: "append_only", actions: { read: "school.read", write: "payment.write", void: "payment.void" }, label: { en: "Payment", fr: "Paiement" } }),
+  // Marks (notes)
+  defineEntity({ name: "school.grading_scheme", stream: "schools", table: t.schoolGradingSchemes, schema: mk.gradingScheme, policy: "server_authoritative", actions: config, label: { en: "Grading scheme", fr: "Barème de notation" } }),
+  defineEntity({ name: "school.subject", stream: "schools", table: t.schoolSubjects, schema: mk.subject, policy: "server_authoritative", actions: config, label: { en: "Subject", fr: "Branche" } }),
+  defineEntity({ name: "school.mark", stream: "schools", table: t.schoolMarks, schema: mk.mark, policy: "lww_history", actions: { read: "school.read", write: "marks.write" }, label: { en: "Mark", fr: "Note" } }),
 ];

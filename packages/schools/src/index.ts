@@ -5,6 +5,7 @@ export * from "./enrolment";
 export * from "./attendance";
 export * from "./fees";
 export * from "./fee-schedule";
+export * from "./marks";
 export * from "./actions";
 export * from "./entities";
 export * as schoolsTables from "./db/schema";

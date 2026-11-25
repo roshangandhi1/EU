@@ -1,5 +1,5 @@
 import { syncColumns } from "@eu/db";
-import { date, index, integer, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, doublePrecision, index, integer, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
 
 /**
  * Schools tables. Every table is synced and spreads syncColumns(); scope_id is the
@@ -150,3 +150,52 @@ export const schoolDeviceTags = pgTable("school_device_tags", {
   phoneId: text("phone_id").notNull(),
   tag: text("tag").notNull(),
 });
+
+// ---- Marks (notes). Kept together at the end of the file to ease merges. ----
+
+/**
+ * Grading scheme: how the year is cut into periods and exams, the pass mark and the mention
+ * bands. scope_id is a school's site id, or "schools" for the programme-wide default; with
+ * neither, the built-in DRC primary scheme applies (see ../marks.ts).
+ */
+export const schoolGradingSchemes = pgTable("school_grading_schemes", {
+  ...syncColumns(),
+  name: text("name").notNull(),
+  /** One entry per trimester: how many periods, and whether it ends with an exam. */
+  terms: jsonb("terms").$type<{ periods: number; exam: boolean }[]>().notNull(),
+  /** Exam maximum = period maximum × this factor. */
+  examFactor: doublePrecision("exam_factor").notNull().default(2),
+  passPercent: integer("pass_percent").notNull().default(50),
+  mentions: jsonb("mentions").$type<{ minPercent: number; en: string; fr: string }[]>().notNull().default([]),
+});
+
+/** Subjects ("branches") per level, with the maximum points for one period. */
+export const schoolSubjects = pgTable(
+  "school_subjects",
+  {
+    ...syncColumns(),
+    level: integer("level").notNull(),
+    /** Stable key that marks refer to, so renaming a subject keeps its marks. */
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    maxPoints: integer("max_points").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [index("school_subjects_scope_level").on(t.scopeId, t.level)],
+);
+
+/** One pupil's mark in one subject for one period or exam (P1..P6, Ex1..Ex3). */
+export const schoolMarks = pgTable(
+  "school_marks",
+  {
+    ...syncColumns(),
+    studentId: uuid("student_id").notNull(),
+    classId: uuid("class_id").notNull(),
+    subject: text("subject").notNull(),
+    period: text("period").notNull(),
+    /** Points, in steps of 0.5; null when the pupil was absent. */
+    score: doublePrecision("score"),
+    absent: boolean("absent").notNull().default(false),
+  },
+  (t) => [index("school_marks_class_period").on(t.classId, t.period)],
+);

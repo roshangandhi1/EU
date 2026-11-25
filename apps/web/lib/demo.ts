@@ -13,7 +13,7 @@ import { boreholes as boreholeTable } from "@eu/boreholes/db/schema";
 import { defaultTemplate } from "@eu/boreholes";
 import { commitImport } from "@eu/forestry/server";
 import { areaHa, type ImportCandidate } from "@eu/forestry";
-import { createSchoolSite } from "@eu/schools";
+import { DRC_SCHEME, createSchoolSite, defaultSubjects, maxFor, periodsOf } from "@eu/schools";
 import { handlePush, type SyncContext } from "@eu/sync/server";
 import type { Mutation } from "@eu/sync";
 import { and, eq, inArray, isNull, like } from "drizzle-orm";
@@ -142,6 +142,7 @@ export async function loadDemo(ctx: SyncContext): Promise<DemoResult> {
       pupilRows.filter((_, pi) => (pi + di) % 9 === 0).forEach((pr, k) => attendance.push(ins("school.absence", schoolId, { studentId: pr.studentId, classId: pr.classId, date: day, reason: reasons[(di + k) % reasons.length] })));
     });
     await push(attendance);
+    await push(demoMarks(schoolId, pupilRows, classIds, nowIso));
     // Fees: most pupils have paid part or all of the term fee, with paper receipt numbers.
     const bookFirst = 1001;
     const paid: Mutation[] = [ins("school.receipt_book", schoolId, { firstNumber: bookFirst, lastNumber: bookFirst + 99, assignedTo: ctx.user.id })];
@@ -224,6 +225,32 @@ export async function loadDemo(ctx: SyncContext): Promise<DemoResult> {
     return { ok: false, reason: e instanceof Error ? e.message : String(e), created };
   }
   return { ok: true, created };
+}
+
+/**
+ * Marks for the demo school: P1 for every pupil, P2 for most pupils of years 1-3, with one absence, on the default
+ * DRC subjects, so the marks and results screens are not empty. Scores are fixed (no randomness)
+ * so screenshots and tests are stable. Removal voids them with the rest of the school's records.
+ */
+export function demoMarks(schoolId: string, pupils: { studentId: string; classId: string }[], classIds: string[], nowIso: string): Mutation[] {
+  const [p1, p2] = periodsOf(DRC_SCHEME);
+  const out: Mutation[] = [];
+  pupils.forEach((pr, pi) => {
+    const level = classIds.indexOf(pr.classId) + 1;
+    defaultSubjects(level).forEach((sub, si) => {
+      for (const [k, period] of [p1!, p2!].entries()) {
+        if (k === 1 && (level > 3 || pi % 4 === 3)) continue; // P2 typed so far for years 1-3 only, a few pupils still to do
+        const max = maxFor(sub, period, DRC_SCHEME);
+        const absent = k === 1 && pi === 0 && si === 0;
+        const ratio = 0.35 + (((pi * 7 + si * 3 + k * 5) % 13) / 13) * 0.6;
+        out.push({
+          mutationId: crypto.randomUUID(), entity: "school.mark", recordId: crypto.randomUUID(), op: "insert", scopeId: schoolId, deviceTime: nowIso,
+          fields: { studentId: pr.studentId, classId: pr.classId, subject: sub.code, period: period.key, score: absent ? null : Math.round(max * ratio * 2) / 2, absent },
+        });
+      }
+    });
+  });
+  return out;
 }
 
 /** Voids every record held under a demo site and marks the sites inactive. */

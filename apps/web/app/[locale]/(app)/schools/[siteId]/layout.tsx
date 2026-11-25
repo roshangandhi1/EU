@@ -12,6 +12,7 @@ export default async function SchoolLayout({ children, params }: { children: Rea
     { href: base, label: tr("nav.overview") },
     { href: `${base}/students`, label: tr("nav.students") },
     { href: `${base}/attendance`, label: tr("nav.attendance") },
+    { href: `${base}/marks`, label: tr("marks.tab") },
     { href: `${base}/fees`, label: tr("nav.fees") },
     { href: `${base}/reports`, label: tr("nav.reports") },
     ...(can(me, "school.configure", p.siteId) ? [{ href: `${base}/setup`, label: tr("nav.setup") }] : []),

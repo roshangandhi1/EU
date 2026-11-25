@@ -36,15 +36,19 @@ describe("demo data", () => {
     expect(bamboo.hectaresCounted).toBeGreaterThan(0);
     expect((await (db as any).select().from(schoolsTables.schoolRegisters)).length).toBeGreaterThan(0);
     expect((await (db as any).select().from(schoolsTables.schoolPayments)).length).toBeGreaterThan(0);
+    const marks = await (db as any).select().from(schoolsTables.schoolMarks);
+    expect(marks.length).toBeGreaterThan(100);
+    expect(new Set(marks.map((m: any) => m.period))).toEqual(new Set(["P1", "P2"]));
 
     const rm = await removeDemo(ctx);
     expect(rm.ok && rm.voided).toBeGreaterThan(40);
     expect((await demoStatus(db)).loaded).toBe(false);
     expect((await (db as any).select().from(sites)).every((s: any) => !s.active)).toBe(true);
+    expect((await (db as any).select().from(schoolsTables.schoolMarks)).every((m: any) => m.voidedAt)).toBe(true);
 
     expect(await loadDemo(ctx)).toMatchObject({ ok: true });
     expect((await demoStatus(db)).sites.some((s) => s.name.endsWith("-2"))).toBe(true);
-  });
+  }, 30_000);
 
   it("is refused to anyone who cannot manage sites", async () => {
     const viewer = { ...ctx, user: { id: ctx.user.id, assignments: [{ role: "viewer" as const, scope: { type: "global" as const } }] } };
