@@ -2,12 +2,23 @@ import { activeOn, formatCdf, live, placesAsAt } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
-import { Adder, ChoiceGroup, Chip, ConfirmButton, EmptyRow, Field, Fields, FormFooter, Notice, Section, SubmitButton, Table } from "@/components/ui";
+import { ChoiceGroup, Chip, ConfirmButton, EmptyRow, Field, Fields, Notice, Section, Table } from "@/components/ui";
 import { can, schoolDevices, schoolFor, schoolStaff, signedIn, today, tr as trFor, userNames } from "@/lib/schools";
+import { sites } from "@eu/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/http";
+
+/** The platform site row: SchoolData has the name but not the map position. */
+async function siteRow(id: string): Promise<{ lat: number | null; lng: number | null }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [r] = await (db() as any).select({ lat: sites.lat, lng: sites.lng }).from(sites).where(eq(sites.id, id));
+  return r ?? { lat: null, lng: null };
+}
 import { Flash, type SP } from "../../flash";
-import { byLevel, classLabel, studentName } from "../labels";
+import { byLevel, classLabel, levelLabel, studentName } from "../labels";
 import { fmtDate } from "../format";
 import * as A from "./actions";
+import { SetupForm } from "./setup-form";
 
 /**
  * School setup: one section per kind of record, each with its list and an "Add …" form in place.
@@ -21,6 +32,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
   const f = (k: string) => t(locale, `ui.form.${k}`);
   if (!can(me, "school.configure", p.siteId)) return <Notice tone="warning">{tr("setup.configureOnly")}</Notice>;
   const d = await schoolFor(me, p.siteId);
+  const site = await siteRow(p.siteId);
   const staff = await schoolStaff(p.siteId);
   const phones = await schoolDevices(p.siteId);
   const tags = live(d.deviceTags);
@@ -33,7 +45,6 @@ export default async function Setup({ params, searchParams }: { params: Promise<
   const optional = tr("common.optional");
   const saving = f("saving");
   const dt = (iso: string | null | undefined) => fmtDate(iso, locale);
-  const done = typeof sp.ok === "string" ? `${sp.s}-${sp.ok}-${sp.n}` : undefined;
 
   const hidden = (section: string) => (
     <>
@@ -50,14 +61,10 @@ export default async function Setup({ params, searchParams }: { params: Promise<
       <ConfirmButton label={f("remove")} confirm={f("removeConfirm")} yes={f("yesRemove")} no={f("keep")} />
     </form>
   );
-  const add = (section: string, label: string, empty: boolean, action: (fd: FormData) => Promise<void>, fields: React.ReactNode) => (
-    <Adder label={label} cancel={f("cancel")} defaultOpen={empty} resetKey={done}>
-      <form action={action}>
-        {hidden(section)}
-        <Fields>{fields}</Fields>
-        <FormFooter><SubmitButton icon="plus" pending={saving}>{label}</SubmitButton></FormFooter>
-      </form>
-    </Adder>
+  const add = (section: string, label: string, empty: boolean, action: (prev: A.SetupState, fd: FormData) => Promise<A.SetupState>, fields: React.ReactNode) => (
+    <SetupForm action={action} hidden={{ locale, siteId: p.siteId, section }} submit={label} busy={saving} adder={{ label, cancel: f("cancel"), defaultOpen: empty }}>
+      <Fields>{fields}</Fields>
+    </SetupForm>
   );
 
   const years = live(d.years).sort((a, b) => (a.startsOn < b.startsOn ? 1 : -1));
@@ -99,18 +106,21 @@ export default async function Setup({ params, searchParams }: { params: Promise<
       <div>
         <Flash sp={sp} tr={tr} />
 
-        <Section id="school" icon="school" title={tr("setup.school")} description={tr("ux.schoolDesc")}>
-          <Flash sp={sp} tr={tr} section="school" />
-          <form action={A.saveSchool}>
-            {hidden("school")}
+        <Section id="school" icon="school" title={tr("setup.school")} description={tr("info.desc")}>
+          <SetupForm action={A.saveSchool} hidden={{ locale, siteId: p.siteId, section: "school" }} submit={tr("common.save")} busy={saving} icon="check">
             <Fields>
-              <ChoiceGroup legend={tr("setup.shiftsRunning")} hint={tr("ux.shiftsHint")}>
+              <Field span={6} label={tr("common.name")}><input name="name" required minLength={3} maxLength={120} defaultValue={d.site.name} /></Field>
+              <Field span={6} label={tr("list.code")} hint={tr("info.codeHint")} error={tr("ux.codeError")}>
+                <input name="code" required pattern="[A-Za-z]{2,12}" defaultValue={d.school?.code} style={{ textTransform: "uppercase" }} />
+              </Field>
+              <Field span={3} label={tr("info.lat")} optional={optional} hint={tr("info.latHint")}><input name="lat" inputMode="decimal" autoComplete="off" placeholder="-8,712" defaultValue={site.lat != null ? String(site.lat) : ""} /></Field>
+              <Field span={3} label={tr("info.lng")} optional={optional} hint={tr("info.lngHint")}><input name="lng" inputMode="decimal" autoComplete="off" placeholder="24,790" defaultValue={site.lng != null ? String(site.lng) : ""} /></Field>
+              <ChoiceGroup span={6} legend={tr("setup.shiftsRunning")} hint={tr("ux.schoolDesc")}>
                 <Chip name="shiftsRunning" value="morning" label={tr("shift.morning")} defaultChecked={d.school?.shiftsRunning.includes("morning")} />
                 <Chip name="shiftsRunning" value="afternoon" label={tr("shift.afternoon")} defaultChecked={d.school?.shiftsRunning.includes("afternoon")} />
               </ChoiceGroup>
             </Fields>
-            <FormFooter><SubmitButton pending={saving}>{tr("common.save")}</SubmitButton></FormFooter>
-          </form>
+          </SetupForm>
         </Section>
 
         <Section id="years" flush icon="calendar" title={tr("setup.year")} description={tr("ux.yearsDesc")} count={years.length}>
@@ -159,7 +169,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
             { key: "x", header: "", shrink: true, render: (r) => remove("rooms", "school.classroom", r.id) },
           ]} />
           {add("rooms", tr("ux.addRoom"), rooms.length === 0, A.addClassroom, <>
-            <Field span={4} label={tr("capacity.room")}><input name="name" required placeholder="Salle 1" /></Field>
+            <Field span={4} label={tr("capacity.room")}><input name="name" required placeholder={tr("ph.room")} /></Field>
             <Field span={4} label={tr("capacity.seatsPerShift")} error={tr("ux.seatsError")}><input name="seatsPerShift" type="number" min={1} step={1} required inputMode="numeric" /></Field>
             <Field span={4} label={tr("capacity.basis")}><select name="basis"><option value="new">{tr("capacity.new")}</option><option value="baseline">{tr("capacity.baseline")}</option></select></Field>
             <Field span={4} label={tr("capacity.commissionedOn")}><input name="commissionedOn" type="date" required /></Field>
@@ -178,8 +188,8 @@ export default async function Setup({ params, searchParams }: { params: Promise<
           ]} />
           {years.length === 0 ? needYear : add("classes", tr("ux.addClass"), classes.length === 0, A.addClass, <>
             <Field span={4} label={tr("setup.yearLabel")}><select name="academicYearId" required>{yearOpts}</select></Field>
-            <Field span={4} label={tr("common.level")}><select name="level">{[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{tr("levelName", { n })}</option>)}</select></Field>
-            <Field span={4} label={tr("setup.section")} hint={tr("ux.sectionHint")}><input name="section" defaultValue="A" maxLength={4} style={{ textTransform: "uppercase" }} /></Field>
+            <Field span={4} label={tr("common.level")}><select name="level">{[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{levelLabel(n, tr)}</option>)}</select></Field>
+            <Field span={4} label={tr("setup.section")} hint={tr("ux.sectionHint")}><input name="section" defaultValue="A" maxLength={2} pattern="[A-Za-z]{1,2}" style={{ textTransform: "uppercase" }} /></Field>
             <Field span={4} label={tr("common.shift")}><select name="shift"><option value="morning">{tr("shift.morning")}</option><option value="afternoon">{tr("shift.afternoon")}</option></select></Field>
             <Field span={4} label={tr("setup.classroom")} optional={optional}><select name="classroomId"><option value="">—</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></Field>
           </>)}
@@ -192,12 +202,13 @@ export default async function Setup({ params, searchParams }: { params: Promise<
             { key: "n", header: tr("setup.feeName"), render: (r) => <strong>{r.name}</strong> },
             { key: "t", header: tr("setup.termNumber"), render: (r) => { const tm = terms.find((x) => x.id === r.termId); return tm ? tr("feeGrid.term", { n: tm.number }) : tr("ux.allYear"); } },
             { key: "l", header: tr("setup.levels"), render: (r) => r.levels.join(", ") },
+            { key: "y", header: tr("setup.yearLabel"), render: (r) => years.find((y) => y.id === r.academicYearId)?.label ?? "" },
             { key: "a", header: tr("fees.amount"), numeric: true, render: (r) => formatCdf(r.amount, locale) },
             { key: "d", header: tr("setup.dueOn"), render: (r) => dt(r.dueOn) },
             { key: "x", header: "", shrink: true, render: (r) => remove("fees", "school.fee_item", r.id) },
           ]} />
           {years.length === 0 ? needYear : add("fees", tr("ux.addFee"), false, A.addFeeItem, <>
-            <Field span={6} label={tr("setup.feeName")}><input name="name" required placeholder="Minerval" /></Field>
+            <Field span={6} label={tr("setup.feeName")}><input name="name" required placeholder={tr("ph.fee")} /></Field>
             <Field span={3} label={tr("setup.yearLabel")}><select name="academicYearId" required>{yearOpts}</select></Field>
             <Field span={3} label={tr("setup.termNumber")} optional={optional}><select name="termId"><option value="">{tr("ux.allYear")}</option>{terms.map((tm) => <option key={tm.id} value={tm.id}>{tr("feeGrid.term", { n: tm.number })} · {years.find((y) => y.id === tm.academicYearId)?.label}</option>)}</select></Field>
             <Field span={4} label={tr("fees.amount")} hint={tr("ux.amountHint")} error={tr("ux.amountError")}><input name="amount" inputMode="numeric" pattern="[0-9 ]+" required className="num-input" /></Field>
@@ -250,7 +261,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
             <Field span={6} label={tr("setup.feeName")}><select name="feeItemId"><option value="">{tr("feeGrid.allFees")}</option>{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></Field>
             <Field span={4} label={tr("setup.kind")}><select name="kind">{(["full", "percent", "fixed"] as const).map((k) => <option key={k} value={k}>{tr(`setup.kinds.${k}`)}</option>)}</select></Field>
             <Field span={4} label={tr("setup.value")} hint={tr("ux.valueHint")}><input name="value" type="number" min={0} step={1} defaultValue={0} className="num-input" /></Field>
-            <Field span={4} label={tr("setup.reason")}><input name="reason" required placeholder="Orphelin" /></Field>
+            <Field span={4} label={tr("setup.reason")}><input name="reason" required placeholder={tr("ph.reason")} /></Field>
           </>)}
         </Section>
       </div>

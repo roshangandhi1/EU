@@ -2,7 +2,7 @@
 import { absenceReason, activeOn, insertMutation, planRegister, updateMutation, voidMutation } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
 import { revalidatePath } from "next/cache";
-import { back, firstRejection, newId, push, schoolFor, signedIn, str } from "@/lib/schools";
+import { back, firstRejection, newId, push, schoolFor, signedIn, str, today } from "@/lib/schools";
 
 /** Saves a register: marks the register taken, adds new absences and voids absences that were unticked. */
 export async function saveRegister(fd: FormData) {
@@ -12,7 +12,8 @@ export async function saveRegister(fd: FormData) {
   const date = str(fd, "date");
   const path = `/${locale}/schools/${siteId}/attendance?class=${classId}&date=${date}`;
   const d = await schoolFor(me, siteId);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !d.classes.some((c) => c.id === classId)) back(path, { error: "invalid" });
+  // No registers for days that have not happened yet, or for a class removed in Setup.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today() || !d.classes.some((c) => c.id === classId && !c.voidedAt)) back(path, { error: "invalid:date" });
 
   const roster = new Set(activeOn(d.enrolments, date).filter((e) => e.classId === classId).map((e) => e.studentId));
   const absent = new Map(
