@@ -43,6 +43,13 @@
       "when": 1795605445210,
       "tag": "0005_public_map",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795605887926,
+      "tag": "0006_evidence_cutoffs",
+      "breakpoints": true
     }
   ]
 }
