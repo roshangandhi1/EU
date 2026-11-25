@@ -39,6 +39,7 @@ export interface SchoolData {
   feeItems: m.Synced<m.FeeItem>[];
   exemptions: m.Synced<m.Exemption>[];
   receiptBooks: m.Synced<m.ReceiptBook>[];
+  deviceTags: m.Synced<m.DeviceTag>[];
   payments: m.Synced<m.Payment>[];
 }
 
@@ -75,6 +76,7 @@ export async function loadSchool(db: Db, siteId: string): Promise<SchoolData | n
     feeItems: await all(t.schoolFeeItems),
     exemptions: await all(t.schoolExemptions),
     receiptBooks: await all(t.schoolReceiptBooks),
+    deviceTags: await all(t.schoolDeviceTags),
     payments: await all(t.schoolPayments),
   };
 }

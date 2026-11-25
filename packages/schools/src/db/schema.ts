@@ -143,3 +143,10 @@ export const schoolPayments = pgTable(
   },
   (t) => [index("school_payments_student").on(t.studentId), index("school_payments_receipt").on(t.scopeId, t.receiptNumber)],
 );
+
+/** Per-school letter for each phone's offline student numbers. */
+export const schoolDeviceTags = pgTable("school_device_tags", {
+  ...syncColumns(),
+  phoneId: text("phone_id").notNull(),
+  tag: text("tag").notNull(),
+});

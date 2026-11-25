@@ -12,6 +12,7 @@ config.resolver.nodeModulesPaths = [path.resolve(projectRoot, "node_modules")];
 config.resolver.extraNodeModules = {
   "@eu/core": path.join(packagesRoot, "core"),
   "@eu/sync": path.join(packagesRoot, "sync"),
+  "@eu/schools": path.join(packagesRoot, "schools"),
 };
 config.resolver.disableHierarchicalLookup = true;
 config.resolver.unstable_enablePackageExports = true;
