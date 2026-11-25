@@ -10,7 +10,7 @@
  *   before but received after are returned in `lateSynced` and join only after admin review.
  */
 import type { MultiPolygon } from "geojson";
-import type { PlantingLine, SamplePlot } from "./db/schema";
+import type { PlantingLine, SamplePlot } from "./types";
 import { estimateStocking, type Estimate } from "./sampling";
 
 export type CountingMode = "captured" | "evidence";

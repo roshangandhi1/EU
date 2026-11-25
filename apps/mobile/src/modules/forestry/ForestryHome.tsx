@@ -7,6 +7,7 @@ import type { Session } from "../../session";
 import { Body, Button, Title } from "../../ui";
 import { getFix } from "../location";
 import { loadPlots, type PlotLite } from "./data";
+import { MonitoringVisit } from "./MonitoringVisit";
 import { PlantingForm } from "./PlantingForm";
 
 /** A stream's plots on the phone: find the one you are standing in, then record a planting. */
@@ -16,6 +17,7 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [open, setOpen] = useState<PlotLite | null>(null);
+  const [mode, setMode] = useState<"planting" | "visit" | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
   const reload = useCallback(() => {
@@ -43,18 +45,26 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
     setGpsNote(t("forestry.m.nearest", { code: nearest.p.code, m: Math.round(nearest.m) }));
   };
 
+  const done = (saved: boolean, msg: string) => {
+    setOpen(null);
+    setMode(null);
+    if (saved) setFlash(msg);
+    reload();
+  };
+  if (open && mode === "planting") return <PlantingForm session={session} stream={stream} plot={open} onDone={(ok) => done(ok, t("forestry.m.saved"))} />;
+  if (open && mode === "visit") return <MonitoringVisit session={session} stream={stream} plot={open} onDone={(ok) => done(ok, t("forestry.m.visit_saved"))} />;
   if (open) {
     return (
-      <PlantingForm
-        session={session}
-        stream={stream}
-        plot={open}
-        onDone={(saved) => {
-          setOpen(null);
-          if (saved) setFlash(t("forestry.m.saved"));
-          reload();
-        }}
-      />
+      <ScrollView contentContainerStyle={s.wrap}>
+        <Title>
+          {t("forestry.plot")} {open.code}
+        </Title>
+        <Body tone="muted">{open.village}</Body>
+        <Body>{t("forestry.m.what_now")}</Body>
+        <Button label={t("forestry.planting.new")} onPress={() => setMode("planting")} />
+        <Button label={t("forestry.visit.new")} onPress={() => setMode("visit")} />
+        <Button kind="secondary" label={t("forestry.m.back")} onPress={() => setOpen(null)} />
+      </ScrollView>
     );
   }
 

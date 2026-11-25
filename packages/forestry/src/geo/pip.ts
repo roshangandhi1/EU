@@ -39,3 +39,16 @@ export function distanceToGeomM(lat: number, lng: number, geom: MultiPolygon): n
   for (const poly of geom.coordinates) for (const ring of poly) for (const [x, y] of ring) best = Math.min(best, distanceM(lat, lng, y!, x!));
   return best;
 }
+
+/** Initial bearing from point 1 to point 2, in degrees clockwise from north. */
+export function bearingDeg(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const r = Math.PI / 180;
+  const y = Math.sin((lng2 - lng1) * r) * Math.cos(lat2 * r);
+  const x = Math.cos(lat1 * r) * Math.sin(lat2 * r) - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos((lng2 - lng1) * r);
+  return ((Math.atan2(y, x) / r) + 360) % 360;
+}
+
+/** Eight-point compass label for a bearing: "N", "NE", ... */
+export function compass(deg: number): "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW" {
+  return (["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const)[Math.round(deg / 45) % 8]!;
+}

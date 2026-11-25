@@ -6,11 +6,20 @@
  * dead plants in each circle. We estimate plants/ha (mean of per-circle densities) and survival %
  * (ratio estimator), each with a 95% confidence interval.
  */
-import bbox from "@turf/bbox";
-import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
-import type { MultiPolygon } from "geojson";
-import type { SamplePlot } from "./db/schema";
+import type { SamplePlot } from "./types";
 import { areaHa } from "./geo/area";
+import { pointInMultiPolygon } from "./geo/pip";
+
+/** Structural so the phone needs no @types/geojson. */
+type MultiPolygon = { type: "MultiPolygon"; coordinates: number[][][][] };
+
+function bbox(g: MultiPolygon): [number, number, number, number] {
+  let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const p of g.coordinates) for (const r of p) for (const [x, y] of r) {
+    minX = Math.min(minX, x!); maxX = Math.max(maxX, x!); minY = Math.min(minY, y!); maxY = Math.max(maxY, y!);
+  }
+  return [minX, minY, maxX, maxY];
+}
 
 export function mulberry32(seed: number) {
   let a = seed >>> 0;
@@ -45,14 +54,14 @@ export function placeSamplePoints(
 ): { pointIndex: number; lat: number; lng: number }[] {
   const n = sampleCount(areaHa(boundary), s);
   const rand = mulberry32(seed);
-  const [minX, minY, maxX, maxY] = bbox(boundary) as [number, number, number, number];
+  const [minX, minY, maxX, maxY] = bbox(boundary);
   const out: { pointIndex: number; lat: number; lng: number }[] = [];
   let tries = 0;
   while (out.length < n && tries < n * 500) {
     tries++;
     const lng = minX + rand() * (maxX - minX);
     const lat = minY + rand() * (maxY - minY);
-    if (booleanPointInPolygon([lng, lat], boundary)) out.push({ pointIndex: out.length, lat, lng });
+    if (pointInMultiPolygon(lng, lat, boundary)) out.push({ pointIndex: out.length, lat, lng });
   }
   return out;
 }
