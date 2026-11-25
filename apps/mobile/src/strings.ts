@@ -2,7 +2,7 @@ import { registerNamespace } from "@eu/core/i18n";
 
 /** Strings for the app shell (login, home, empty states). Module strings live in their packages. */
 const en = {
-  tagline: "Programme app · EU Global Gateway",
+  tagline: "EU Global Gateway programme in Haut‑Lomami",
   welcome: "Welcome",
   signInIntro: "Sign in with the email and password from your GoCongo administrator. You only need internet the first time.",
   pinIntro: "Your PIN unlocks the app on this phone, even without internet.",
@@ -23,9 +23,12 @@ const en = {
   boreholes: "Boreholes",
   bamboo: "Bamboo",
   miombo: "Miombo",
-  countSchools: "{count} school(s)",
-  countBoreholes: "{count} borehole(s)",
-  countPlots: "{count} plot(s)",
+  countSchools: "{count} schools",
+  countBoreholes: "{count} boreholes",
+  countPlots: "{count} plots",
+  countSchools1: "1 school",
+  countBoreholes1: "1 borehole",
+  countPlots1: "1 plot",
   emptyTile: "Not set up yet",
   emptyTitle: "Nothing here yet",
   emptySchools: "No school is on this phone yet. A school is created on the web (Schools → New school), then it appears here after the next sync.",
@@ -45,7 +48,7 @@ const en = {
 };
 
 const fr: typeof en = {
-  tagline: "Application du programme · Global Gateway UE",
+  tagline: "Programme Global Gateway de l'UE au Haut‑Lomami",
   welcome: "Bienvenue",
   signInIntro: "Connectez-vous avec l'e-mail et le mot de passe fournis par votre administrateur GoCongo. Internet n'est nécessaire que la première fois.",
   pinIntro: "Votre code PIN déverrouille l'application sur ce téléphone, même sans internet.",
@@ -66,9 +69,12 @@ const fr: typeof en = {
   boreholes: "Forages",
   bamboo: "Bambou",
   miombo: "Miombo",
-  countSchools: "{count} école(s)",
-  countBoreholes: "{count} forage(s)",
-  countPlots: "{count} parcelle(s)",
+  countSchools: "{count} écoles",
+  countBoreholes: "{count} forages",
+  countPlots: "{count} parcelles",
+  countSchools1: "1 école",
+  countBoreholes1: "1 forage",
+  countPlots1: "1 parcelle",
   emptyTile: "Pas encore configuré",
   emptyTitle: "Rien pour l'instant",
   emptySchools: "Aucune école sur ce téléphone. Une école se crée sur le web (Écoles → Nouvelle école), puis elle apparaît ici après la prochaine synchronisation.",

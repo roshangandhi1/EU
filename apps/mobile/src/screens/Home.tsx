@@ -51,7 +51,7 @@ export function Home({ session }: { session: Session }) {
           <>
             <LanguageSwitch locale={locale} onChange={(l) => setLocale(l as Locale)} onDark />
             <Pressable accessibilityRole="button" onPress={() => session.lock()} style={s.lock}>
-              <Text style={s.lockText}>{t("app.lock")}</Text>
+              <Text style={s.lockText} accessibilityLabel={t("app.lock")}>🔒</Text>
             </Pressable>
           </>
         }
@@ -78,7 +78,7 @@ export function Home({ session }: { session: Session }) {
                 key={m}
                 module={m}
                 label={t(`app.${m}`)}
-                detail={counts == null ? "…" : counts[m] > 0 ? t(COUNT_KEY[m], { count: counts[m] }) : t("app.emptyTile")}
+                detail={counts == null ? "…" : counts[m] === 1 ? t(`${COUNT_KEY[m]}1`) : counts[m] > 1 ? t(COUNT_KEY[m], { count: counts[m] }) : t("app.emptyTile")}
                 onPress={() => ((counts?.[m] ?? 0) > 0 ? setOpen(m) : setEmpty(m))}
               />
             ))}
@@ -111,7 +111,7 @@ function SyncCard({ session }: { session: Session }) {
   const t = useT();
   const { locale } = useContext(LocaleContext);
   const st = session.status;
-  const when = st.lastOk ? new Date(st.lastOk).toLocaleString(locale) : null;
+  const when = st.lastOk ? new Date(st.lastOk).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : null;
   const pill = st.running ? (
     <Pill label={t("sync.syncing")} tone="muted" />
   ) : st.offline ? (
@@ -140,10 +140,8 @@ function SyncCard({ session }: { session: Session }) {
     );
   return (
     <Card accent={colors.gcGreen}>
-      <View style={s.row}>
-        <Subtitle>{t("app.syncCard")}</Subtitle>
-        <View style={{ marginLeft: "auto" }}>{pill}</View>
-      </View>
+      <Subtitle>{t("app.syncCard")}</Subtitle>
+      {pill}
       <Body tone="muted">{when ? t("sync.lastSync", { time: when }) : t("sync.never")}</Body>
       {notes}
       <Button kind="secondary" label={st.running ? t("sync.syncing") : t("sync.syncNow")} onPress={() => void session.syncNow()} disabled={st.running} />
@@ -211,7 +209,6 @@ export function Revoked() {
 const s = StyleSheet.create({
   moduleFrame: { flex: 1, backgroundColor: colors.surface, paddingTop: Math.max(0, TOP - space.xl) },
   body: { padding: space.md, gap: space.md, flexGrow: 1 },
-  row: { flexDirection: "row", alignItems: "center" },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: space.md },
   tile: { width: "48%", minHeight: 150, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: "#E4E8E1", padding: space.md, paddingTop: space.md + 6, gap: 6, overflow: "hidden" },
   tileBar: { position: "absolute", top: 0, left: 0, right: 0, height: 6 },
@@ -219,7 +216,7 @@ const s = StyleSheet.create({
   tileEmoji: { fontSize: 28 },
   tileLabel: { fontSize: 18, fontWeight: "800", color: colors.text },
   tileDetail: { fontSize: 14, color: colors.textMuted },
-  lock: { minHeight: 36, justifyContent: "center", paddingHorizontal: 10, borderRadius: 999, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.6)" },
+  lock: { minHeight: 36, minWidth: 40, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, borderRadius: 999, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.6)" },
   lockText: { color: colors.surface, fontWeight: "700", fontSize: 14 },
   back: { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" },
   backText: { color: colors.gcGreen, fontSize: 17, fontWeight: "700" },
