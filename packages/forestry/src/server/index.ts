@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import centroidOf from "@turf/centroid";
 import { boundaryApprovals, forestrySettings, monitoringVisits, plantingEvents, plotBoundaries, plots } from "../db/schema";
 import { defaultSettings } from "../defaults";
-import type { IndicatorRules } from "../indicators";
+import { boundaryAsAt, evaluatePlot, type IndicatorRules } from "../indicators";
 import { areaHa } from "../geo/area";
 import type { PlotInput } from "../indicators";
 import type { ImportCandidate } from "../import/kml";
@@ -48,6 +48,7 @@ export interface PlotRow {
   /** Latest boundary (approved or not), for the map. */
   geom: MultiPolygon | null;
   geomApproved: boolean;
+  publicVisible: boolean;
 }
 
 /** Everything the indicator and the map need for one stream. */
@@ -83,6 +84,7 @@ export async function loadStream(db: Db, stream: ForestryStream): Promise<{ plot
     return {
       siteId: p.scopeId, code: p.code, village: p.village, status: p.status, species: p.species,
       geom: latest?.geom ?? null, geomApproved: latest ? approvedIds.has(latest.id) : false,
+      publicVisible: !!p.publicVisible,
     };
   });
   return { plots: rows, inputs };
@@ -191,5 +193,50 @@ export function rulesFrom(stream: ForestryStream, s: StreamSettings): IndicatorR
   return {
     densityRulePerHa: s.densityRulePerHa,
     isNative: stream === "miombo" ? (k) => !nonNative.has(k) : undefined,
+  };
+}
+
+/** Properties a public plot feature may carry; anything else is dropped before publishing. */
+export const PUBLIC_PLOT_PROPS = ["code", "village", "stream", "species", "areaHa", "plantedPerHa", "counted", "status"];
+
+const roundCoords = (g: MultiPolygon, dp: number): MultiPolygon => {
+  const f = 10 ** dp;
+  return { type: "MultiPolygon", coordinates: g.coordinates.map((p) => p.map((r) => r.map(([x, y]) => [Math.round(x! * f) / f, Math.round(y! * f) / f]))) };
+};
+
+/**
+ * The public layer for a stream: only plots marked public that have an approved boundary as at
+ * `asAt`, with the boundary rounded to about 10 m and evidence-mode indicator figures.
+ */
+export async function buildPublicLayer(db: Db, stream: ForestryStream, asAt: string) {
+  const { plots: rows, inputs } = await loadStream(db, stream);
+  const settings = await loadSettings(db, stream);
+  const rules = rulesFrom(stream, settings);
+  const latin = new Map(settings.speciesList.map((s) => [s.key, s.latin]));
+  const features: import("geojson").Feature[] = [];
+  let ha = 0;
+  let countedHa = 0;
+  rows.forEach((row, i) => {
+    if (!row.publicVisible) return;
+    const input = inputs[i]!;
+    const b = boundaryAsAt(input, asAt, "evidence");
+    if (!b?.geom) return;
+    const r = evaluatePlot(input, asAt, "evidence", rules);
+    const area = Math.round(r.areaHa * 10) / 10;
+    ha += r.areaHa;
+    if (r.outcome === "counted") countedHa += r.areaHa;
+    features.push({
+      type: "Feature",
+      geometry: roundCoords(b.geom as MultiPolygon, 4),
+      properties: {
+        code: row.code, village: row.village, stream, status: row.status,
+        species: row.species.map((k) => latin.get(k) ?? k).join(", "),
+        areaHa: area, plantedPerHa: Math.round(r.plantedPerHa), counted: r.outcome === "counted",
+      },
+    });
+  });
+  return {
+    data: { type: "FeatureCollection" as const, features },
+    summary: { plots: features.length, hectares: Math.round(ha * 10) / 10, countedHectares: Math.round(countedHa * 10) / 10 },
   };
 }

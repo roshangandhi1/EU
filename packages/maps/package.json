@@ -3,9 +3,32 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./web": "./src/web/MapView.tsx" },
-  "scripts": { "test": "vitest run", "typecheck": "tsc -p ." },
-  "dependencies": { "maplibre-gl": "5.24.1", "pmtiles": "4.5.0" },
-  "peerDependencies": { "react": "*" },
-  "devDependencies": { "@types/geojson": "7946.0.16", "@types/react": "19.3.2", "react": "19.3.1", "typescript": "5.9.3", "vitest": "5.1.1", "@types/node": "22.20.6" }
+  "exports": {
+    ".": "./src/index.ts",
+    "./web": "./src/web/MapView.tsx",
+    "./db/schema": "./src/db/schema.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "maplibre-gl": "5.24.1",
+    "pmtiles": "4.5.0",
+    "@eu/db": "*",
+    "drizzle-orm": "0.45.4"
+  },
+  "peerDependencies": {
+    "react": "*"
+  },
+  "devDependencies": {
+    "@types/geojson": "7946.0.16",
+    "@types/react": "19.3.2",
+    "react": "19.3.1",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1",
+    "@types/node": "22.20.6",
+    "@electric-sql/pglite": "^0.6.0"
+  }
 }

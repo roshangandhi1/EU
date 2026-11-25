@@ -8,6 +8,8 @@ import { db } from "@/lib/http";
 import { permissions } from "@/lib/registry";
 import { isIsoDate, todayDrc } from "@/lib/dates";
 import { PlotsView } from "./plots-view";
+import { PublishButton } from "@/components/publish-button";
+import { canPublish } from "@/lib/public-map";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +44,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
       <div className="module-head">
         <h1>{t(locale, `forestry.${s}`)}</h1>
         {canImport && <Link className="btn secondary" href={`/${locale}/forestry/${s}/import`}>{t(locale, "forestry.import.kmz")}</Link>}
+        {canPublish(me.user, s) && <PublishButton layer={s} locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
       </div>
 
       <form className="asat" method="get">

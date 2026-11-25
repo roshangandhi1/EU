@@ -71,3 +71,4 @@ export function generalise(fc: FeatureCollection, decimals: number): FeatureColl
   const round = (c: unknown): unknown => (Array.isArray(c) && typeof c[0] === "number" ? (c as number[]).map((v) => Math.round(v * f) / f) : Array.isArray(c) ? c.map(round) : c);
   return { ...fc, features: fc.features.map((ft) => ({ ...ft, geometry: ft.geometry && "coordinates" in ft.geometry ? ({ ...ft.geometry, coordinates: round(ft.geometry.coordinates) } as Geometry) : ft.geometry })) };
 }
+export { publicMapStrings } from "./i18n";

@@ -74,3 +74,13 @@ fieldset { border: 1px solid #d5dad2; border-radius: 8px; }
 .row label.narrow { flex: 0 1 110px; }
 .row input, .row select { font-size: 16px; min-height: 48px; padding: 8px 12px; border: 1px solid #b8c0b4; border-radius: 8px; background: var(--bg); color: var(--text); }
 .fails { margin: 4px 0 0; padding-left: 18px; font-size: 14px; color: var(--muted); }
+
+/* Public map */
+.public-map .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 16px 0; }
+.public-map .stat-card { border: 1px solid var(--border, #D5DAD2); border-radius: 8px; padding: 12px 16px; }
+.public-map .stat-card h2 { font-size: 1.05rem; margin: 0 0 6px; }
+.public-map .stat-card ul { margin: 0; padding-left: 18px; }
+.public-map-wrap .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 8px; font-size: 0.9rem; }
+.public-map-wrap .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.public-map-wrap .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-left: 6px; }
+.publish { display: inline-flex; flex-direction: column; gap: 4px; max-width: 340px; }
