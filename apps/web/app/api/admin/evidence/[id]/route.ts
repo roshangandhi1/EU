@@ -1,5 +1,6 @@
 import { auditLog } from "@eu/db";
 import { csvLocale } from "@/lib/csv";
+import { todayDrc } from "@/lib/dates";
 import { evidenceCsv, getCutoff } from "@/lib/evidence";
 import { authenticate, db, json } from "@/lib/http";
 import { entities, permissions } from "@/lib/registry";
@@ -20,6 +21,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     userId: auth.principal.user.id,
     newValues: { cutoffAt: cutoff.cutoffAt.toISOString(), rows: csv.split("\r\n").length - 2 },
   });
-  const name = `evidence-${cutoff.cutoffAt.toISOString().slice(0, 10)}.csv`;
+  const name = `evidence-${todayDrc(cutoff.cutoffAt)}.csv`;
   return new Response(csv, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${name}"`, "cache-control": "no-store" } });
 }

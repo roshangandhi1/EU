@@ -14,6 +14,7 @@
  * so remove them before real reporting. The placeholder photo rows (sha256 "demo") count as
  * photos day to day, but never as evidence in evidence mode or cut-off exports (DATA-7).
  */
+import { todayDrc } from "@eu/core";
 import { files, sites, type Db } from "@eu/db";
 import { createBorehole, loadTemplates, saveTemplate } from "@eu/boreholes/server";
 import { boreholes as boreholeTable } from "@eu/boreholes/db/schema";
@@ -81,8 +82,9 @@ function candidate(i: number, name: string, lng: number, lat: number, ha: number
 const FIRST = ["Amani", "Bijou", "Christelle", "Daniel", "Esther", "Fiston", "Grâce", "Héritier", "Israël", "Joëlle", "Kevin", "Lydie"];
 const LAST = ["Kabila", "Mukendi", "Ilunga", "Kasongo", "Mwamba", "Ngoy", "Banza", "Kalenga"];
 
+/** The Haut-Lomami date of a moment (UTC+2). */
 function iso(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return todayDrc(d);
 }
 
 /** The academic year running on `now`: September to early July. */
