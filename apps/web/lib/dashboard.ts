@@ -1,6 +1,7 @@
 /** Programme dashboard loader: asks each module for its indicator values as at a date. */
 import { loadBoreholes } from "@eu/boreholes/server";
-import { computeIndicator, miomboRegeneratingHa, type CountingMode } from "@eu/forestry";
+import { computeIndicator, miomboRegeneratingHa, withAdmitted, type CountingMode } from "@eu/forestry";
+import { admittedRecordIds, cutoffOn } from "./evidence";
 import { loadSettings, loadStream, photoUploads, rulesFrom } from "@eu/forestry/server";
 import { schoolsIndicators } from "@eu/schools";
 import { db } from "./http";
@@ -8,16 +9,25 @@ import { assemble, type IndicatorRow } from "./indicator-defs";
 
 export * from "./indicator-defs";
 
-export async function loadDashboard(asAt: string, mode: CountingMode, today: string): Promise<IndicatorRow[]> {
+/**
+ * In evidence mode, late records an admin admitted for the cut-off count too (DATA-5). The cut-off
+ * is `cutoffId` when given, else the latest cut-off falling on the as-at day (if there is one).
+ */
+export async function loadDashboard(asAt: string, mode: CountingMode, today: string, cutoffId?: string): Promise<IndicatorRow[]> {
   const d = db();
+  let admitted = new Set<string>();
+  if (mode === "evidence") {
+    const id = cutoffId ?? (await cutoffOn(d, asAt))?.id;
+    if (id) admitted = await admittedRecordIds(d, id);
+  }
   const forestry = async (s: "bamboo" | "miombo") => {
     const [{ inputs }, settings] = await Promise.all([loadStream(d, s), loadSettings(d, s)]);
-    return computeIndicator(inputs, asAt, mode, { ...rulesFrom(s, settings), photoUploadedAt: await photoUploads(d, inputs) });
+    return computeIndicator(withAdmitted(inputs, admitted), asAt, mode, { ...rulesFrom(s, settings), photoUploadedAt: await photoUploads(d, inputs) });
   };
   const [bh, miombo, bamboo, schools] = await Promise.all([
-    loadBoreholes(d, asAt, mode, today), forestry("miombo"), forestry("bamboo"),
+    loadBoreholes(d, asAt, mode, today, admitted), forestry("miombo"), forestry("bamboo"),
     // Schools calls "captured" mode "operational".
-    schoolsIndicators(d, asAt, mode === "evidence" ? "evidence" : "operational"),
+    schoolsIndicators(d, asAt, mode === "evidence" ? "evidence" : "operational", admitted),
   ]);
   const school = (code: string) => {
     const v = schools.find((x) => x.code === code)?.value;

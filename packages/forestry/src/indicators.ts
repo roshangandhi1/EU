@@ -137,15 +137,18 @@ export function evaluatePlot(p: PlotInput, asAt: string, mode: CountingMode, rul
   // The indicator uses the contract rule only; a plot's own target density is operational, not a payment test.
   const threshold = rules.densityRulePerHa;
   const up = rules.photoUploadedAt;
-  const isEvidence = (id: string) => {
+  /** `admitted`: the record was admitted late for this cut-off, so its (late) photo is admitted with it. */
+  const isEvidence = (id: string, admitted?: boolean) => {
     if (!up) return true;
     const t = up.get(id);
     if (!t) return false;
     if (up.scopeOf && up.scopeOf.get(id) !== p.siteId) return false;
     if (mode === "evidence" && up.demo?.has(id)) return false;
-    return mode === "captured" || t <= at;
+    return mode === "captured" || !!admitted || t <= at;
   };
-  const hasPhoto = plantings.some((e) => e.photos.some(isEvidence)) || visits.some((v) => v.photos.some((p) => isEvidence(p.fileId)));
+  const hasPhoto =
+    plantings.some((e) => e.photos.some((id) => isEvidence(id, e.lateAccepted))) ||
+    visits.some((v) => v.photos.some((ph) => isEvidence(ph.fileId, v.lateAccepted)));
 
   let outcome: PlotOutcome;
   if (!b) outcome = "no_authoritative_boundary";
@@ -187,3 +190,13 @@ export function miomboRegeneratingHa(result: IndicatorResult): number {
 export const UNIT_EUR = { "2.2.1": 3000, "2.1.1": 484 } as const;
 
 const round4 = (n: number) => Math.round(n * 10_000) / 10_000;
+
+/**
+ * Marks the records an admin admitted late for an evidence cut-off (DATA-5), so they count in
+ * "evidence" mode. Excluded and undecided late records stay out.
+ */
+export function withAdmitted(inputs: PlotInput[], admitted: ReadonlySet<string>): PlotInput[] {
+  if (admitted.size === 0) return inputs;
+  const mark = <T extends Stamped>(rows: T[]): T[] => rows.map((r) => (admitted.has(r.id) ? { ...r, lateAccepted: true } : r));
+  return inputs.map((p) => ({ ...p, boundaries: mark(p.boundaries), approvals: mark(p.approvals), plantings: mark(p.plantings), visits: mark(p.visits) }));
+}

@@ -71,7 +71,14 @@ export interface BoreholeRow {
 
 const RANK = { none: 0, ok: 1, due_soon: 2, due: 3, overdue: 4 } as const;
 
-export async function loadBoreholes(db: Db, asAt: string, mode: "captured" | "evidence", today: string): Promise<{ rows: BoreholeRow[]; counted: number }> {
+/** `admitted`: visit ids an admin admitted late for the evidence cut-off being reported (DATA-5). */
+export async function loadBoreholes(
+  db: Db,
+  asAt: string,
+  mode: "captured" | "evidence",
+  today: string,
+  admitted: ReadonlySet<string> = new Set(),
+): Promise<{ rows: BoreholeRow[]; counted: number }> {
   const d = db as AnyDb;
   const [attrs, vs, fs, templates, settings] = await Promise.all([
     d.select().from(boreholes).where(isNull(boreholes.voidedAt)),
@@ -84,7 +91,7 @@ export async function loadBoreholes(db: Db, asAt: string, mode: "captured" | "ev
   const ind = indicator111(
     attrs.map((b: any) => ({
       borehole: { siteId: b.scopeId, code: b.code, pumpRatingKw: b.pumpRatingKw, commissionedOn: b.commissionedOn, waterQuality: b.waterQuality, caretakersTrained: b.caretakersTrained, sopHandedOver: b.sopHandedOver },
-      visits: vs.filter((v: any) => v.scopeId === b.scopeId).map((v: any) => ({ id: v.id, visitedOn: v.visitedOn, operational: v.operational, deviceTime: v.deviceTime, serverTime: v.serverTime, voidedAt: v.voidedAt })),
+      visits: vs.filter((v: any) => v.scopeId === b.scopeId).map((v: any) => ({ id: v.id, visitedOn: v.visitedOn, operational: v.operational, deviceTime: v.deviceTime, serverTime: v.serverTime, voidedAt: v.voidedAt, lateAccepted: admitted.has(v.id) })),
     })),
     asAt, mode, settings,
   );

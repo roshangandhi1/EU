@@ -1,7 +1,7 @@
 import { auditLog, devices, evidenceCutoffs, evidenceDecisions, type Db } from "@eu/db";
 import type { EntityDef, EntityRegistry } from "@eu/sync";
 import { toCsv, yes, type CsvLocale } from "./csv";
-import { and, asc, eq, getTableColumns, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, gt, gte, isNull, lte, or, sql } from "drizzle-orm";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = any;
@@ -73,6 +73,31 @@ async function decisionsFor(db: Db, cutoffId: string, entity: string): Promise<M
 export async function admittedIds(db: Db, cutoffId: string, entity: string): Promise<Set<string>> {
   const d = await decisionsFor(db, cutoffId, entity);
   return new Set([...d].filter(([, v]) => v.decision === "admitted").map(([k]) => k));
+}
+
+/** Every record id admitted for this cut-off, across record types (ids are UUIDs, unique across tables). */
+export async function admittedRecordIds(db: Db, cutoffId: string): Promise<Set<string>> {
+  const rows = (await (db as AnyDb)
+    .select({ recordId: evidenceDecisions.recordId })
+    .from(evidenceDecisions)
+    .where(and(eq(evidenceDecisions.cutoffId, cutoffId), eq(evidenceDecisions.decision, "admitted")))) as { recordId: string }[];
+  return new Set(rows.map((r) => r.recordId));
+}
+
+/**
+ * The cut-off an evidence-mode report as at `asAt` (a Haut-Lomami date) stands for: the latest
+ * cut-off falling on that day, if any. Its admit decisions then apply to the report.
+ */
+export async function cutoffOn(db: Db, asAt: string): Promise<Cutoff | undefined> {
+  const from = new Date(`${asAt}T00:00:00+02:00`);
+  const to = new Date(`${asAt}T23:59:59.999+02:00`);
+  const [row] = await (db as AnyDb)
+    .select()
+    .from(evidenceCutoffs)
+    .where(and(gte(evidenceCutoffs.cutoffAt, from), lte(evidenceCutoffs.cutoffAt, to)))
+    .orderBy(sql`${evidenceCutoffs.cutoffAt} desc`)
+    .limit(1);
+  return row;
 }
 
 /** Records captured before the cut-off that reached the server after it, with any decision taken. */
