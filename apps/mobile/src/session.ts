@@ -3,7 +3,7 @@ import { DeviceRevokedError, SyncClient, type SyncOutcome } from "@eu/sync/clien
 import type { SqlStore } from "@eu/sync/sql-store";
 import * as Crypto from "expo-crypto";
 import { AppState } from "react-native";
-import { ApiError, httpTransport, registerDevice } from "./api";
+import { ApiError, httpTransport, registerDevice, reportStatus } from "./api";
 import { PIN_MAX_FAILURES, SYNC_INTERVAL_MS } from "./config";
 import { openStore } from "./db";
 import { EvidenceFiles } from "./files";
@@ -15,6 +15,7 @@ export interface SyncStatus {
   running: boolean;
   pending: number;
   photosPending: number;
+  nextCutoff: { at: string; label: string } | null;
   rejected: number;
   lastOk: string | null;
   last: SyncOutcome | null;
@@ -31,7 +32,7 @@ export class Session {
   phase: Phase = "loading";
   user: { id: string; name: string } | null = null;
   notice: string | null = null; // an i18n key to show on the next screen
-  status: SyncStatus = { running: false, pending: 0, photosPending: 0, rejected: 0, lastOk: null, last: null, offline: false };
+  status: SyncStatus = { running: false, pending: 0, photosPending: 0, nextCutoff: null, rejected: 0, lastOk: null, last: null, offline: false };
   store!: SqlStore;
   client!: SyncClient;
   /** Photo evidence: files.capture({ entity, scopeId }) → { fileId } to store in a record. */
@@ -167,6 +168,20 @@ export class Session {
     }
     this.status = { ...this.status, running: false, last: out, lastOk: out.ok ? new Date().toISOString() : this.status.lastOk };
     await this.refreshCounts();
+    if (out.ok) await this.report();
+  }
+
+  /** Best effort: lets an admin see unsynced work before removing this phone, and fetches the next cut-off. */
+  private async report(): Promise<void> {
+    const tok = await secure.token.get();
+    if (!tok) return;
+    try {
+      const r = await reportStatus(tok, { pendingChanges: this.status.pending, pendingPhotos: this.status.photosPending });
+      this.status = { ...this.status, nextCutoff: r.nextCutoff };
+      this.emit();
+    } catch {
+      // offline or server busy: the next sync tries again
+    }
   }
 
   async refreshCounts(): Promise<void> {

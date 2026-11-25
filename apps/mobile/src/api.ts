@@ -39,6 +39,11 @@ export function registerDevice(email: string, password: string, deviceId: string
   return post<SignedIn>("/api/devices/register", { email, password, deviceId, deviceName, appVersion: APP_VERSION });
 }
 
+/** Tells the server what this phone still holds unsynced; learns the next evidence cut-off. */
+export function reportStatus(token: string, s: { pendingChanges: number; pendingPhotos: number }): Promise<{ nextCutoff: { at: string; label: string } | null }> {
+  return post("/api/device/status", s, token);
+}
+
 export function httpTransport(getToken: () => Promise<string | null>): Transport {
   const withToken = async <T,>(path: string, body: unknown) => {
     const t = await getToken();
