@@ -106,7 +106,7 @@ export const fr: Record<BoreholeKey, string> = {
   "boreholes.m.not_done": "Pas fait",
   "boreholes.m.reading": "Mesure ({unit})",
   "boreholes.m.out_of_range": "Hors de la plage attendue : une panne sera ouverte.",
-  "boreholes.m.photo_task": "Photo requise : les photos arrivent dans la prochaine mise à jour. Cochez fait si c'est fait.",
+  "boreholes.m.photo_task": "Photo requise : prenez-la, puis indiquez le résultat.",
   "boreholes.m.note": "Remarque",
   "boreholes.m.bucket_seconds": "Secondes pour remplir 20 L",
   "boreholes.m.flow_result": "Débit : {lpm} L/min",

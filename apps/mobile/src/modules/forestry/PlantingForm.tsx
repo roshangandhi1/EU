@@ -6,6 +6,7 @@ import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
 import { Body, Button, Field, Title } from "../../ui";
 import { getFix, localToday, type Fix } from "../location";
+import { PhotoStrip } from "../photos";
 import { loadSpecies, type PlotLite, type SpeciesOption } from "./data";
 
 interface Line {
@@ -26,6 +27,7 @@ export function PlantingForm({ session, stream, plot, onDone }: { session: Sessi
   const [gapFilling, setGapFilling] = useState(false);
   const [team, setTeam] = useState("");
   const [notes, setNotes] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [fix, setFix] = useState<Fix | null>(null);
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +61,7 @@ export function PlantingForm({ session, stream, plot, onDone }: { session: Sessi
       isGapFilling: gapFilling,
       team: team.trim() || null,
       notes: notes.trim() || null,
-      photos: [],
+      photos,
       gpsLat: fix?.lat ?? null,
       gpsLng: fix?.lng ?? null,
       gpsAccuracyM: fix?.accuracyM ?? null,
@@ -115,7 +117,8 @@ export function PlantingForm({ session, stream, plot, onDone }: { session: Sessi
 
       <Body tone={fix ? "good" : "muted"}>{gpsNote ?? (fix ? t("forestry.m.gps_ok", { m: Math.round(fix.accuracyM ?? 0) }) : t("forestry.m.gps_none"))}</Body>
       <Button kind="secondary" label={t("forestry.m.record_gps")} onPress={() => void recordGps()} />
-      <Body tone="muted">{t("forestry.m.photos_soon")}</Body>
+      <Body tone="muted">{t("forestry.m.photo_hint")}</Body>
+      <PhotoStrip session={session} entity={`${stream}.planting`} scopeId={plot.scopeId} ids={photos} onChange={setPhotos} />
 
       {error && <Body tone="critical">{error}</Body>}
       <Button label={t("forestry.m.save")} onPress={() => void save()} disabled={saving} />

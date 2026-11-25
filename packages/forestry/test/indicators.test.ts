@@ -50,6 +50,16 @@ describe("2.2.1 bamboo", () => {
     expect(computeIndicator([p], "2026-10-16", "captured", bambooRules).plots[0]!.outcome).toBe("missing_evidence");
   });
 
+  it("counts a photo only once it has reached the server, and by the as-at date in evidence mode", () => {
+    const p = bambooPlot();
+    const none = new Map<string, Date>();
+    expect(computeIndicator([p], "2026-10-16", "captured", { ...bambooRules, photoUploadedAt: none }).plots[0]!.outcome).toBe("missing_evidence");
+    const late = new Map([["f1", T("2026-10-20T08:00:00Z")]]);
+    expect(computeIndicator([p], "2026-10-16", "captured", { ...bambooRules, photoUploadedAt: late }).plots[0]!.outcome).toBe("counted");
+    expect(computeIndicator([p], "2026-10-16", "evidence", { ...bambooRules, photoUploadedAt: late }).plots[0]!.outcome).toBe("missing_evidence");
+    expect(computeIndicator([p], "2026-10-21", "evidence", { ...bambooRules, photoUploadedAt: late }).plots[0]!.outcome).toBe("counted");
+  });
+
   it("needs an authoritative boundary in force on the date", () => {
     const p = bambooPlot({ approvals: [] });
     expect(computeIndicator([p], "2026-10-16", "captured", bambooRules).plots[0]!.outcome).toBe("no_authoritative_boundary");

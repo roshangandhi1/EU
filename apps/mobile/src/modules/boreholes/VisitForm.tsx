@@ -7,6 +7,7 @@ import type { Session } from "../../session";
 import { Body, Button, Field, Title } from "../../ui";
 import { getFix, localToday, type Fix } from "../location";
 import type { BoreholeRow, Schedule } from "./data";
+import { PhotoStrip } from "../photos";
 
 type Mark = "ok" | "problem" | "not_done";
 type Kind = "routine" | "repair" | "inspection" | "commissioning";
@@ -43,6 +44,8 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
   const [bucketSec, setBucketSec] = useState("");
   const [severity, setSeverity] = useState<Severity>("reduced");
   const [notes, setNotes] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [taskPhotos, setTaskPhotos] = useState<Record<string, string[]>>({});
   const [fix, setFix] = useState<Fix | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -66,7 +69,8 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
     }
     const m = marks[key];
     if (!m || m === "not_done") return m ? { taskKey: key, done: false, note } : null;
-    return { taskKey: key, done: true, pass: m === "ok", note };
+    const photo = taskPhotos[key]?.[0];
+    return { taskKey: key, done: true, pass: m === "ok", note, ...(photo ? { photoFileId: photo } : {}) };
   };
   const results = tasks.map((x) => resultFor(x.key)).filter((r): r is TaskResult => r !== null);
   const faults = failedResults(tasks, results);
@@ -82,7 +86,7 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
       flowLpm: lpm,
       partsUsed: [],
       faultsClosed: [],
-      photos: [],
+      photos,
       notes: notes.trim() || null,
       gpsLat: fix?.lat ?? null,
       gpsLng: fix?.lng ?? null,
@@ -162,6 +166,9 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
               />
             )}
             {task.proof.kind === "photo" && <Body tone="muted">{t("boreholes.m.photo_task")}</Body>}
+            {task.proof.kind === "photo" && (
+              <PhotoStrip session={session} entity="boreholes.visit" scopeId={borehole.siteId} ids={taskPhotos[task.key] ?? []} onChange={(ids) => setTaskPhotos({ ...taskPhotos, [task.key]: ids })} />
+            )}
             {r && r.pass === false && task.failOpensFault && <Body tone="critical">{t("boreholes.m.out_of_range")}</Body>}
             {r && r.pass === false && (
               <Field label={t("boreholes.m.note")} value={taskNotes[task.key] ?? ""} onChangeText={(v) => setTaskNotes({ ...taskNotes, [task.key]: v })} />
@@ -179,6 +186,7 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
       )}
 
       <Field label={t("forestry.m.notes")} value={notes} onChangeText={setNotes} multiline />
+      <PhotoStrip session={session} entity="boreholes.visit" scopeId={borehole.siteId} ids={photos} onChange={setPhotos} />
       <Body tone={fix ? "good" : "muted"}>{fix ? t("forestry.m.gps_ok", { m: Math.round(fix.accuracyM ?? 0) }) : t("forestry.m.gps_none")}</Body>
       {error && <Body tone="critical">{error}</Body>}
       <Button label={t("forestry.m.save")} onPress={() => void save()} disabled={saving} />
