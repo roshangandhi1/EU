@@ -71,7 +71,8 @@ export interface IndicatorResult {
   plots: PlotResult[];
 }
 
-const endOfDay = (d: string) => new Date(`${d}T23:59:59.999Z`);
+/** As-at dates are inclusive to the end of the day in Lubumbashi time (Haut-Lomami, UTC+2, no DST). */
+const endOfDay = (d: string) => new Date(`${d}T23:59:59.999+02:00`);
 
 function inScope<T extends Stamped>(r: T, asAt: Date, mode: CountingMode): "in" | "late" | "out" {
   if (r.voidedAt && r.voidedAt <= asAt) return "out";

@@ -73,7 +73,7 @@ export function indicator111(
   mode: "captured" | "evidence",
   s: OperationalSettings,
 ): { asAt: string; counted: number; rows: BoreholeIndicatorRow[] } {
-  const at = new Date(`${asAt}T23:59:59.999Z`);
+  const at = new Date(`${asAt}T23:59:59.999+02:00`);
   const rows = items.map(({ borehole: b, visits }) => {
     const late: string[] = [];
     const eligible = visits.filter((v) => {
