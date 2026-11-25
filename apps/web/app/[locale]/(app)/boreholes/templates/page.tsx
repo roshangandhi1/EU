@@ -1,4 +1,6 @@
 import { notFound, redirect } from "next/navigation";
+import { Icon } from "@/components/icons";
+import { PageHeader } from "@/components/ui";
 import { isLocale, t } from "@eu/core/i18n";
 import { loadTemplates } from "@eu/boreholes/server";
 import { currentPrincipal } from "@/lib/session";
@@ -19,7 +21,7 @@ export default async function TemplatesPage({ params }: { params: Promise<{ loca
   const templates = await loadTemplates(db());
   return (
     <section className="module" data-stream="boreholes">
-      <h1>{t(locale, "boreholes.template.title")}</h1>
+      <PageHeader icon={<Icon name="wrench" size={24} />} title={t(locale, "boreholes.template.title")} />
       {templates.map((tpl) => (
         <TemplateEditor
           key={tpl.templateKey}

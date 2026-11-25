@@ -11,6 +11,8 @@ import { BoreholesView } from "./boreholes-view";
 import { NewBoreholeForm } from "./new-borehole";
 import { PublishButton } from "@/components/publish-button";
 import { canPublish } from "@/lib/public-map";
+import { PageHeader } from "@/components/ui";
+import { Icon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -38,11 +40,15 @@ export default async function BoreholesPage({ params, searchParams }: {
 
   return (
     <section className="module" data-stream="boreholes">
-      <div className="module-head">
-        <h1>{t(locale, "boreholes.title")}</h1>
-        {canTemplates && <Link className="btn secondary" href={`/${locale}/boreholes/templates`}>{t(locale, "boreholes.template.edit")}</Link>}
-        {canPublish(me.user, "boreholes") && <PublishButton layer="boreholes" locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
-      </div>
+      <PageHeader
+        icon={<Icon name="drop" size={24} />}
+        title={t(locale, "boreholes.title")}
+        subtitle={t(locale, "ui.home.boreholes.sub")}
+        actions={<>
+          {canTemplates && <Link className="btn secondary" href={`/${locale}/boreholes/templates`}><Icon name="wrench" size={16} />{t(locale, "boreholes.template.edit")}</Link>}
+          {canPublish(me.user, "boreholes") && <PublishButton layer="boreholes" locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
+        </>}
+      />
       <form className="asat" method="get">
         <label>{t(locale, "boreholes.as_at")}<input type="date" name="asAt" defaultValue={asAt} /></label>
         <label>
@@ -62,7 +68,7 @@ export default async function BoreholesPage({ params, searchParams }: {
           <div><dt>{t(locale, "boreholes.target_2030")}</dt><dd>140</dd></div>
         </dl>
       </div>
-      {rows.length === 0 ? <p>{t(locale, "boreholes.no_boreholes")}</p> : (
+      {rows.length === 0 ? <div className="empty-state"><div className="es-icon"><Icon name="drop" size={28} /></div><p>{t(locale, "boreholes.no_boreholes")}</p></div> : (
         <BoreholesView
           rows={rows.map((r) => ({ siteId: r.siteId, code: r.code, village: r.village, lifecycle: r.lifecycle, lat: r.lat, lng: r.lng, lastVisitOn: r.lastVisitOn, worstDue: r.worstDue, openFaults: r.openFaults, counted: r.indicator.counted, fails: r.indicator.fails }))}
           labels={{

@@ -17,8 +17,7 @@ export function PublishButton({ layer, locale, labels }: { layer: "bamboo" | "mi
   };
   return (
     <div className="publish">
-      <button className="btn secondary" type="button" onClick={() => void go()} disabled={state.busy}>{labels.button}</button>
-      <span className="muted small">{labels.help}</span>
+      <button className="btn secondary" type="button" title={labels.help} aria-describedby={undefined} onClick={() => void go()} disabled={state.busy}>{labels.button}</button>
       {state.msg && <p className={state.ok ? "ok" : "error"}>{state.msg} {state.ok && <a href={`/${locale}/map`}>{labels.view}</a>}</p>}
     </div>
   );

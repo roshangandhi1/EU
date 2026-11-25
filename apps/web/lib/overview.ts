@@ -3,8 +3,8 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { FeatureCollection } from "geojson";
 import { devices, roleAssignments, sites } from "@eu/db";
 import { loadBoreholes, loadTemplates } from "@eu/boreholes/server";
-import { populationEstimates } from "@eu/boreholes/db";
-import { computeIndicator, type ForestryStream } from "@eu/forestry";
+import { populationEstimates } from "@eu/boreholes/db/schema";
+import { areaHa, computeIndicator, type ForestryStream } from "@eu/forestry";
 import { loadSettings, loadStream, photoUploads, rulesFrom } from "@eu/forestry/server";
 import { loadSchool } from "@eu/schools";
 import type { Principal } from "./auth";
@@ -46,7 +46,7 @@ async function forestry(stream: ForestryStream, today: string) {
   );
   const summary: ForestrySummary = {
     plots: plots.length,
-    haMapped: result.plots.reduce((n, p) => n + p.areaHa, 0),
+    haMapped: plots.reduce((n, p) => n + (p.geom ? areaHa(p.geom) : 0), 0),
     haCounted: result.hectaresCounted,
     planted,
   };
@@ -59,7 +59,7 @@ async function forestry(stream: ForestryStream, today: string) {
           type: "Feature" as const,
           id: p.siteId,
           geometry: p.geom!,
-          properties: { _id: p.siteId, kind: stream, code: p.code, village: p.village, status: p.status, areaHa: r?.areaHa ?? 0, outcome: r?.outcome ?? "", species: p.species.join(", ") },
+          properties: { _id: p.siteId, kind: stream, code: p.code, village: p.village, status: p.status, areaHa: areaHa(p.geom!), outcome: r?.outcome ?? "", species: p.species.join(", ") },
         };
       }),
   );

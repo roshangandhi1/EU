@@ -42,7 +42,7 @@ export function Icon({ name, size = 20, className }: { name: IconName | string; 
 export function EuFlag({ width = 36 }: { width?: number }) {
   const stars = Array.from({ length: 12 }, (_, i) => {
     const a = (i * Math.PI) / 6;
-    return [30 + 13.3 * Math.sin(a), 20 - 13.3 * Math.cos(a)];
+    return [30 + 13.3 * Math.sin(a), 20 - 13.3 * Math.cos(a)] as const;
   });
   return (
     <svg width={width} height={(width * 2) / 3} viewBox="0 0 60 40" aria-hidden style={{ flex: "none", borderRadius: 2 }}>

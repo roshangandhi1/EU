@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/icons";
 import { Button, Field, Form, Notice, PageHeader, Table } from "@/components/ui";
 import { formatLocal, requireAction } from "@/lib/admin";
 import { listCutoffs } from "@/lib/evidence";
@@ -13,7 +14,7 @@ export default async function CutoffsPage({ params, searchParams }: { params: Pr
   const cutoffs = await listCutoffs(db());
   return (
     <section>
-      <PageHeader title={tr("cutoffs")} subtitle={tr("cutoffsIntro")} />
+      <PageHeader icon={<Icon name="clock" size={24} />} title={tr("cutoffs")} subtitle={tr("cutoffsIntro")} />
       {sp.error && <Notice tone="error">{tr("reasonRequired")}</Notice>}
       <Table
         rows={cutoffs}

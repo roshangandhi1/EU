@@ -1,4 +1,6 @@
 import { notFound, redirect } from "next/navigation";
+import { Icon } from "@/components/icons";
+import { PageHeader } from "@/components/ui";
 import { isLocale, t } from "@eu/core/i18n";
 import { fa, type ForestryStream } from "@eu/forestry";
 import { loadSettings } from "@eu/forestry/server";
@@ -23,7 +25,7 @@ export default async function ImportPage({ params }: { params: Promise<{ locale:
   const canApprove = permissions.can(me.user, fa(s, "boundary.approve"), { stream: s });
   return (
     <section className="module" data-stream={s}>
-      <h1>{t(locale, "forestry.import.kmz")} · {t(locale, `forestry.${s}`)}</h1>
+      <PageHeader icon={<Icon name="upload" size={24} />} eyebrow={t(locale, `forestry.${s}`)} title={t(locale, "forestry.import.kmz")} />
       <p className="muted">{t(locale, "forestry.boundary.draft_note")}</p>
       <ImportForm
         locale={locale}

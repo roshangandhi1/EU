@@ -18,6 +18,8 @@ export interface MapViewProps {
   selectedId?: string | null;
   onSelect?: (id: string | null, layerId: string | null) => void;
   ariaLabel: string;
+  /** Padding when fitting to the data, e.g. to keep features clear of an overlay panel. */
+  fitPadding?: number | { top: number; right: number; bottom: number; left: number };
 }
 
 function baseStyle(b: Basemap): StyleSpecification {
@@ -39,7 +41,7 @@ function colorExpr(l: OverlayLayer): any {
   return ["match", ["to-string", ["get", l.colorBy]], ...Object.entries(l.colors).flat(), l.defaultColor];
 }
 
-export function MapView({ overlays, imagery = [], basemap = { kind: "osm" }, center = [24.8, -8.7], zoom = 9, height = 480, selectedId, onSelect, ariaLabel }: MapViewProps) {
+export function MapView({ overlays, imagery = [], basemap = { kind: "osm" }, center = [24.8, -8.7], zoom = 9, height = 480, selectedId, onSelect, ariaLabel, fitPadding = 40 }: MapViewProps) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
   const loaded = useRef(false);
@@ -57,7 +59,7 @@ export function MapView({ overlays, imagery = [], basemap = { kind: "osm" }, cen
     m.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
     m.on("load", () => {
       loaded.current = true;
-      sync(m, latest.current.overlays, latest.current.imagery, true);
+      sync(m, latest.current.overlays, latest.current.imagery, true, fitPadding);
     });
     m.on("click", (e) => {
       const ids = latest.current.overlays.flatMap((l) => [`${l.id}-main`]).filter((id) => m.getLayer(id));
@@ -94,7 +96,7 @@ export function MapView({ overlays, imagery = [], basemap = { kind: "osm" }, cen
   return <div ref={el} role="region" aria-label={ariaLabel} style={{ width: "100%", height, borderRadius: 8, overflow: "hidden" }} />;
 }
 
-function sync(m: MlMap, overlays: OverlayLayer[], imagery: RasterLayer[], fit: boolean) {
+function sync(m: MlMap, overlays: OverlayLayer[], imagery: RasterLayer[], fit: boolean, padding: MapViewProps["fitPadding"] = 40) {
   for (const r of imagery) {
     if (m.getSource(`img-${r.id}`)) continue;
     m.addSource(`img-${r.id}`, { type: "raster", url: r.url.startsWith("pmtiles://") ? r.url : undefined, tiles: r.url.startsWith("pmtiles://") ? undefined : [r.url], tileSize: 256, attribution: r.attribution, maxzoom: r.maxzoom });
@@ -125,6 +127,6 @@ function sync(m: MlMap, overlays: OverlayLayer[], imagery: RasterLayer[], fit: b
   }
   if (fit) {
     const b = bboxOf(overlays.map((l) => l.data));
-    if (b) m.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 40, maxZoom: 16, duration: 0 });
+    if (b) m.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding, maxZoom: 16, duration: 0 });
   }
 }

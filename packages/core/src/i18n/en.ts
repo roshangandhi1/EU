@@ -43,7 +43,7 @@ export const en = {
   },
   admin: {
     demoTitle: "Demo data",
-    demoIntro: "Load a small, clearly marked demo set (one school, four plots, three boreholes, all named DEMO-…) so the phone app and these pages are not empty. Demo records count in the dashboard until you remove them.",
+    demoIntro: "Load a small, clearly marked demo set (a school with 24 pupils, attendance and fees, six bamboo and miombo plots, five boreholes with maintenance visits, all named DEMO-…) so the phone app and these pages are not empty. Demo records count in the dashboard until you remove them.",
     demoLoadedIntro: "Demo data is loaded ({count} sites named DEMO-…). Remove it before real reporting: phones drop it on their next sync.",
     demoLoad: "Load demo data",
     demoRemove: "Remove demo data",

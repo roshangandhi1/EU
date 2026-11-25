@@ -1,4 +1,5 @@
 import { PageHeader, Tabs } from "@/components/ui";
+import { Icon } from "@/components/icons";
 import { can, schoolFor, signedIn, tr as trFor } from "@/lib/schools";
 
 export default async function SchoolLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string; siteId: string }> }) {
@@ -16,8 +17,8 @@ export default async function SchoolLayout({ children, params }: { children: Rea
     ...(can(me, "school.configure", p.siteId) ? [{ href: `${base}/setup`, label: tr("nav.setup") }] : []),
   ];
   return (
-    <section>
-      <PageHeader title={data.site.name} subtitle={data.school?.code} />
+    <section data-stream="schools">
+      <PageHeader icon={<Icon name="school" size={24} />} title={data.site.name} subtitle={data.school?.code} />
       <Tabs items={items} />
       {children}
     </section>

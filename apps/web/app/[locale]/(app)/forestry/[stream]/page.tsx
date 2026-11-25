@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@eu/core/i18n";
-import { computeIndicator, fa, miomboRegeneratingHa, UNIT_EUR, type CountingMode, type ForestryStream } from "@eu/forestry";
+import { areaHa, computeIndicator, fa, miomboRegeneratingHa, UNIT_EUR, type CountingMode, type ForestryStream } from "@eu/forestry";
 import { loadSettings, loadStream, photoUploads, rulesFrom } from "@eu/forestry/server";
 import { currentPrincipal } from "@/lib/session";
 import { db } from "@/lib/http";
@@ -10,6 +10,8 @@ import { isIsoDate, todayDrc } from "@/lib/dates";
 import { PlotsView } from "./plots-view";
 import { PublishButton } from "@/components/publish-button";
 import { canPublish } from "@/lib/public-map";
+import { PageHeader } from "@/components/ui";
+import { Icon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +43,15 @@ export default async function ForestryStreamPage({ params, searchParams }: {
 
   return (
     <section className="module" data-stream={s}>
-      <div className="module-head">
-        <h1>{t(locale, `forestry.${s}`)}</h1>
-        {canImport && <Link className="btn secondary" href={`/${locale}/forestry/${s}/import`}>{t(locale, "forestry.import.kmz")}</Link>}
-        {canPublish(me.user, s) && <PublishButton layer={s} locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
-      </div>
+      <PageHeader
+        icon={<Icon name={s === "bamboo" ? "bamboo" : "tree"} size={24} />}
+        title={t(locale, `forestry.${s}`)}
+        subtitle={t(locale, s === "bamboo" ? "ui.home.bamboo.sub" : "ui.home.miombo.sub")}
+        actions={<>
+          {canImport && <Link className="btn" href={`/${locale}/forestry/${s}/import`}><Icon name="upload" size={16} />{t(locale, "forestry.import.kmz")}</Link>}
+          {canPublish(me.user, s) && <PublishButton layer={s} locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
+        </>}
+      />
 
       <form className="asat" method="get">
         <label>{t(locale, "forestry.as_at")}<input type="date" name="asAt" defaultValue={asAt} /></label>
@@ -73,14 +79,18 @@ export default async function ForestryStreamPage({ params, searchParams }: {
       </div>
 
       {plots.length === 0 ? (
-        <p>{t(locale, "forestry.no_plots")}</p>
+        <div className="empty-state">
+          <div className="es-icon"><Icon name={s === "bamboo" ? "bamboo" : "tree"} size={28} /></div>
+          <p>{t(locale, "forestry.no_plots")}</p>
+          {canImport && <div className="es-actions"><Link className="btn" href={`/${locale}/forestry/${s}/import`}><Icon name="upload" size={16} />{t(locale, "forestry.import.kmz")}</Link></div>}
+        </div>
       ) : (
         <PlotsView
           locale={locale}
           stream={s}
           plots={plots.map((p) => {
             const r = result.plots.find((x) => x.siteId === p.siteId)!;
-            return { ...p, areaHa: r.areaHa, plantedPerHa: r.plantedPerHa, outcome: r.outcome };
+            return { ...p, areaHa: p.geom ? areaHa(p.geom) : r.areaHa, plantedPerHa: r.plantedPerHa, outcome: r.outcome };
           })}
           labels={{
             plot: t(locale, "forestry.plot"),

@@ -15,5 +15,5 @@ export async function demoAction(fd: FormData) {
   const ctx = { db: db(), user: me.user, deviceId: me.deviceId ?? `web:${me.user.id}`, permissions, entities };
   const r = fd.get("action") === "remove" ? await removeDemo(ctx) : await loadDemo(ctx);
   revalidatePath(`/${locale}`, "layout");
-  redirect(`/${locale}?demo=${r.ok ? (fd.get("action") === "remove" ? "removed" : "loaded") : "failed"}`);
+  redirect(`/${locale}/admin/demo?demo=${r.ok ? (fd.get("action") === "remove" ? "removed" : "loaded") : "failed"}`);
 }

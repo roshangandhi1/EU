@@ -1,4 +1,5 @@
 import { CLOCK_SKEW_LIMIT_MS } from "@eu/core";
+import { Icon } from "@/components/icons";
 import { devices, users } from "@eu/db";
 import { desc, eq } from "drizzle-orm";
 import { Button, Check, Form, Notice, PageHeader, Table } from "@/components/ui";
@@ -20,7 +21,7 @@ export default async function PhonesPage({ params, searchParams }: { params: Pro
 
   return (
     <section>
-      <PageHeader title={tr("phones")} subtitle={tr("phonesIntro")} />
+      <PageHeader icon={<Icon name="phone" size={24} />} title={tr("phones")} subtitle={tr("phonesIntro")} />
       {sp.error === "confirm" && <Notice tone="error">{tr("revokeConfirm")}</Notice>}
       {sp.ok && <Notice tone="success">{tr("saved")}</Notice>}
       <Table

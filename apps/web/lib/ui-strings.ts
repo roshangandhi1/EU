@@ -2,8 +2,10 @@
 export const uiStrings = {
   en: {
     brandSub: "EU programme · Haut-Lomami, DRC",
+    auth: { title: "Schools, water and forests across Haut-Lomami, in one record.", body: "The working system for the GoCongo programme funded by the European Union. Sign in with the account your administrator gave you." },
     menu: "Menu",
     closeMenu: "Close menu",
+    signOut: "Sign out",
     nav: {
       overview: "Overview",
       programme: "Programme",
@@ -33,7 +35,7 @@ export const uiStrings = {
       greeting: "Welcome, {name}",
       intro: "Everything the programme tracks in one place: schools, boreholes, bamboo plantations and miombo restoration across Haut-Lomami.",
       earned: "Indicator value earned",
-      ofCeiling: "of €{n} maximum",
+      ofCeiling: "of {n} maximum",
       streamsTitle: "Streams",
       open: "Open",
       mapTitle: "Where the programme works",
@@ -80,6 +82,10 @@ export const uiStrings = {
       selectHint: "Select a feature on the map to see its details.",
       satellite: "Satellite",
       streets: "Streets",
+      pupils: "Pupils enrolled",
+      people: "People served",
+      village: "Village",
+      lastVisit: "Last maintenance visit",
     },
     users: {
       title: "Users & access",
@@ -118,8 +124,10 @@ export const uiStrings = {
   },
   fr: {
     brandSub: "Programme UE · Haut-Lomami, RDC",
+    auth: { title: "Écoles, eau et forêts du Haut-Lomami, dans un seul registre.", body: "Le système de travail du programme GoCongo financé par l'Union européenne. Connectez-vous avec le compte fourni par votre administrateur." },
     menu: "Menu",
     closeMenu: "Fermer le menu",
+    signOut: "Déconnexion",
     nav: {
       overview: "Vue d'ensemble",
       programme: "Programme",
@@ -149,7 +157,7 @@ export const uiStrings = {
       greeting: "Bienvenue, {name}",
       intro: "Tout ce que suit le programme au même endroit : écoles, forages, plantations de bambou et restauration du miombo dans le Haut-Lomami.",
       earned: "Valeur des indicateurs acquise",
-      ofCeiling: "sur un maximum de {n} €",
+      ofCeiling: "sur un maximum de {n}",
       streamsTitle: "Volets",
       open: "Ouvrir",
       mapTitle: "Où le programme intervient",
@@ -196,6 +204,10 @@ export const uiStrings = {
       selectHint: "Sélectionnez un élément sur la carte pour voir ses détails.",
       satellite: "Satellite",
       streets: "Plan",
+      pupils: "Élèves inscrits",
+      people: "Personnes desservies",
+      village: "Village",
+      lastVisit: "Dernière visite d'entretien",
     },
     users: {
       title: "Utilisateurs et accès",

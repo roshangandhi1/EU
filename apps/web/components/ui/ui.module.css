@@ -2,7 +2,7 @@
 .header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .headTitle { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .headIcon { flex: none; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; color: #fff; background: var(--accent, var(--gc-green)); box-shadow: var(--shadow-sm); }
-.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent, var(--gc-green)); margin-bottom: 2px; }
+.eyebrow { font-size: 12px; font-weight: 700; color: var(--accent, var(--gc-green)); margin-bottom: 2px; }
 .header h1 { margin: 0; font-size: 1.75rem; }
 .header p { margin: 4px 0 0; color: var(--muted); max-width: 760px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -27,7 +27,7 @@
 .tableWrap { width: 100%; overflow-x: auto; margin: 12px 0 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
 .table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .table th, .table td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-.table th { background: var(--surface-alt); font-weight: 650; white-space: nowrap; color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.03em; }
+.table th { background: var(--surface-alt); font-weight: 650; white-space: nowrap; color: var(--muted); font-size: 12.5px; }
 .table tbody tr:hover { background: #f7faf6; }
 .table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .table tr:last-child td { border-bottom: 0; }

@@ -1,4 +1,5 @@
 import { activeOn, placesAsAt } from "@eu/schools";
+import { Icon } from "@/components/icons";
 import Link from "next/link";
 import { Button, Field, Form, Notice, PageHeader, Table } from "@/components/ui";
 import { db } from "@/lib/http";
@@ -23,8 +24,8 @@ export default async function SchoolsPage({ params, searchParams }: { params: Pr
   );
   const canCreate = can(me, "sites.manage");
   return (
-    <section>
-      <PageHeader title={tr("list.title")} subtitle={tr("list.subtitle")} />
+    <section data-stream="schools">
+      <PageHeader icon={<Icon name="school" size={24} />} title={tr("list.title")} subtitle={tr("list.subtitle")} />
       <Flash sp={sp} tr={tr} />
       {rows.length === 0 && !canCreate && <Notice>{tr("common.noAccess")}</Notice>}
       <Table

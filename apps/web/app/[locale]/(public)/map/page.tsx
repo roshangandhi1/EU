@@ -4,6 +4,7 @@ import { latestSnapshots } from "@eu/maps/server";
 import { db } from "@/lib/http";
 import "@/lib/registry";
 import { PublicMap } from "./public-map";
+import { PublicChrome } from "@/components/shell/public-chrome";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function PublicMapPage({ params }: { params: Promise<{ loca
   const tt = (k: string, v?: Record<string, string | number>) => t(locale, `publicmap.${k}`, v);
 
   return (
+    <PublicChrome locale={locale} path="map">
     <section className="module public-map">
       <h1>{tt("title")}</h1>
       <p className="muted">{tt("intro")}</p>
@@ -48,5 +50,6 @@ export default async function PublicMapPage({ params }: { params: Promise<{ loca
         </>
       )}
     </section>
+    </PublicChrome>
   );
 }

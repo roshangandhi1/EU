@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Icon } from "@/components/icons";
+import { PageHeader } from "@/components/ui";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@eu/core/i18n";
 import type { CountingMode } from "@eu/forestry";
@@ -33,9 +35,8 @@ export default async function Dashboard({ params, searchParams }: {
   const n = (v: number | null) => (v === null ? "–" : nf.format(v));
 
   return (
-    <section className="module dashboard">
-      <h1>{t(locale, "dashboard.title")}</h1>
-      <p className="muted">{t(locale, "dashboard.intro")}</p>
+    <section className="module dashboard" data-stream="platform">
+      <PageHeader icon={<Icon name="chart" size={24} />} title={t(locale, "dashboard.title")} subtitle={t(locale, "dashboard.intro")} />
 
       <form className="asat" method="get">
         <label>{t(locale, "forestry.as_at")}<input type="date" name="asAt" defaultValue={asAt} /></label>

@@ -1,11 +1,12 @@
 import { isLocale, t } from "@eu/core/i18n";
 import { SetupForm } from "./form";
+import { AuthLayout } from "@/components/shell/public-chrome";
 
 export default async function SetupPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) return null;
   return (
-    <section className="card narrow">
+    <AuthLayout locale={locale} path="setup">
       <h1>{t(locale, "setup.title")}</h1>
       <p>{t(locale, "setup.intro")}</p>
       <SetupForm
@@ -20,6 +21,6 @@ export default async function SetupPage({ params }: { params: Promise<{ locale: 
           closed: t(locale, "setup.closed"),
         }}
       />
-    </section>
+    </AuthLayout>
   );
 }
