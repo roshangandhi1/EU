@@ -6,7 +6,7 @@ import { SyncClient, type Transport } from "@eu/sync/client";
 import { MemoryStore } from "@eu/sync/memory-store";
 import { handlePull, handlePush } from "@eu/sync/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { schoolsActions, schoolsEntities, schoolsTables, splitAsAt, studentBalance, type Synced, type Payment, type FeeItem } from "../src";
+import { createSchoolSite, schoolsActions, schoolsEntities, schoolsTables, splitAsAt, studentBalance, type Synced, type Payment, type FeeItem } from "../src";
 
 const permissions = new PermissionRegistry().register(platformActions).register(schoolsActions);
 const entities = new EntityRegistry().register(...schoolsEntities);
@@ -26,6 +26,8 @@ let close: () => Promise<void>;
 beforeEach(async () => {
   // The committed migrations (platform + 0001_schools_init) create every table.
   ({ db, close } = await createTestDb());
+  await createSchoolSite(db, { id: SITE, name: "École Luniemu" });
+  await createSchoolSite(db, { id: "school-other", name: "Autre école" });
 });
 afterEach(async () => close());
 
