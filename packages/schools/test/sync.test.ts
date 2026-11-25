@@ -121,7 +121,26 @@ describe("schools entities on the sync engine", () => {
     expect((await a.store.getServerRecord("school.fee_item", fid))?.amount).toBe(30_000);
   });
 
-  it("phone letters for student numbers are assigned by programme staff only, and W is reserved", async () => {
+  it("the headteacher configures their own school, but not another school; the school admin does not configure", async () => {
+    const h = device("phone-head", head);
+    const o = device("phone-other", otherHead);
+    const a = device("phone-admin", admin);
+    const year = { label: "2026-2027", startsOn: "2026-09-01", endsOn: "2027-07-02" };
+    const yid = await h.client.create("school.academic_year", SITE, year);
+    expect((await h.client.sync()).ok).toBe(true);
+    const item = { academicYearId: yid, termId: null, name: "Minerval", levels: [1], amount: 15_000, dueOn: "2026-12-20" };
+    await h.client.create("school.fee_item", SITE, item);
+    expect((await h.client.sync()).ok).toBe(true);
+    expect(await h.store.rejections()).toHaveLength(0);
+    await o.client.create("school.fee_item", SITE, item);
+    await o.client.sync();
+    expect((await o.store.rejections())[0]?.reason).toBe("forbidden");
+    await a.client.create("school.academic_year", SITE, { ...year, label: "2027-2028", startsOn: "2027-09-01", endsOn: "2028-07-01" });
+    await a.client.sync();
+    expect((await a.store.rejections())[0]?.reason).toBe("forbidden");
+  });
+
+  it("phone letters for student numbers are not assigned by the school admin, and W is reserved", async () => {
     const a = device("phone-admin", admin);
     const m = device("web-manager", manager);
     await a.client.create("school.device_tag", SITE, { phoneId: "phone-admin", tag: "A" });
