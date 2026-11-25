@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, radius, space, touch } from "@eu/core/tokens";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Title } from "../../ui";
+import { BackBar, Body, Button, Title } from "../../ui";
 import { getFix } from "../location";
 import { loadPlots, type PlotLite } from "./data";
 import { MonitoringVisit } from "./MonitoringVisit";
@@ -56,6 +56,7 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
   if (open) {
     return (
       <ScrollView contentContainerStyle={s.wrap}>
+        <BackBar label={t("forestry.m.back")} onBack={() => setOpen(null)} />
         <Title>
           {t("forestry.plot")} {open.code}
         </Title>
@@ -63,7 +64,6 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
         <Body>{t("forestry.m.what_now")}</Body>
         <Button label={t("forestry.planting.new")} onPress={() => setMode("planting")} />
         <Button label={t("forestry.visit.new")} onPress={() => setMode("visit")} />
-        <Button kind="secondary" label={t("forestry.m.back")} onPress={() => setOpen(null)} />
       </ScrollView>
     );
   }
@@ -72,6 +72,7 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
 
   return (
     <ScrollView contentContainerStyle={s.wrap}>
+      <BackBar label={t("forestry.m.back")} onBack={onBack} />
       <Title>{t(`forestry.${stream}`)}</Title>
       {flash && <Body tone="good">{flash}</Body>}
       <Button label={t("forestry.m.find_plot")} onPress={() => void findPlot()} disabled={!plots || plots.length === 0} />
@@ -87,8 +88,6 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
           {p.plantings > 0 && <Text style={s.meta}>{t("forestry.m.plantings_here", { n: p.plantings, total: p.planted })}</Text>}
         </Pressable>
       ))}
-      <View style={{ height: space.md }} />
-      <Button kind="secondary" label={t("forestry.m.back")} onPress={onBack} />
     </ScrollView>
   );
 }

@@ -4,7 +4,7 @@ import { useContext, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Field, Title } from "../../ui";
+import { BackBar, Body, Button, Field, Title } from "../../ui";
 import { getFix, localToday, type Fix } from "../location";
 import type { BoreholeRow, Schedule } from "./data";
 import { PhotoStrip } from "../photos";
@@ -122,6 +122,7 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
 
   return (
     <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
+      <BackBar label={t("forestry.m.back")} onBack={() => onDone(false)} />
       <Title>{t("boreholes.visit.new")}</Title>
       <Body tone="muted">
         {borehole.code} · {borehole.village}

@@ -4,7 +4,7 @@ import { useContext, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Field, Title } from "../../ui";
+import { BackBar, Body, Button, Field, Title } from "../../ui";
 import { getFix, localToday, type Fix } from "../location";
 import { PhotoStrip } from "../photos";
 import { loadSpecies, type PlotLite, type SpeciesOption } from "./data";
@@ -80,6 +80,7 @@ export function PlantingForm({ session, stream, plot, onDone }: { session: Sessi
 
   return (
     <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
+      <BackBar label={t("forestry.m.back")} onBack={() => onDone(false)} />
       <Title>{t("forestry.planting.new")}</Title>
       <Body tone="muted">
         {t("forestry.plot")} {plot.code} · {plot.village}

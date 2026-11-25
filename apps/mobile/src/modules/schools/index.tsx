@@ -2,7 +2,7 @@ import type { School } from "@eu/schools/mobile";
 import { useEffect, useState } from "react";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Screen, Title } from "../../ui";
+import { BackBar, Body, Button, Screen, Title } from "../../ui";
 import { Attendance } from "./Attendance";
 import { listSchools, live, today, useSchool, type Local } from "./data";
 import { Fees } from "./Fees";
@@ -37,10 +37,10 @@ export function SchoolsApp({ session, onExit }: { session: Session; onExit: () =
   if (!school)
     return (
       <Screen>
+        <BackBar label={t("schools.mobile.back")} onBack={onExit} />
         <Title>{t("schools.mobile.pickSchool")}</Title>
         {schools.length === 0 && <Body tone="warning">{t("schools.mobile.noSchools")}</Body>}
         {schools.map((s) => <Button key={s.id} kind="secondary" label={s.code} onPress={() => setSchool(s)} />)}
-        <Button kind="secondary" label={t("schools.mobile.back")} onPress={onExit} />
       </Screen>
     );
   return <SchoolMenu session={session} school={school} onExit={schools.length > 1 ? () => setSchool(null) : onExit} />;
@@ -61,13 +61,13 @@ function SchoolMenu({ session, school, onExit }: { session: Session; school: Loc
   const missing = yearClasses.filter((c) => !live(data.registers).some((r) => r.classId === c.id && r.date === d)).length;
   return (
     <Screen>
+      <BackBar label={t("schools.mobile.back")} onBack={onExit} />
       <Title>{school.code}</Title>
       <Body tone="muted">{t("schools.mobile.menu")}</Body>
       {missing > 0 && <Body tone="warning">{t("schools.mobile.notTaken", { count: missing })}</Body>}
       <Button label={t("schools.attendance.takeRegister")} onPress={() => setView("attendance")} />
       <Button label={t("schools.nav.students")} onPress={() => setView("students")} />
       <Button label={t("schools.fees.payment")} onPress={() => setView("fees")} />
-      <Button kind="secondary" label={t("schools.mobile.back")} onPress={onExit} />
     </Screen>
   );
 }

@@ -2,7 +2,7 @@ import { activeOn, checkReceiptNumber, formatCdf, normaliseName, studentBalance,
 import { useContext, useState } from "react";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Field, Title } from "../../ui";
+import { BackBar, Body, Button, Field, Title } from "../../ui";
 import { live, studentName, today, type Local, type SchoolData } from "./data";
 import { Row, Scroll } from "./parts";
 
@@ -47,6 +47,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
 
   return (
     <Scroll>
+      <BackBar label={t("schools.mobile.back")} onBack={onBack} />
       <Title>{t("schools.fees.payment")}</Title>
       {!student ? (
         <>
@@ -66,7 +67,6 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
           ))}
         </>
       )}
-      <Button kind="secondary" label={t("schools.mobile.back")} onPress={onBack} />
     </Scroll>
   );
 }
