@@ -4,7 +4,7 @@
  * checks, validation and audit trail as writes from phones.
  */
 import type { UserContext } from "@eu/core";
-import { sites, type Db } from "@eu/db";
+import { files, sites, type Db } from "@eu/db";
 import type { EntityRegistry } from "@eu/sync";
 import type { PermissionRegistry } from "@eu/core";
 import { handlePush } from "@eu/sync/server";
@@ -52,6 +52,16 @@ export interface PlotRow {
 }
 
 /** Everything the indicator and the map need for one stream. */
+/** When each referenced photo reached the server (only uploaded photos appear). */
+export async function photoUploads(db: Db, inputs: PlotInput[]): Promise<Map<string, Date>> {
+  const ids = [...new Set(inputs.flatMap((p) => [...p.plantings.flatMap((e) => e.photos), ...p.visits.flatMap((v) => v.photos.map((x) => x.fileId))]))];
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const valid = ids.filter((x) => uuid.test(x));
+  if (valid.length === 0) return new Map();
+  const rows = await (db as AnyDb).select({ id: files.id, uploadedAt: files.uploadedAt }).from(files).where(inArray(files.id, valid));
+  return new Map(rows.map((r: { id: string; uploadedAt: Date }) => [r.id, new Date(r.uploadedAt)]));
+}
+
 export async function loadStream(db: Db, stream: ForestryStream): Promise<{ plots: PlotRow[]; inputs: PlotInput[] }> {
   const d = db as AnyDb;
   const plotRows = await d.select().from(plots).where(and(eq(plots.stream, stream), isNull(plots.voidedAt)));
@@ -211,7 +221,7 @@ const roundCoords = (g: MultiPolygon, dp: number): MultiPolygon => {
 export async function buildPublicLayer(db: Db, stream: ForestryStream, asAt: string) {
   const { plots: rows, inputs } = await loadStream(db, stream);
   const settings = await loadSettings(db, stream);
-  const rules = rulesFrom(stream, settings);
+  const rules = { ...rulesFrom(stream, settings), photoUploadedAt: await photoUploads(db, inputs) };
   const latin = new Map(settings.speciesList.map((s) => [s.key, s.latin]));
   const features: import("geojson").Feature[] = [];
   let ha = 0;

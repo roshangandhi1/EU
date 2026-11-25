@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isLocale, t } from "@eu/core/i18n";
 import { computeIndicator, fa, miomboRegeneratingHa, UNIT_EUR, type CountingMode, type ForestryStream } from "@eu/forestry";
-import { loadSettings, loadStream, rulesFrom } from "@eu/forestry/server";
+import { loadSettings, loadStream, photoUploads, rulesFrom } from "@eu/forestry/server";
 import { currentPrincipal } from "@/lib/session";
 import { db } from "@/lib/http";
 import { permissions } from "@/lib/registry";
@@ -32,7 +32,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
   const mode: CountingMode = sp.mode === "evidence" ? "evidence" : "captured";
 
   const [{ plots, inputs }, settings] = await Promise.all([loadStream(db(), s), loadSettings(db(), s)]);
-  const result = computeIndicator(inputs, asAt, mode, rulesFrom(s, settings));
+  const result = computeIndicator(inputs, asAt, mode, { ...rulesFrom(s, settings), photoUploadedAt: await photoUploads(db(), inputs) });
   const target = TARGETS[s];
   const unit = UNIT_EUR[target.code];
   const late = result.plots.reduce((n, p) => n + p.lateSynced.length, 0);

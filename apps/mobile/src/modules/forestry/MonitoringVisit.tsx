@@ -10,6 +10,7 @@ import type { Session } from "../../session";
 import { Body, Button, Field, Title } from "../../ui";
 import { getFix, localToday, type Fix } from "../location";
 import { loadSpecies, type PlotLite, type SpeciesOption } from "./data";
+import { PhotoStrip } from "../photos";
 
 type Threat = "fire" | "charcoal" | "grazing" | "encroachment" | "pests" | "disease" | "livestock" | "flooding" | "other";
 const THREATS: Threat[] = ["fire", "charcoal", "grazing", "encroachment", "pests", "disease", "livestock", "flooding", "other"];
@@ -56,6 +57,7 @@ export function MonitoringVisit({ session, stream, plot, onDone }: { session: Se
   const [weeding, setWeeding] = useState<("done" | "partial" | "needed")[]>([]);
   const [height, setHeight] = useState("");
   const [notes, setNotes] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -122,7 +124,7 @@ export function MonitoringVisit({ session, stream, plot, onDone }: { session: Se
       meanHeightCm: height.trim() ? Number(height) : null,
       threats,
       weeding: weeding[0] ?? null,
-      photos: [],
+      photos: photos.map((fileId) => ({ fileId })),
       notes: notes.trim() || null,
       gpsLat: fix?.lat ?? null,
       gpsLng: fix?.lng ?? null,
@@ -217,7 +219,8 @@ export function MonitoringVisit({ session, stream, plot, onDone }: { session: Se
       <Pills value={weeding} onToggle={(v) => setWeeding(weeding[0] === v ? [] : [v])} options={(["done", "partial", "needed"] as const).map((v) => ({ v, label: t(`forestry.m.weed.${v}`) }))} />
       <Field label={t("forestry.m.mean_height")} value={height} onChangeText={setHeight} keyboardType="number-pad" />
       <Field label={t("forestry.m.notes")} value={notes} onChangeText={setNotes} multiline />
-      <Body tone="muted">{t("forestry.m.photos_soon")}</Body>
+      <Body tone="muted">{t("forestry.m.photo_hint")}</Body>
+      <PhotoStrip session={session} entity={`${stream}.visit`} scopeId={plot.scopeId} ids={photos} onChange={setPhotos} />
       {error && <Body tone="critical">{error}</Body>}
       <Button label={t("forestry.m.save")} onPress={() => void save()} disabled={saving} />
       {drawn.length > 0 && <Button kind="secondary" label={t("forestry.m.prev_point")} onPress={() => setPhase("points")} />}

@@ -136,5 +136,7 @@ export const en = {
   "forestry.m.survival": "Survival of planted stock: {pct}% (95% range {low} to {high}%)",
   "forestry.m.visit_saved": "Visit saved on this phone. It will sync when there is signal.",
   "forestry.m.visit_date": "Visit date",
+  "forestry.m.take_photo": "Take a photo",
+  "forestry.m.photo_hint": "Take at least one photo: hectares only count with photo evidence.",
 } as const;
 export type ForestryKey = keyof typeof en;

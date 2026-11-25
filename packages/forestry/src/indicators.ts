@@ -43,6 +43,12 @@ export interface IndicatorRules {
   countGapFilling?: boolean;
   /** Evidence needed for a hectare to count: at least one dated photo. Default true. */
   requirePhoto?: boolean;
+  /**
+   * When the server supplies it: when each referenced photo reached the server. A photo the phone
+   * has not uploaded yet is not evidence; in evidence mode it must also have arrived by the as-at date.
+   * Without it, any referenced photo counts (unit tests, previews).
+   */
+  photoUploadedAt?: Map<string, Date>;
 }
 
 export type PlotOutcome =
@@ -120,7 +126,13 @@ export function evaluatePlot(p: PlotInput, asAt: string, mode: CountingMode, rul
   const perHa = area > 0 ? planted / area : 0;
   // The indicator uses the contract rule only; a plot's own target density is operational, not a payment test.
   const threshold = rules.densityRulePerHa;
-  const hasPhoto = plantings.some((e) => e.photos.length > 0) || visits.some((v) => v.photos.length > 0);
+  const up = rules.photoUploadedAt;
+  const isEvidence = (id: string) => {
+    if (!up) return true;
+    const t = up.get(id);
+    return !!t && (mode === "captured" || t <= at);
+  };
+  const hasPhoto = plantings.some((e) => e.photos.some(isEvidence)) || visits.some((v) => v.photos.some((p) => isEvidence(p.fileId)));
 
   let outcome: PlotOutcome;
   if (!b) outcome = "no_authoritative_boundary";

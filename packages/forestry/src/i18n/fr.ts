@@ -138,4 +138,6 @@ export const fr: Record<ForestryKey, string> = {
   "forestry.m.survival": "Survie des plants : {pct} % (plage à 95 % : {low} à {high} %)",
   "forestry.m.visit_saved": "Visite enregistrée sur ce téléphone. Synchronisation dès qu'il y aura du réseau.",
   "forestry.m.visit_date": "Date de la visite",
+  "forestry.m.take_photo": "Prendre une photo",
+  "forestry.m.photo_hint": "Prenez au moins une photo : les hectares ne comptent qu'avec une preuve photo.",
 };

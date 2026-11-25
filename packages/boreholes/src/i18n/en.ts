@@ -104,7 +104,7 @@ export const en = {
   "boreholes.m.not_done": "Not done",
   "boreholes.m.reading": "Reading ({unit})",
   "boreholes.m.out_of_range": "Outside the expected range: this will open a fault.",
-  "boreholes.m.photo_task": "Needs a photo: photos come in the next app update. Mark done if you did it.",
+  "boreholes.m.photo_task": "Needs a photo: take one, then mark the result.",
   "boreholes.m.note": "Note",
   "boreholes.m.bucket_seconds": "Seconds to fill 20 L",
   "boreholes.m.flow_result": "Flow: {lpm} L/min",
