@@ -32,7 +32,7 @@ export function expoDriver(db: SQLite.SQLiteDatabase): SqlDriver {
   };
 }
 
-export async function openStore(key: string): Promise<{ store: SqlStore; db: SQLite.SQLiteDatabase }> {
-  const db = await openEncryptedDb(key);
-  return { store: await SqlStore.open(expoDriver(db)), db };
+export async function openStore(key: string): Promise<{ store: SqlStore; driver: SqlDriver }> {
+  const driver = expoDriver(await openEncryptedDb(key));
+  return { store: await SqlStore.open(driver), driver };
 }

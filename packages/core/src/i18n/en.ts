@@ -18,6 +18,7 @@ export const en = {
     failed: "Sync failed. Will retry.",
     clockSuspect: "This phone's clock looks wrong. Please correct the date and time.",
     deviceRevoked: "This phone has been removed from the system.",
+    photosWaiting: "Photos waiting to upload ({count})",
     syncNow: "Sync now",
     syncing: "Syncing…",
     offline: "No connection. Your work is saved on this phone.",
