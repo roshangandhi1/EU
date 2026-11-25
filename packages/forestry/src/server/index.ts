@@ -259,6 +259,11 @@ export function rulesFrom(stream: ForestryStream, s: StreamSettings): IndicatorR
   };
 }
 
+/** The label a plot carries on the public map: never its code or placemark name. */
+export function publicPlotLabel(stream: ForestryStream, n: number): string {
+  return `${stream === "bamboo" ? "B" : "M"}-${String(n).padStart(3, "0")}`;
+}
+
 /** Properties a public plot feature may carry; anything else is dropped before publishing. */
 export const PUBLIC_PLOT_PROPS = ["code", "village", "stream", "species", "areaHa", "plantedPerHa", "counted", "status"];
 
@@ -279,6 +284,9 @@ export async function buildPublicLayer(db: Db, stream: ForestryStream, asAt: str
   const features: import("geojson").Feature[] = [];
   let ha = 0;
   let countedHa = 0;
+  // Public labels: placemark names are often a landholder's name, so the public map never shows the
+  // plot code. Each public plot gets a neutral label, B-001 or M-002, numbered in a fixed order (SEC-8).
+  const order = new Map([...rows].sort((a, b) => (a.siteId < b.siteId ? -1 : 1)).map((r, n) => [r.siteId, n + 1]));
   rows.forEach((row, i) => {
     if (!row.publicVisible) return;
     const input = inputs[i]!;
@@ -292,7 +300,7 @@ export async function buildPublicLayer(db: Db, stream: ForestryStream, asAt: str
       type: "Feature",
       geometry: roundCoords(b.geom as MultiPolygon, 4),
       properties: {
-        code: row.code, village: row.village, stream, status: row.status,
+        code: publicPlotLabel(stream, order.get(row.siteId)!), village: row.village, stream, status: row.status,
         species: row.species.map((k) => latin.get(k) ?? k).join(", "),
         areaHa: area, plantedPerHa: Math.round(r.plantedPerHa), counted: r.outcome === "counted",
       },
