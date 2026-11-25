@@ -2,13 +2,21 @@
   "expo": {
     "name": "GoCongo",
     "slug": "gocongo-eu",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
       "package": "cd.gocongo.eu",
-      "versionCode": 1,
-      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "versionCode": 2,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1C6B33"
+      }
     },
     "plugins": [
       [
@@ -19,7 +27,12 @@
       ],
       "expo-secure-store",
       "expo-localization",
-      ["expo-image-picker", { "cameraPermission": "GoCongo uses the camera to take evidence photos." }],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "GoCongo uses the camera to take evidence photos."
+        }
+      ],
       [
         "expo-location",
         {
@@ -33,6 +46,8 @@
         "projectId": "3360412d-5e27-4140-abf3-d3335d34f729"
       }
     },
-    "owner": "roshangocongos-team"
+    "owner": "roshangocongos-team",
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#1C6B33"
   }
 }

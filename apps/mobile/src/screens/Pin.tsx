@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Body, Button, EuBand, Field, Screen, Title } from "../ui";
+import { Body, Button, Field } from "../ui";
 import { useT } from "../i18n";
 import type { Session } from "../session";
+import { AuthLayout } from "./AuthLayout";
 
 const valid = (p: string) => /^\d{4,6}$/.test(p);
 
@@ -15,15 +16,13 @@ export function SetPin({ session }: { session: Session }) {
     await session.setPin(first);
   };
   return (
-    <Screen>
-      <Title>{t("auth.setPin")}</Title>
+    <AuthLayout title={t("auth.setPin")} intro={t("app.pinIntro")}>
       {session.user && <Body tone="muted">{t("auth.signedInAs", { name: session.user.name })}</Body>}
       {error && <Body tone="critical">{t(error)}</Body>}
       <Field label={t("auth.setPin")} value={first} onChangeText={setFirst} keyboardType="number-pad" secureTextEntry maxLength={6} />
       <Field label={t("auth.confirmPin")} value={second} onChangeText={setSecond} keyboardType="number-pad" secureTextEntry maxLength={6} />
       <Button label={t("common.save")} onPress={submit} disabled={!valid(first) || !valid(second)} />
-      <EuBand text={t("common.fundedByEu")} />
-    </Screen>
+    </AuthLayout>
   );
 }
 
@@ -37,13 +36,10 @@ export function Unlock({ session }: { session: Session }) {
     if (!r.ok) setError(t("auth.pinWrong", { count: r.remaining }));
   };
   return (
-    <Screen>
-      <Title>{t("auth.enterPin")}</Title>
-      {session.user && <Body tone="muted">{t("auth.signedInAs", { name: session.user.name })}</Body>}
+    <AuthLayout title={session.user ? t("app.hello", { name: session.user.name }) : t("auth.enterPin")} intro={t("app.pinIntro")}>
       {error && <Body tone="critical">{error}</Body>}
-      <Field label={t("auth.enterPin")} value={value} onChangeText={setValue} keyboardType="number-pad" secureTextEntry maxLength={6} autoFocus />
+      <Field label={t("auth.enterPin")} value={value} onChangeText={setValue} keyboardType="number-pad" secureTextEntry maxLength={6} autoFocus onSubmitEditing={() => valid(value) && void submit()} />
       <Button label={t("common.signIn")} onPress={submit} disabled={!valid(value)} />
-      <EuBand text={t("common.fundedByEu")} />
-    </Screen>
+    </AuthLayout>
   );
 }

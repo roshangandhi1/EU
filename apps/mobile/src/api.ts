@@ -1,3 +1,4 @@
+import type { RoleAssignment } from "@eu/core";
 import { DeviceRevokedError, type Transport } from "@eu/sync/client";
 import { API_BASE, APP_VERSION } from "./config";
 
@@ -11,12 +12,16 @@ export class ApiError extends Error {
 }
 
 async function post<T>(path: string, body: unknown, bearer?: string): Promise<T> {
+  return call<T>("POST", path, body, bearer);
+}
+
+async function call<T>(method: "GET" | "POST", path: string, body: unknown, bearer?: string): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
+      method,
       headers: { "content-type": "application/json", ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) },
-      body: JSON.stringify(body),
+      ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
     });
   } catch {
     throw new ApiError(0, "offline");
@@ -31,7 +36,17 @@ async function post<T>(path: string, body: unknown, bearer?: string): Promise<T>
 
 export interface SignedIn {
   token: string;
-  user: { id: string; name: string; email: string; locale: string };
+  user: { id: string; name: string; email: string; locale: string; assignments?: RoleAssignment[] };
+}
+
+/** Who this phone's token belongs to now, with current roles (they can change on the web). */
+export function getMe(token: string): Promise<{ id: string; name: string; assignments: RoleAssignment[] }> {
+  return call("GET", "/api/me", undefined, token);
+}
+
+/** Loads the demo data set (system admin or programme manager only). */
+export function loadDemo(token: string): Promise<{ ok: true; created: string[] }> {
+  return post("/api/admin/demo", { action: "load" }, token);
 }
 
 /** Phone sign-in: registers this phone and returns its long-lived token. */

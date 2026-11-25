@@ -1,9 +1,10 @@
+import type { RoleAssignment } from "@eu/core";
 import NetInfo from "@react-native-community/netinfo";
 import { DeviceRevokedError, SyncClient, type SyncOutcome } from "@eu/sync/client";
 import type { SqlStore } from "@eu/sync/sql-store";
 import * as Crypto from "expo-crypto";
 import { AppState } from "react-native";
-import { ApiError, httpTransport, registerDevice, reportStatus } from "./api";
+import { ApiError, getMe, httpTransport, loadDemo, registerDevice, reportStatus } from "./api";
 import { PIN_MAX_FAILURES, SYNC_INTERVAL_MS } from "./config";
 import { openStore } from "./db";
 import { EvidenceFiles } from "./files";
@@ -31,6 +32,8 @@ type Listener = () => void;
 export class Session {
   phase: Phase = "loading";
   user: { id: string; name: string } | null = null;
+  /** Role assignments from the server, saved for offline use; undefined until first known. */
+  roles: RoleAssignment[] | undefined = undefined;
   notice: string | null = null; // an i18n key to show on the next screen
   status: SyncStatus = { running: false, pending: 0, photosPending: 0, nextCutoff: null, rejected: 0, lastOk: null, last: null, offline: false };
   store!: SqlStore;
@@ -59,6 +62,7 @@ export class Session {
     this.files = await EvidenceFiles.open(driver, secure.token.get);
     this.client = new SyncClient(store, httpTransport(secure.token.get), { newId: () => Crypto.randomUUID() });
     this.user = await secure.savedUser();
+    this.roles = await secure.savedRoles.get();
     const [tok, hasPin] = await Promise.all([secure.token.get(), secure.pin.isSet()]);
     await this.refreshCounts();
     this.go(!tok ? "signIn" : hasPin ? "unlock" : "setPin");
@@ -78,6 +82,10 @@ export class Session {
       await secure.token.set(res.token);
       this.user = { id: res.user.id, name: res.user.name };
       await secure.saveUser(this.user);
+      if (res.user.assignments) {
+        this.roles = res.user.assignments;
+        await secure.savedRoles.set(this.roles);
+      }
       this.go("setPin");
       return null;
     } catch (e) {
@@ -182,6 +190,30 @@ export class Session {
     } catch {
       // offline or server busy: the next sync tries again
     }
+    try {
+      const me = await getMe(tok);
+      if (JSON.stringify(me.assignments) !== JSON.stringify(this.roles)) {
+        this.roles = me.assignments;
+        await secure.savedRoles.set(me.assignments);
+        this.emit();
+      }
+    } catch {
+      // keep the saved roles
+    }
+  }
+
+  /** Loads the demo data on the server, then syncs so it arrives here. Returns an i18n key for the outcome. */
+  async loadDemo(): Promise<string> {
+    const tok = await secure.token.get();
+    if (!tok) return "app.demoFailed";
+    try {
+      await loadDemo(tok);
+    } catch {
+      return "app.demoFailed";
+    }
+    while (this.status.running) await new Promise((r) => setTimeout(r, 300));
+    await this.syncNow();
+    return "app.demoLoaded";
   }
 
   async refreshCounts(): Promise<void> {
