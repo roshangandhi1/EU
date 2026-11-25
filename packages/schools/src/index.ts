@@ -10,3 +10,4 @@ export * as schoolsTables from "./db/schema";
 export { schools as schoolsEn } from "./i18n/en";
 export { schools as schoolsFr } from "./i18n/fr";
 export * from "./queries";
+export * from "./indicators";
