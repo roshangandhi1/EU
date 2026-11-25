@@ -39,7 +39,7 @@ export interface IndicatorRules {
   densityRulePerHa: number;
   /** Miombo: only these species count as native. Bamboo: ignored. */
   isNative?: (species: string) => boolean;
-  /** Replacement planting adds to "planted per ha" only if true. Default false (conservative). */
+  /** Replacement planting adds to "planted per ha" unless false. Default true (Roshan, 2026-11-25). */
   countGapFilling?: boolean;
   /** Evidence needed for a hectare to count: at least one dated photo. Default true. */
   requirePhoto?: boolean;
@@ -117,7 +117,7 @@ export function evaluatePlot(p: PlotInput, asAt: string, mode: CountingMode, rul
   const native = rules.isNative ?? (() => true);
 
   const planted = plantings
-    .filter((e) => rules.countGapFilling || !e.isGapFilling)
+    .filter((e) => (rules.countGapFilling ?? true) || !e.isGapFilling)
     .flatMap((e) => e.lines)
     .filter((l) => p.stream === "bamboo" || native(l.species))
     .reduce((s, l) => s + l.count, 0);

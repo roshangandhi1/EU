@@ -36,13 +36,13 @@ describe("2.2.1 bamboo", () => {
     expect(r.plots[0]!.outcome).toBe("below_density");
   });
 
-  it("gap filling is excluded from density by default", () => {
+  it("gap filling counts towards density by default, and can be excluded", () => {
     const p = bambooPlot({ plantings: [
       { ...stamp("e1", "2026-09-10T10:00:00Z"), plantedOn: "2026-09-10", lines: [{ species: "x", count: 3500 }], isGapFilling: false, photos: ["f"] },
       { ...stamp("e2", "2026-10-01T10:00:00Z"), plantedOn: "2026-10-01", lines: [{ species: "x", count: 600 }], isGapFilling: true, photos: [] },
     ] });
-    expect(computeIndicator([p], "2026-10-16", "captured", bambooRules).hectaresCounted).toBe(0);
-    expect(computeIndicator([p], "2026-10-16", "captured", { ...bambooRules, countGapFilling: true }).hectaresCounted).toBe(10);
+    expect(computeIndicator([p], "2026-10-16", "captured", { ...bambooRules, countGapFilling: false }).hectaresCounted).toBe(0);
+    expect(computeIndicator([p], "2026-10-16", "captured", bambooRules).hectaresCounted).toBe(10);
   });
 
   it("requires photo evidence", () => {
