@@ -195,6 +195,11 @@ export default async function Setup({ params, searchParams }: { params: Promise<
           </>)}
         </Section>
 
+        <Section id="grading" icon="layers" title={tr("marks.setupLink")} description={tr("marks.schemeIntro")}
+          actions={<Link className="btn secondary sm" href={`/${locale}/schools/${p.siteId}/setup/grading`}><Icon name="layers" size={15} />{tr("marks.setupLink")}</Link>}>
+          {null}
+        </Section>
+
         <Section id="fees" flush icon="coins" title={tr("setup.feeItems")} description={tr("ux.feesDesc")} count={items.length}
           actions={<Link className="btn secondary sm" href={`/${locale}/schools/${p.siteId}/setup/fees`}><Icon name="coins" size={15} />{tr("feeGrid.open")}</Link>}>
           <Flash sp={sp} tr={tr} section="fees" />
