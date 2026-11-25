@@ -161,6 +161,21 @@ export const receiptBook = z.object({
 });
 export type ReceiptBook = z.infer<typeof receiptBook>;
 
+/**
+ * The letter a phone (or "W" for the web) puts in student numbers it issues offline.
+ * Assigned per school on the web, so two phones can never issue the same number.
+ */
+export const deviceTag = z.object({
+  phoneId: z.string().min(1), // platform devices.id of the phone
+  tag: z.string().regex(/^[A-VX-Z]$/), // W is reserved for the web
+});
+export type DeviceTag = z.infer<typeof deviceTag>;
+
+/** The letter assigned to a device at a school, if any. */
+export function tagForDevice(tags: readonly (DeviceTag & { voidedAt?: string | null })[], deviceId: string): string | null {
+  return tags.find((t) => !t.voidedAt && t.phoneId === deviceId)?.tag ?? null;
+}
+
 export const payment = z.object({
   studentId: id,
   paidOn: isoDate,

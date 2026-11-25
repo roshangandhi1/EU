@@ -15,6 +15,13 @@
       "when": 1795602019135,
       "tag": "0001_schools_init",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795603650336,
+      "tag": "0002_schools_device_tags",
+      "breakpoints": true
     }
   ]
 }

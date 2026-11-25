@@ -1,9 +1,10 @@
 import type { Locale } from "@eu/core/i18n";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { View } from "react-native";
 import { Body, Button, EuBand, Screen, Title } from "../ui";
 import { LocaleContext, useT } from "../i18n";
 import type { Session } from "../session";
+import { SchoolsApp, useHasSchools } from "../modules/schools";
 
 /**
  * Home: who is signed in, sync status, and (later) one tile per module the user can use.
@@ -12,8 +13,12 @@ import type { Session } from "../session";
 export function Home({ session }: { session: Session }) {
   const t = useT();
   const { locale, setLocale } = useContext(LocaleContext);
+  const [module, setModule] = useState<"schools" | null>(null);
+  const hasSchools = useHasSchools(session);
   const st = session.status;
   const when = st.lastOk ? new Date(st.lastOk).toLocaleString(locale) : null;
+
+  if (module === "schools") return <SchoolsApp session={session} onExit={() => setModule(null)} />;
 
   return (
     <Screen>
@@ -34,6 +39,7 @@ export function Home({ session }: { session: Session }) {
         )}
       </View>
 
+      {hasSchools && <Button label={t("schools.nav.schools")} onPress={() => setModule("schools")} />}
       <Button label={st.running ? t("sync.syncing") : t("sync.syncNow")} onPress={() => void session.syncNow()} disabled={st.running} />
       <Button
         kind="secondary"
