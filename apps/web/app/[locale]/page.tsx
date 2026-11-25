@@ -40,6 +40,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           </ul>
         </>
       )}
+      {permissions.can(me.user, "dashboard.read", { stream: "platform" }) && (
+        <p><Link className="btn" href={`/${locale}/dashboard`}>{t(locale, "dashboard.nav")}</Link></p>
+      )}
       <SignOutButton label={t(locale, "common.signOut")} locale={locale} />
     </section>
   );

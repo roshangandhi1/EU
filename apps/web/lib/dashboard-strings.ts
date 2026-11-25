@@ -1,0 +1,49 @@
+/** "dashboard" namespace. Indicator names are short forms of the Annex III wording. */
+export const dashboardStrings = {
+  en: {
+    title: "Programme indicators",
+    intro: "The 13 indicators of the EU contract, with what the app can already count. Values use the Annex III unit rates and are capped at each indicator's maximum.",
+    nav: "Programme indicators",
+    forbidden: "You don't have access to the programme dashboard.",
+    col: { code: "Code", name: "Indicator", value: "Achieved", t2027: "2027 target", t2030: "2030 target", eur: "Value (EUR)", cap: "Maximum (EUR)", source: "Source" },
+    name: {
+      i111: "Solar boreholes operational", i121: "Cooperative constituted", i122: "Buying centre functional",
+      i123: "Smallholders certified", i211: "Hectares of miombo restored", i221: "Hectares of bamboo established",
+      i311: "TVET centre foundations", i312: "TVET centre superstructures", i313: "TVET centres finished and equipped",
+      i314: "TVET places available", i321: "Primary schools upgraded", i322: "New primary student places", i411: "Third-party assessment reports approved",
+    },
+    status: {
+      live: "Counted in the app", awaiting_api: "Awaiting the AgriCoopGC link", awaiting_module: "Coming with the schools module",
+      parked: "TVET module not started", manual: "Not tracked in the app",
+    },
+    source: { boreholes: "Boreholes", miombo: "Miombo", bamboo: "Bamboo", schools: "Schools", agricoop: "AgriCoopGC", tvet: "TVET", tpa: "Third-party assessor" },
+    regenerating_ha: "Reading B (living saplings): {n} ha",
+    late: "{n} record(s) received after the date, awaiting review",
+    total: { earned: "Earned so far", tracked: "Maximum of indicators counted here", ceiling: "Maximum of all 13 indicators" },
+    pct: "{n}% of 2030",
+    open: "Open",
+  },
+  fr: {
+    title: "Indicateurs du programme",
+    intro: "Les 13 indicateurs du contrat UE, avec ce que l'application compte déjà. Les valeurs utilisent les prix unitaires de l'annexe III et sont plafonnées au maximum de chaque indicateur.",
+    nav: "Indicateurs du programme",
+    forbidden: "Vous n'avez pas accès au tableau de bord du programme.",
+    col: { code: "Code", name: "Indicateur", value: "Réalisé", t2027: "Cible 2027", t2030: "Cible 2030", eur: "Valeur (EUR)", cap: "Maximum (EUR)", source: "Source" },
+    name: {
+      i111: "Forages solaires opérationnels", i121: "Coopérative constituée", i122: "Centre d'achat fonctionnel",
+      i123: "Petits exploitants certifiés", i211: "Hectares de miombo restaurés", i221: "Hectares de bambou établis",
+      i311: "Fondations des centres EFTP", i312: "Superstructures des centres EFTP", i313: "Centres EFTP achevés et équipés",
+      i314: "Places EFTP disponibles", i321: "Écoles primaires améliorées", i322: "Nouvelles places d'élèves au primaire", i411: "Rapports d'évaluation tierce approuvés",
+    },
+    status: {
+      live: "Compté dans l'application", awaiting_api: "En attente du lien AgriCoopGC", awaiting_module: "Arrive avec le module écoles",
+      parked: "Module EFTP pas encore commencé", manual: "Non suivi dans l'application",
+    },
+    source: { boreholes: "Forages", miombo: "Miombo", bamboo: "Bambou", schools: "Écoles", agricoop: "AgriCoopGC", tvet: "EFTP", tpa: "Évaluateur tiers" },
+    regenerating_ha: "Lecture B (jeunes plants vivants) : {n} ha",
+    late: "{n} enregistrement(s) reçu(s) après la date, en attente de vérification",
+    total: { earned: "Acquis à ce jour", tracked: "Maximum des indicateurs comptés ici", ceiling: "Maximum des 13 indicateurs" },
+    pct: "{n} % de 2030",
+    open: "Ouvrir",
+  },
+};

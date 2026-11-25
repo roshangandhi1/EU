@@ -84,3 +84,13 @@ fieldset { border: 1px solid #d5dad2; border-radius: 8px; }
 .public-map-wrap .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .public-map-wrap .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-left: 6px; }
 .publish { display: inline-flex; flex-direction: column; gap: 4px; max-width: 340px; }
+
+/* Programme dashboard */
+.table-wrap { overflow-x: auto; }
+table.dash { width: 100%; border-collapse: collapse; }
+table.dash th, table.dash td { padding: 10px 8px; border-bottom: 1px solid var(--line, #dfe5e0); vertical-align: top; text-align: left; }
+table.dash .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.dash td.big { font-size: 20px; font-weight: 700; }
+table.dash tr:not([data-status="live"]) td.big { color: var(--muted); font-weight: 400; }
+.dashboard .bar { height: 6px; background: #e8ece9; border-radius: 3px; margin-top: 6px; max-width: 220px; overflow: hidden; }
+.dashboard .bar span { display: block; height: 100%; background: var(--gc-green); }
