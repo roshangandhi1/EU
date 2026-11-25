@@ -76,6 +76,6 @@ describe("on-time rate and faults", () => {
   });
 
   it("default template validates", () => {
-    expect(templateSchema.safeParse(defaultTemplate).success).toBe(true);
+    expect(templateSchema.safeParse({ ...defaultTemplate, templateVersion: 1 }).success).toBe(true);
   });
 });

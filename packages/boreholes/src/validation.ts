@@ -35,6 +35,8 @@ export const taskDefSchema = z.object({
 
 export const templateSchema = z.object({
   templateKey: z.string().regex(/^[a-z0-9_]{2,40}$/),
+  templateVersion: z.number().int().positive(),
+  active: z.boolean().default(true),
   name: bi,
   tasks: z.array(taskDefSchema).min(1).refine((ts) => new Set(ts.map((t) => t.key)).size === ts.length, "duplicate_task_key"),
 });
@@ -60,8 +62,16 @@ export const boreholeSchema = z.object({
   handedOverOn: isoDate.nullable().optional(),
   waterCommittee: z.string().nullable().optional(),
   sopHandedOver: z.boolean().default(false),
+  casing: z.string().nullable().optional(),
+  serials: z.record(z.string(), z.string()).nullable().optional(),
+  drawdownM: z.number().min(0).max(1000).nullable().optional(),
+  recoveryMin: z.number().min(0).nullable().optional(),
+  waterQuality: z.array(z.object({ testedOn: isoDate, turbidityNtu: z.number().min(0).optional(), ecoliPer100ml: z.number().min(0).optional(), notes: z.string().optional() })).nullable().optional(),
+  caretakersTrained: z.array(z.object({ name: z.string().min(1), phone: z.string().optional(), trainedOn: isoDate })).nullable().optional(),
+  attachments: z.record(z.string(), z.array(z.string())).default({}),
+  publicVisible: z.boolean().default(false),
   notes: z.string().max(4000).nullable().optional(),
-}).passthrough();
+});
 
 export const taskResultSchema = z.object({
   taskKey: z.string(),

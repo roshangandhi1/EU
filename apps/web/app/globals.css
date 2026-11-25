@@ -65,3 +65,12 @@ h1 { color: var(--gc-green); }
 .badge { display: inline-block; border: 2px solid; border-radius: 999px; padding: 2px 10px; font-size: 14px; white-space: nowrap; }
 .check { flex-direction: row !important; align-items: center; font-weight: 400 !important; }
 fieldset { border: 1px solid #d5dad2; border-radius: 8px; }
+.panel { border: 1px solid #d5dad2; border-radius: 8px; padding: 16px; margin: 24px 0; }
+.panel > summary { font-weight: 700; cursor: pointer; min-height: 48px; display: flex; align-items: center; }
+.tasks { padding-left: 20px; display: flex; flex-direction: column; gap: 16px; }
+.task { border-bottom: 1px solid #d5dad2; padding-bottom: 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 8px; }
+.row label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; flex: 1 1 200px; }
+.row label.narrow { flex: 0 1 110px; }
+.row input, .row select { font-size: 16px; min-height: 48px; padding: 8px 12px; border: 1px solid #b8c0b4; border-radius: 8px; background: var(--bg); color: var(--text); }
+.fails { margin: 4px 0 0; padding-left: 18px; font-size: 14px; color: var(--muted); }

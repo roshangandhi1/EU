@@ -7,7 +7,9 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./db/schema": "./src/db/schema.ts"
+    "./db/schema": "./src/db/schema.ts",
+    "./server": "./src/server/index.ts",
+    "./types": "./src/db/types-only.ts"
   },
   "scripts": {
     "test": "vitest run",
