@@ -4,6 +4,7 @@ import { schoolsActions, schoolsEn, schoolsEntities, schoolsFr } from "@eu/schoo
 import { EntityRegistry } from "@eu/sync";
 import { boreholeActions, boreholeEntities, registerBoreholesStrings } from "@eu/boreholes";
 import { forestryActions, forestryEntities, registerForestryStrings } from "@eu/forestry";
+import { publicMapStrings } from "@eu/maps";
 
 /**
  * The one place modules plug in. Each module exports its ActionMap and entities;
@@ -24,3 +25,4 @@ export const entities = new EntityRegistry()
 registerNamespace("schools", { en: schoolsEn, fr: schoolsFr });
 registerForestryStrings();
 registerBoreholesStrings();
+registerNamespace("publicmap", publicMapStrings);
