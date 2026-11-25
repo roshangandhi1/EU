@@ -5,7 +5,6 @@ import { EntityRegistry } from "@eu/sync";
 import { SyncClient, type Transport } from "@eu/sync/client";
 import { MemoryStore } from "@eu/sync/memory-store";
 import { handlePull, handlePush } from "@eu/sync/server";
-import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { schoolsActions, schoolsEntities, schoolsTables, splitAsAt, studentBalance, type Synced, type Payment, type FeeItem } from "../src";
 
@@ -25,8 +24,8 @@ const serverNow = { t: new Date("2026-12-10T08:00:00Z") };
 let db: Db;
 let close: () => Promise<void>;
 beforeEach(async () => {
-  const stmts = await generateMigration(generateDrizzleJson({}), generateDrizzleJson({ ...schoolsTables }));
-  ({ db, close } = await createTestDb(stmts));
+  // The committed migrations (platform + 0001_schools_init) create every table.
+  ({ db, close } = await createTestDb());
 });
 afterEach(async () => close());
 
