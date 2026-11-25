@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { isLocale, t } from "@eu/core/i18n";
+import Link from "next/link";
+import { permissions } from "@/lib/registry";
 import { currentPrincipal } from "@/lib/session";
 import { SignOutButton } from "./sign-out";
 
@@ -21,6 +23,23 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           </li>
         ))}
       </ul>
+      {(permissions.can(me.user, "evidence.manage", { stream: "platform" }) || permissions.can(me.user, "devices.manage", { stream: "platform" })) && (
+        <>
+          <h2>{t(locale, "admin.menu")}</h2>
+          <ul>
+            {permissions.can(me.user, "evidence.manage", { stream: "platform" }) && (
+              <li>
+                <Link href={`/${locale}/admin/evidence`}>{t(locale, "admin.cutoffs")}</Link>
+              </li>
+            )}
+            {permissions.can(me.user, "devices.manage", { stream: "platform" }) && (
+              <li>
+                <Link href={`/${locale}/admin/phones`}>{t(locale, "admin.phones")}</Link>
+              </li>
+            )}
+          </ul>
+        </>
+      )}
       <SignOutButton label={t(locale, "common.signOut")} locale={locale} />
     </section>
   );

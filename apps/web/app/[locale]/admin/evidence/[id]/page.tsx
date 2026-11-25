@@ -1,0 +1,88 @@
+import { notFound } from "next/navigation";
+import { Button, ButtonLink, Field, Form, Notice, PageHeader, Table } from "@/components/ui";
+import { formatLocal, requireAction } from "@/lib/admin";
+import { getCutoff, lateRecords, summarise, type LateRecord } from "@/lib/evidence";
+import { db } from "@/lib/http";
+import { entities } from "@/lib/registry";
+import { decideAction } from "../../actions";
+
+export const dynamic = "force-dynamic";
+
+export default async function CutoffPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const p = await params;
+  const { locale, tr } = await requireAction(p.locale, "evidence.manage");
+  const sp = await searchParams;
+  const cutoff = await getCutoff(db(), p.id);
+  if (!cutoff) notFound();
+  const summary = await summarise(db(), entities, cutoff);
+  const late: LateRecord[] = (await Promise.all(entities.all().map((e) => lateRecords(db(), e, cutoff)))).flat();
+  const label = (name: string) => entities.get(name)?.label[locale] ?? name;
+
+  return (
+    <section>
+      <PageHeader
+        title={cutoff.label}
+        subtitle={formatLocal(cutoff.cutoffAt, locale)}
+        actions={<ButtonLink href={`/api/admin/evidence/${cutoff.id}`} variant="secondary">{tr("download")}</ButtonLink>}
+      />
+      {sp.error === "reason_required" && <Notice tone="error">{tr("reasonRequired")}</Notice>}
+      {sp.ok && <Notice tone="success">{tr("saved")}</Notice>}
+      <Table
+        rows={summary}
+        rowKey={(s) => s.entity}
+        empty={tr("none")}
+        columns={[
+          { key: "type", header: tr("recordType"), render: (s) => s.label[locale] },
+          { key: "counted", header: tr("counted"), numeric: true, render: (s) => s.counted },
+          { key: "admitted", header: tr("lateAdmitted"), numeric: true, render: (s) => s.lateAdmitted },
+          { key: "pending", header: tr("latePending"), numeric: true, render: (s) => (s.latePending ? <strong>{s.latePending}</strong> : 0) },
+          { key: "excluded", header: tr("lateExcluded"), numeric: true, render: (s) => s.lateExcluded },
+          { key: "clock", header: tr("clockSuspect"), numeric: true, render: (s) => s.clockSuspect },
+        ]}
+      />
+      <h2>{tr("latePending")}</h2>
+      <Table
+        rows={late}
+        rowKey={(r) => `${r.entity}:${r.recordId}`}
+        empty={tr("none")}
+        columns={[
+          { key: "type", header: tr("recordType"), render: (r) => label(r.entity) },
+          { key: "captured", header: tr("capturedAt"), render: (r) => <>{formatLocal(r.deviceTime, locale)}{r.clockSuspect && <> · <strong>{tr("clockSuspect")}</strong></>}</> },
+          { key: "received", header: tr("receivedAt"), render: (r) => formatLocal(r.serverTime, locale) },
+          {
+            key: "decision",
+            header: tr("decision"),
+            render: (r) => (
+              <Form action={decideAction}>
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="cutoffId" value={cutoff.id} />
+                <input type="hidden" name="entity" value={r.entity} />
+                <input type="hidden" name="recordId" value={r.recordId} />
+                {r.decision && (
+                  <p>
+                    <strong>{r.decision === "admitted" ? tr("lateAdmitted") : tr("lateExcluded")}</strong>: {r.reason}
+                  </p>
+                )}
+                <Field label={tr("reason")}>
+                  <input name="reason" required minLength={3} />
+                </Field>
+                <Button small name="decision" value="admitted">
+                  {tr("admit")}
+                </Button>{" "}
+                <Button small variant="secondary" name="decision" value="excluded">
+                  {tr("exclude")}
+                </Button>
+              </Form>
+            ),
+          },
+        ]}
+      />
+    </section>
+  );
+}
