@@ -56,7 +56,11 @@ function candidate(i: number, name: string, lng: number, lat: number, ha: number
   return { index: i, name, properties: {}, geom, areaHa: areaHa(geom), problems: [] };
 }
 
-const FIRST = ["Amani", "Bijou", "Christelle", "Daniel", "Esther", "Fiston", "Grâce", "Héritier", "Israël", "Joëlle", "Kevin", "Lydie"];
+/** Demo pupils' first names, by sex, so a girl is never called Daniel. */
+/** Demo first names by sex, so a girl is never called Patrick. */
+export const GIRLS = ["Amani", "Bijou", "Christelle", "Esther", "Grâce", "Joëlle", "Lydie", "Merveille", "Nathalie", "Rachel", "Sarah", "Ruth"];
+export const BOYS = ["Daniel", "Fiston", "Héritier", "Israël", "Kevin", "Moïse", "Patrick", "Jonathan", "Samuel", "Trésor", "Junior", "Emmanuel"];
+const FIRST = GIRLS.flatMap((g, i) => [g, BOYS[i]!]);
 const LAST = ["Kabila", "Mukendi", "Ilunga", "Kasongo", "Mwamba", "Ngoy", "Banza", "Kalenga"];
 
 function iso(d: Date) {
@@ -121,7 +125,7 @@ export async function loadDemo(ctx: SyncContext): Promise<DemoResult> {
       const level = (i % 6) + 1;
       pupils.push(
         ins("school.student", schoolId, {
-          studentNumber: `DEMO-${String(i + 1).padStart(3, "0")}`, firstName: FIRST[i % FIRST.length], lastName: LAST[i % LAST.length], postName: "",
+          studentNumber: `DEMO-${String(i + 1).padStart(3, "0")}`, firstName: (i % 2 === 0 ? GIRLS : BOYS)[Math.floor(i / 2) % GIRLS.length], lastName: LAST[i % LAST.length], postName: "",
           sex: i % 2 === 0 ? "F" : "M", dateOfBirth: null, birthYearEstimate: now.getUTCFullYear() - 5 - level, guardianName: "", guardianPhone: "", village: "Kiabukwa",
         }, sid),
         ins("school.enrolment", schoolId, { studentId: sid, classId: classIds[level - 1], academicYearId: yearId, enrolledOn: y.startsOn, leftOn: null, status: "active" }),

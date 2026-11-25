@@ -5,7 +5,9 @@ import { t } from "@eu/core/i18n";
 import { EmptyRow, Field, Fields, FormFooter, Notice, Section, SubmitButton } from "@/components/ui";
 import { can, mySchools, schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
 import { Flash, param, type SP } from "../../../flash";
-import { classLabel, studentName } from "../../labels";
+import { classLabel, levelLabel, studentName } from "../../labels";
+import { FormGuard, SelectAll } from "../../../guard";
+import { plural } from "../../../text";
 import { bulkExempt, copyFees, saveFeeSchedule } from "./actions";
 
 /** Whole francs with a plain space between thousands (the save action strips spaces). */
@@ -89,11 +91,11 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
       {err ? <Notice tone="error">{err}</Notice> : <Flash sp={sp} tr={tr} />}
       {saved.length === 3 && <Notice tone="success">{tr("feeGrid.saved", { created: saved[0]!, updated: saved[1]!, voided: saved[2]! })}</Notice>}
       {param(sp, "fee_nothing") && <Notice>{tr("feeGrid.nothing")}</Notice>}
-      {param(sp, "fee_copied") && <Notice tone="success">{tr("feeGrid.copied", { count: param(sp, "fee_copied") })}</Notice>}
+      {param(sp, "fee_copied") && <Notice tone="success">{plural(locale, tr, "feeGrid.copied", Number(param(sp, "fee_copied")))}</Notice>}
       {param(sp, "fee_skipped") && <Notice tone="warning">{tr("feeGrid.copySkipped", { names: param(sp, "fee_skipped") })}</Notice>}
       {param(sp, "fee_noterm") && <Notice tone="warning">{tr("feeGrid.copyNoTerm", { count: param(sp, "fee_noterm") })}</Notice>}
       {param(sp, "fee_terms") && <Notice>{tr("feeGrid.copyTerms", { count: param(sp, "fee_terms") })}</Notice>}
-      {param(sp, "fee_exempted") && <Notice tone="success">{tr("feeGrid.exempted", { count: param(sp, "fee_exempted") })}</Notice>}
+      {param(sp, "fee_exempted") && <Notice tone="success">{plural(locale, tr, "feeGrid.exempted", Number(param(sp, "fee_exempted")))}</Notice>}
 
       <Section id="grid" icon="coins" title={tr("feeGrid.title")} description={tr("feeGrid.intro")}
         actions={<Link className="btn ghost sm" href={base}>{tr("nav.setup")}</Link>}>
@@ -110,7 +112,8 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
           <button className="btn secondary" type="submit">{tr("feeGrid.show")}</button>
         </form>
 
-        <form action={saveFeeSchedule}>
+        <form action={saveFeeSchedule} id="fee-grid-form">
+          <FormGuard formId="fee-grid-form" message={tr("att.leave")} />
           {hidden}
           <input type="hidden" name="fee" value={fee} />
           {!fee && (
@@ -139,12 +142,12 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
                 </tr>
                 {LEVELS.map((l) => (
                   <tr key={l}>
-                    <th scope="row" className="fee-level" style={{ top: "auto", fontSize: 14.5, color: "var(--text)", verticalAlign: "middle" }}>{tr("levelName", { n: l })}</th>
+                    <th scope="row" className="fee-level" style={{ top: "auto", fontSize: 14.5, color: "var(--text)", verticalAlign: "middle" }}>{levelLabel(l, tr)}</th>
                     {columns.map((c) => {
                       const k = colKey(c.termId);
                       return (
                         <td key={k} className="num">
-                          <input className="ctl num-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l) != null ? groupDigits(cell(k, l)!, locale) : ""} placeholder="—" aria-label={`${tr("levelName", { n: l })} · ${c.label} (FC)`} />
+                          <input className="ctl num-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l) != null ? groupDigits(cell(k, l)!, locale) : ""} placeholder="—" aria-label={`${levelLabel(l, tr)} · ${c.label} (FC)`} />
                         </td>
                       );
                     })}
@@ -195,6 +198,7 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
           <form action={bulkExempt}>
             {hidden}
             {fee && <input type="hidden" name="fee" value={fee} />}
+            <SelectAll name="studentId" label={tr("feeGrid.selectAll")} />
             <div className="pick-list">
               <table className="grid fee-pupils">
                 <tbody>
