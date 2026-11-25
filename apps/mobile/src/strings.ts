@@ -45,6 +45,17 @@ const en = {
   demoLoaded: "Demo data loaded.",
   demoFailed: "Demo data could not be loaded. Check the connection and try again.",
   demoBadge: "Demo data on this phone",
+  syncing: "Syncing…",
+  syncOffline: "Offline",
+  syncWaiting: "{count} to send",
+  syncFailedShort: "Sync failed",
+  syncNever: "Never synced",
+  lastSyncShort: "Last sync {time}",
+  today: "Today",
+  yesterday: "Yesterday",
+  savedOnPhone: "Saved on this phone. It will sync by itself.",
+  pinTitleUnlock: "Enter your PIN",
+  modulesHint: "Tap a stream to start",
 };
 
 const fr: typeof en = {
@@ -91,6 +102,18 @@ const fr: typeof en = {
   demoLoaded: "Données de démonstration chargées.",
   demoFailed: "Impossible de charger la démonstration. Vérifiez la connexion et réessayez.",
   demoBadge: "Données de démonstration sur ce téléphone",
+  syncing: "Synchronisation…",
+  syncOffline: "Hors ligne",
+  syncWaiting: "{count} à envoyer",
+  syncFailedShort: "Échec de la synchro",
+  syncNever: "Jamais synchronisé",
+  lastSyncShort: "Dernière synchro {time}",
+  today: "Aujourd'hui",
+  yesterday: "Hier",
+  savedOnPhone: "Enregistré sur ce téléphone. La synchronisation se fera toute seule.",
+  pinTitleUnlock: "Entrez votre code PIN",
+  modulesHint: "Touchez un volet pour commencer",
 };
 
 registerNamespace("app", { en, fr });
+import "./ux-strings";

@@ -2,12 +2,12 @@
   "expo": {
     "name": "GoCongo",
     "slug": "gocongo-eu",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
       "package": "cd.gocongo.eu",
-      "versionCode": 3,
+      "versionCode": 4,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
@@ -26,6 +26,17 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/InterTight_400Regular.ttf",
+            "./assets/fonts/InterTight_600SemiBold.ttf",
+            "./assets/fonts/InterTight_700Bold.ttf",
+            "./assets/fonts/InterTight_800ExtraBold.ttf"
+          ]
+        }
+      ],
       "expo-localization",
       [
         "expo-image-picker",

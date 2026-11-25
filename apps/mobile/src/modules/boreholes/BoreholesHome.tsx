@@ -1,10 +1,9 @@
-import { colors, radius, space, touch } from "@eu/core/tokens";
+import { colors, streamAccent } from "@eu/core/tokens";
 import { distanceM } from "@eu/forestry/mobile";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
-import { BackBar, Body, Button, Title } from "../../ui";
+import { Button, EmptyState, Header, IconBadge, ListGroup, ListRow, Notice, Page, StatusChip, Toast, Txt, type Tone } from "../../ui";
 import { getFix, localToday } from "../location";
 import { loadBoreholes, loadSchedule, type BoreholeRow, type Schedule } from "./data";
 import { VisitForm } from "./VisitForm";
@@ -56,38 +55,37 @@ export function BoreholesHome({ session, onBack }: { session: Session; onBack: (
   }
 
   const sorted = rows && highlight ? [...rows.filter((r) => r.id === highlight), ...rows.filter((r) => r.id !== highlight)] : rows;
+  const dueTotal = (rows ?? []).filter((r) => r.dueCount > 0).length;
 
   return (
-    <ScrollView contentContainerStyle={s.wrap}>
-      <BackBar label={t("forestry.m.back")} onBack={onBack} />
-      <Title>{t("boreholes.title")}</Title>
-      {flash && <Body tone="good">{flash}</Body>}
-      <Button label={t("boreholes.m.find")} onPress={() => void findNearest()} disabled={!rows || rows.length === 0} />
-      {note && <Body tone="muted">{note}</Body>}
-      {rows && rows.length === 0 && <Body tone="warning">{t("boreholes.m.none")}</Body>}
-      {sorted?.map((r) => {
-        const worst = r.due.find((d) => d.status !== "each_visit");
-        const tone = worst?.status === "overdue" ? colors.statusCritical : worst?.status === "due" ? colors.statusWarning : colors.textMuted;
-        return (
-          <Pressable key={r.id} accessibilityRole="button" onPress={() => setOpen(r)} style={[s.row, r.id === highlight && s.rowHot]}>
-            <Text style={s.code}>{r.code}</Text>
-            <Text style={s.meta}>
-              {r.village} · {t(`boreholes.lifecycle.${r.lifecycle}`)}
-            </Text>
-            <Text style={[s.meta, { color: tone }]}>
-              {r.due.length === 0 ? t("boreholes.m.not_in_service") : r.dueCount > 0 ? t("boreholes.m.due_count", { n: r.dueCount }) : t("boreholes.due.ok")}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <Page
+      header={<Header title={t("boreholes.title")} subtitle={rows ? t("ux.boreholesSummary", { n: rows.length, due: dueTotal }) : undefined} onBack={onBack} backLabel={t("forestry.m.back")} accent={streamAccent.boreholes} />}
+      toast={<Toast message={flash} onHide={() => setFlash(null)} />}
+    >
+      <Button kind="secondary" icon="locate" label={t("boreholes.m.find")} onPress={() => void findNearest()} disabled={!rows || rows.length === 0} />
+      {note && <Notice tone={highlight ? "good" : "info"} icon={highlight ? "pin" : "locate"}>{note}</Notice>}
+      {rows && rows.length === 0 && <EmptyState icon="drop" color={streamAccent.boreholes} title={t("app.emptyTitle")}><Txt center>{t("boreholes.m.none")}</Txt></EmptyState>}
+      {sorted && sorted.length > 0 && (
+        <ListGroup>
+          {sorted.map((r) => {
+            const worst = r.due.find((d) => d.status !== "each_visit");
+            const tone: Tone = r.due.length === 0 ? "muted" : worst?.status === "overdue" ? "critical" : r.dueCount > 0 ? "warning" : "good";
+            const chip = r.due.length === 0 ? t("ux.noSchedule") : r.dueCount > 0 ? t("boreholes.m.due_count", { n: r.dueCount }) : t("boreholes.due.ok");
+            return (
+              <ListRow
+                key={r.id}
+                title={r.code}
+                detail={`${r.village} · ${t(`boreholes.lifecycle.${r.lifecycle}`)}`}
+                leading={<IconBadge icon={r.lifecycle === "needs_repair" || r.lifecycle === "non_functional" ? "wrench" : "drop"} color={r.lifecycle === "needs_repair" || r.lifecycle === "non_functional" ? colors.statusCritical : streamAccent.boreholes} />}
+                status={<StatusChip label={chip} tone={tone} />}
+                onPress={() => setOpen(r)}
+                highlight={r.id === highlight}
+                chevron
+              />
+            );
+          })}
+        </ListGroup>
+      )}
+    </Page>
   );
 }
-
-const s = StyleSheet.create({
-  wrap: { padding: space.md, paddingTop: space.xl, gap: space.sm, backgroundColor: colors.surface },
-  row: { minHeight: touch.minTarget, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.sm, gap: 2 },
-  rowHot: { borderColor: colors.gcGreen, borderWidth: 2 },
-  code: { fontSize: touch.bodyText, fontWeight: "700", color: colors.text },
-  meta: { fontSize: 14, color: colors.textMuted },
-});
