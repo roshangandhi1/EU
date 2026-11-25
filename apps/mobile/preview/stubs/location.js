@@ -4,3 +4,4 @@ export const Accuracy = { High: 4 };
 export const requestForegroundPermissionsAsync = async () => ({ status: "granted" });
 export const getCurrentPositionAsync = async () => pos;
 export const getLastKnownPositionAsync = async () => pos;
+export const hasServicesEnabledAsync = async () => true;

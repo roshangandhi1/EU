@@ -11,6 +11,7 @@ import { openModule, useModuleCounts, type ModuleCounts } from "../modules/field
 import type { Session } from "../session";
 import type { IconName } from "../icons";
 import { Body, BrandBar, Button, Card, EmptyState, EuBand, Header, IconBadge, IconButton, LanguageSwitch, Notice, Page, Screen, StatusChip, Title, Txt, ui, type Tone } from "../ui";
+import { SyncProblems } from "./SyncProblems";
 
 export const MODULE_ICON: Record<ModuleKey, IconName> = { schools: "school", boreholes: "drop", bamboo: "bamboo", miombo: "tree" };
 const WEB_PATH: Record<ModuleKey, string> = { schools: "schools", boreholes: "boreholes", bamboo: "forestry/bamboo", miombo: "forestry/miombo" };
@@ -22,8 +23,10 @@ export function Home({ session }: { session: Session }) {
   const t = useT();
   const { locale, setLocale } = useContext(LocaleContext);
   const counts = useModuleCounts(session);
+  const insets = useSafeAreaInsets();
   const [open, setOpen] = useState<ModuleKey | null>(null);
   const [empty, setEmpty] = useState<ModuleKey | null>(null);
+  const [problems, setProblems] = useState(false);
 
   if (open)
     return (
@@ -31,6 +34,13 @@ export function Home({ session }: { session: Session }) {
         <StatusBar style="light" />
         {openModule(open, session, () => setOpen(null))}
       </View>
+    );
+  if (problems)
+    return (
+      <>
+        <StatusBar style="light" />
+        <SyncProblems session={session} onBack={() => setProblems(false)} />
+      </>
     );
   if (empty)
     return (
@@ -45,7 +55,6 @@ export function Home({ session }: { session: Session }) {
   const shown = MODULES.filter((m) => allowed.has(m) || (counts?.[m] ?? 0) > 0);
   const total = counts ? MODULES.reduce((n, m) => n + counts[m], 0) : null;
   const role = mainRoleKey(session.roles);
-  const insets = useSafeAreaInsets();
 
   return (
     <View style={{ flex: 1, backgroundColor: ui.page }}>
@@ -63,7 +72,7 @@ export function Home({ session }: { session: Session }) {
           {role && <Txt tone="muted">{t(role)}</Txt>}
         </View>
 
-        <SyncCard session={session} />
+        <SyncCard session={session} onProblems={() => setProblems(true)} />
 
         <View style={s.sectionHead}>
           <Txt variant="heading">{t("app.modules")}</Txt>
@@ -109,16 +118,19 @@ function Tile({ module, label, detail, count, onPress }: { module: ModuleKey; la
   );
 }
 
-function SyncCard({ session }: { session: Session }) {
+function SyncCard({ session, onProblems }: { session: Session; onProblems: () => void }) {
   const t = useT();
   const { locale } = useContext(LocaleContext);
   const st = session.status;
   const when = st.lastOk ? new Date(st.lastOk).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
+  const noNet = st.noInternet || (st.last && !st.last.ok && st.last.error === "offline");
   const [icon, tone, label]: [IconName, Tone, string] = st.running
     ? ["sync", "info", t("app.syncing")]
     : st.offline
       ? ["cloudOff", "warning", t("app.syncOffline")]
-      : st.last && !st.last.ok
+      : noNet
+        ? ["cloudOff", "warning", t("app.syncNoInternet")]
+        : st.last && !st.last.ok
         ? ["alert", "critical", t("app.syncFailedShort")]
         : st.pending > 0
           ? ["sync", "warning", t("app.syncWaiting", { count: st.pending })]
@@ -129,12 +141,13 @@ function SyncCard({ session }: { session: Session }) {
   if (st.nextCutoff && Date.parse(st.nextCutoff.at) - Date.now() < 7 * 86_400_000)
     notes.push(<Notice key="cut" tone="warning">{t("sync.cutoffSoon", { time: new Date(st.nextCutoff.at).toLocaleString(locale), label: st.nextCutoff.label })}</Notice>);
   if (st.photosPending > 0) notes.push(<Notice key="ph" tone="warning" icon="camera">{t("sync.photosWaiting", { count: st.photosPending })}</Notice>);
-  if (st.offline) notes.push(<Txt key="off" variant="small" tone="muted">{t("sync.offline")}</Txt>);
-  if (st.last?.clockSuspect) notes.push(<Notice key="clk" tone="critical">{t("sync.clockSuspect")}</Notice>);
+  if (st.offline || noNet) notes.push(<Txt key="off" variant="small" tone="muted">{t(st.offline ? "sync.offline" : "app.noInternetHint")}</Txt>);
+  if (st.clockSuspect) notes.push(<Notice key="clk" tone="critical" title={t("app.clockTitle")}>{t("app.clockBody")}</Notice>);
   if (st.rejected > 0)
     notes.push(
       <Notice key="rej" tone="critical" title={t("sync.rejected", { count: st.rejected })}>
-        <Txt>{t("sync.rejectedHint")}</Txt>
+        <Txt>{t("app.rejectedHint")}</Txt>
+        <Button kind="secondary" label={t("app.seeProblems")} iconAfter="chevronRight" onPress={onProblems} />
       </Notice>,
     );
   const colour = { good: colors.statusGood, warning: colors.statusWarningText, critical: colors.statusCritical, muted: colors.textMuted, info: colors.statusInfo }[tone];
@@ -144,6 +157,9 @@ function SyncCard({ session }: { session: Session }) {
         <IconBadge icon={icon} color={colour} size={44} />
         <View style={{ flex: 1, gap: 1 }}>
           <Txt weight={700} color={tone === "muted" ? colors.text : colour}>{label}</Txt>
+          {st.pending > 0 && label !== t("app.syncWaiting", { count: st.pending }) ? (
+            <Txt variant="small" weight={700} tone="warning">{t("app.syncWaiting", { count: st.pending })}</Txt>
+          ) : null}
           {when ? <Txt variant="small" tone="muted">{t("app.lastSyncShort", { time: when })}</Txt> : null}
         </View>
       </View>
@@ -161,7 +177,7 @@ function DemoCard({ session }: { session: Session }) {
     <Card accent={colors.gcOrange}>
       <Txt variant="heading">{t("app.demoTitle")}</Txt>
       <Txt>{t("app.demoIntro")}</Txt>
-      {msg && <Body tone={msg === "app.demoLoaded" ? "good" : "critical"}>{t(msg)}</Body>}
+      {msg && <Body tone={msg === "app.demoLoaded" ? "good" : msg === "app.demoSyncFailed" ? "warning" : "critical"}>{t(msg)}</Body>}
       <Button
         label={busy ? t("app.demoLoading") : t("app.demoLoad")}
         disabled={busy}
@@ -196,12 +212,21 @@ function EmptyModule({ session, module, counts, onBack }: { session: Session; mo
   );
 }
 
-export function Revoked() {
+export function Revoked({ session }: { session: Session }) {
   const t = useT();
+  const [busy, setBusy] = useState(false);
   return (
     <Screen>
       <Title>{t("common.appName")}</Title>
-      <Body tone="critical">{t("sync.deviceRevoked")}</Body>
+      <Notice tone="critical" title={t("sync.deviceRevoked")}>{t("app.revokedBody")}</Notice>
+      <Button
+        label={t("app.signInAgain")}
+        busy={busy}
+        onPress={() => {
+          setBusy(true);
+          void session.restart().finally(() => setBusy(false));
+        }}
+      />
     </Screen>
   );
 }

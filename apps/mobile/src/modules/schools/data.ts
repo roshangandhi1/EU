@@ -3,8 +3,9 @@ import type {
   AcademicYear, Absence, DeviceTag, Enrolment, Exemption, FeeItem, Payment, ReceiptBook, RegisterTaken, School, SchoolClass, Student, Synced,
 } from "@eu/schools/mobile";
 import { schoolsEn, schoolsFr } from "@eu/schools/mobile";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "../../session";
+import { addDays as shiftDays, programmeToday } from "../../time";
 
 registerNamespace("schools", { en: schoolsEn, fr: schoolsFr });
 
@@ -26,16 +27,9 @@ export interface SchoolData {
   deviceTags: Local<DeviceTag>[];
 }
 
-/** Today in the DRC's eastern time (UTC+2), as YYYY-MM-DD. */
-export function today(now = new Date()): string {
-  return new Date(now.getTime() + 2 * 3600_000).toISOString().slice(0, 10);
-}
-
-export function addDays(date: string, n: number): string {
-  const d = new Date(`${date}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
+/** Today in Haut-Lomami (UTC+2), as YYYY-MM-DD. */
+export const today = programmeToday;
+export const addDays = shiftDays;
 
 /** Unsent inserts have no times yet; give them the shape the rules expect. */
 function norm<T>(r: Record<string, unknown>): Local<T> {
@@ -69,13 +63,21 @@ export async function loadSchool(session: Session, school: Local<School>): Promi
   return { school, years, classes, students, enrolments, absences, registers, feeItems, exemptions, receiptBooks, payments, deviceTags };
 }
 
-/** Loads one school and reloads it whenever the session changes (a sync finished, a record was saved). */
+/**
+ * Loads one school, and reloads it only when records changed (a save on this phone, or a sync that
+ * sent or brought something): not on every sync status flicker, which would jank a slow phone.
+ */
 export function useSchool(session: Session, school: Local<School>): { data: SchoolData | null; reload: () => Promise<void> } {
   const [data, setData] = useState<SchoolData | null>(null);
   const reload = useCallback(async () => setData(await loadSchool(session, school)), [session, school]);
+  const seen = useRef(session.changes);
   useEffect(() => {
     void reload();
-    return session.subscribe(() => void reload());
+    return session.subscribe(() => {
+      if (session.changes === seen.current) return;
+      seen.current = session.changes;
+      void reload();
+    });
   }, [session, reload]);
   return { data, reload };
 }

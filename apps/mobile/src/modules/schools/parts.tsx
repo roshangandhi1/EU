@@ -27,3 +27,12 @@ export function maskDate(raw: string): { text: string; iso: string | null } {
   const t = new Date(`${iso}T12:00:00Z`);
   return { text, iso: !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === iso ? iso : null };
 }
+
+/**
+ * The school's name for headers. The name lives on the site; the phone shows it when the synced
+ * school record carries it (`name`), and falls back to the short code otherwise.
+ */
+export function schoolName(s: { code: string }): string {
+  const name = (s as { name?: unknown }).name;
+  return typeof name === "string" && name.trim() ? name.trim() : s.code;
+}

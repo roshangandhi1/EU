@@ -13,6 +13,9 @@ const K = {
   dbKey: "eu.dbKey",
   locale: "eu.locale",
   roles: "eu.roles", // JSON role assignments, to choose which home tiles to show offline
+  userEmail: "eu.userEmail",
+  notice: "eu.notice", // an i18n key to show on the sign-in screen after a restart (session ended)
+  clock: "eu.clock", // JSON { serverMs, deviceMs, suspect }: last server time seen, to check the clock offline
 } as const;
 
 const get = (k: string) => SecureStore.getItemAsync(k);
@@ -33,24 +36,24 @@ export async function deviceId(): Promise<string> {
   return id;
 }
 
-/** Random 256-bit SQLCipher key, created on first launch and never leaving the phone. */
-export async function dbKey(): Promise<string> {
-  let key = await get(K.dbKey);
-  if (!key) {
-    key = hex(Crypto.getRandomBytes(32));
-    await set(K.dbKey, key);
-  }
-  return key;
+/** Random 256-bit SQLCipher key, created on first launch and never leaving the phone. `created`: it is new. */
+export async function dbKey(): Promise<{ key: string; created: boolean }> {
+  const key = await get(K.dbKey);
+  if (key) return { key, created: false };
+  const fresh = hex(Crypto.getRandomBytes(32));
+  await set(K.dbKey, fresh);
+  return { key: fresh, created: true };
 }
+export const forgetDbKey = () => del(K.dbKey);
 
 export const token = { get: () => get(K.token), set: (v: string) => set(K.token, v), clear: () => del(K.token) };
 
-export async function savedUser(): Promise<{ id: string; name: string } | null> {
-  const [id, name] = await Promise.all([get(K.userId), get(K.userName)]);
-  return id ? { id, name: name ?? "" } : null;
+export async function savedUser(): Promise<{ id: string; name: string; email: string | null } | null> {
+  const [id, name, email] = await Promise.all([get(K.userId), get(K.userName), get(K.userEmail)]);
+  return id ? { id, name: name ?? "", email } : null;
 }
-export async function saveUser(u: { id: string; name: string }): Promise<void> {
-  await Promise.all([set(K.userId, u.id), set(K.userName, u.name)]);
+export async function saveUser(u: { id: string; name: string; email?: string }): Promise<void> {
+  await Promise.all([set(K.userId, u.id), set(K.userName, u.name), u.email ? set(K.userEmail, u.email) : Promise.resolve()]);
 }
 
 /** The signed-in person's role assignments, kept so the home screen works offline. */
@@ -64,6 +67,27 @@ export const savedRoles = {
     }
   },
   set: (r: RoleAssignment[]) => set(K.roles, JSON.stringify(r)),
+  clear: () => del(K.roles),
+};
+
+/** A notice for the sign-in screen that must survive a restart. */
+export const pendingNotice = { get: () => get(K.notice), set: (k: string) => set(K.notice, k), clear: () => del(K.notice) };
+
+export interface ClockState {
+  serverMs: number;
+  deviceMs: number;
+  suspect: boolean;
+}
+export const clock = {
+  get: async (): Promise<ClockState | null> => {
+    try {
+      const raw = await get(K.clock);
+      return raw ? (JSON.parse(raw) as ClockState) : null;
+    } catch {
+      return null;
+    }
+  },
+  set: (c: ClockState) => set(K.clock, JSON.stringify(c)),
 };
 
 export const savedLocale = { get: () => get(K.locale), set: (v: string) => set(K.locale, v) };
@@ -106,7 +130,10 @@ export const pin = {
   },
 };
 
-/** Device revoked by an admin: forget everything, including the database key. */
+/**
+ * Device revoked by an admin: forget everything, including the database key and the device id,
+ * so the phone registers again as a new device if it is issued to someone.
+ */
 export async function forgetAll(): Promise<void> {
-  await Promise.all(Object.values(K).filter((k) => k !== K.deviceId).map(del));
+  await Promise.all(Object.values(K).filter((k) => k !== K.locale).map(del));
 }

@@ -11,6 +11,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 401 {"error":"session_ended"}: the password was reset, the account deactivated or the token
+ * expired. Unlike a revoked phone, nothing is wiped: the person signs in again and the work syncs.
+ */
+export class SessionEndedError extends Error {
+  constructor() {
+    super("session_ended");
+  }
+}
+
+/** Server time from each response's Date header, to check the phone's clock (see Session). */
+export const serverClock: { onDate: ((serverMs: number, deviceMs: number) => void) | null } = { onDate: null };
+
 async function post<T>(path: string, body: unknown, bearer?: string): Promise<T> {
   return call<T>("POST", path, body, bearer);
 }
@@ -26,6 +39,8 @@ async function call<T>(method: "GET" | "POST", path: string, body: unknown, bear
   } catch {
     throw new ApiError(0, "offline");
   }
+  const date = Date.parse(res.headers.get("date") ?? "");
+  if (Number.isFinite(date)) serverClock.onDate?.(date, Date.now());
   const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
   if (!res.ok) {
     if (res.status === 401 && data.error === "device_revoked") throw new DeviceRevokedError();

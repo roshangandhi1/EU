@@ -1,7 +1,8 @@
+import { t as translate } from "@eu/core/i18n";
 import { colors, radius, space, touch, type as scale } from "@eu/core/tokens";
-import { Children, Fragment, isValidElement, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { Children, Fragment, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
-  Animated, BackHandler, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, BackHandler, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type StyleProp, type TextInputProps, type TextStyle, type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,6 +45,12 @@ const toneColor: Record<Tone, string> = {
   muted: colors.textMuted,
   info: colors.statusInfo,
 };
+/** The kit's own words (screen-reader labels, dialog buttons), in the app's language. */
+function useKitT() {
+  const { locale } = useContext(LocaleContext);
+  return (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars);
+}
+
 const toneTint: Record<Tone, string> = { good: ui.goodTint, warning: ui.warnTint, critical: ui.dangerTint, muted: "#EDF0EA", info: ui.infoTint };
 
 /* ------------------------------------------------------------------ text */
@@ -91,16 +98,17 @@ function useHardwareBack(onBack?: () => void) {
  * it is about (the school, plot or borehole). The coloured stripe underneath is the module's own
  * colour, so you always know which stream you are in.
  */
-export function Header({ title, subtitle, onBack, backLabel = "Back", accent = colors.gcLime, right }: {
+export function Header({ title, subtitle, onBack, backLabel, accent = colors.gcLime, right }: {
   title: string; subtitle?: string; onBack?: () => void; backLabel?: string; accent?: string; right?: ReactNode;
 }) {
+  const kt = useKitT();
   const insets = useSafeAreaInsets();
   useHardwareBack(onBack);
   return (
     <View>
       <View style={[s.header, { paddingTop: insets.top + 6 }]}>
         {onBack ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={backLabel} onPress={onBack} hitSlop={6} android_ripple={{ color: ui.deep, borderless: true, radius: 24 }} style={s.headerBack}>
+          <Pressable accessibilityRole="button" accessibilityLabel={backLabel ?? kt("app.back")} onPress={onBack} hitSlop={6} android_ripple={{ color: ui.deep, borderless: true, radius: 24 }} style={s.headerBack}>
             <Icon name="back" color={colors.surface} size={26} strokeWidth={2.2} />
           </Pressable>
         ) : (
@@ -119,9 +127,10 @@ export function Header({ title, subtitle, onBack, backLabel = "Back", accent = c
 
 /** Kept for screens built before the header existed: a back arrow that also handles hardware back. */
 export function BackBar({ onBack, label }: { onBack: () => void; label?: string }) {
+  const kt = useKitT();
   useHardwareBack(onBack);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label ?? "Back"} onPress={onBack} hitSlop={8} style={s.backBar}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label ?? kt("app.back")} onPress={onBack} hitSlop={8} style={s.backBar}>
       <Icon name="back" color={colors.gcGreen} />
       {label ? <Txt weight={700} color={colors.gcGreen}>{label}</Txt> : null}
     </Pressable>
@@ -132,16 +141,22 @@ export function BackBar({ onBack, label }: { onBack: () => void; label?: string 
  * A screen: optional header, scrolling content on the page grey, and an optional action bar held
  * at the bottom (above the keyboard and the Android navigation bar), so Save is always in reach.
  */
-export function Page({ header, children, footer, scroll = true, gap = space.md, toast }: {
+export function Page({ header, children, footer, scroll = true, bare, gap = space.md, toast, form }: {
   header?: ReactNode; children: ReactNode; footer?: ReactNode; scroll?: boolean; gap?: number; toast?: ReactNode;
+  /** The content manages its own scrolling (a FlatList): no padding, no ScrollView. */
+  bare?: boolean;
+  /** Lets the form scroll to its first error (see useFormScroll / Anchor). */
+  form?: FormScroll;
 }) {
   const insets = useSafeAreaInsets();
   const pad = { padding: space.md, gap, paddingBottom: footer ? space.lg : space.lg + insets.bottom };
   return (
     <KeyboardAvoidingView style={s.page} behavior="height">
       {header}
-      {scroll ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={[pad, { flexGrow: 1 }]} keyboardShouldPersistTaps="handled">
+      {bare ? (
+        <View style={{ flex: 1 }}>{children}</View>
+      ) : scroll ? (
+        <ScrollView ref={form?.ref as never} style={{ flex: 1 }} contentContainerStyle={[pad, { flexGrow: 1 }]} keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
       ) : (
@@ -151,6 +166,33 @@ export function Page({ header, children, footer, scroll = true, gap = space.md, 
       {footer ? <View style={[s.actionBar, { paddingBottom: space.sm + insets.bottom }]}>{footer}</View> : null}
     </KeyboardAvoidingView>
   );
+}
+
+/** Where each named part of a form sits in its scrolling page, so Save can scroll to the first error. */
+type ScrollHandle = { scrollTo: (o: { y: number; animated?: boolean }) => void };
+export interface FormScroll {
+  ref: RefObject<ScrollHandle | null>;
+  ys: Map<string, number>;
+  scrollTo: (name: string | undefined) => void;
+}
+export function useFormScroll(): FormScroll {
+  const ref = useRef<ScrollHandle | null>(null);
+  const ys = useRef(new Map<string, number>()).current;
+  return useMemo(
+    () => ({
+      ref,
+      ys,
+      scrollTo: (name) => {
+        const y = name ? ys.get(name) : undefined;
+        if (y !== undefined) ref.current?.scrollTo({ y: Math.max(0, y - space.sm), animated: true });
+      },
+    }),
+    [ys],
+  );
+}
+/** Marks a direct child of a Page as a place to scroll to. */
+export function Anchor({ form, name, children }: { form: FormScroll; name: string; children: ReactNode }) {
+  return <View style={{ gap: space.md }} onLayout={(e) => form.ys.set(name, e.nativeEvent.layout.y)}>{children}</View>;
 }
 
 /** Simple padded page with no header (status messages, loading). */
@@ -190,8 +232,8 @@ export function Button({ label, onPress, disabled, kind = "primary", icon, iconA
         flex ? { flex } : null,
       ]}
     >
-      {icon ? <Icon name={icon} color={fg} size={22} strokeWidth={2.1} /> : null}
-      <Txt weight={700} color={fg} lines={1}>{busy ? "…" : label}</Txt>
+      {busy ? <ActivityIndicator color={fg} /> : icon ? <Icon name={icon} color={fg} size={22} strokeWidth={2.1} /> : null}
+      <Txt weight={700} color={fg} lines={2} center style={{ flexShrink: 1 }}>{label}</Txt>
       {iconAfter ? <Icon name={iconAfter} color={fg} size={22} strokeWidth={2.1} /> : null}
     </Pressable>
   );
@@ -253,6 +295,24 @@ export function ListGroup({ children }: { children: ReactNode }) {
       ))}
     </View>
   );
+}
+
+/**
+ * The ListGroup look for one row of a FlatList (long lists must be virtualised on cheap phones):
+ * white block, rounded at the ends, a hairline between rows.
+ */
+export function groupItemStyle(i: number, n: number): ViewStyle {
+  return {
+    backgroundColor: colors.surface,
+    marginHorizontal: space.md,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderTopWidth: 1,
+    borderColor: ui.line,
+    overflow: "hidden",
+    ...(i === 0 ? { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg } : null),
+    ...(i === n - 1 ? { borderBottomWidth: 1, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg } : null),
+  };
 }
 
 export function ListRow({ title, detail, leading, trailing, status, onPress, chevron, highlight, tone }: {
@@ -339,24 +399,24 @@ export function Stat({ value, label, tone }: { value: string | number; label: st
  * Confirmation that slides up above the action bar after a save, then goes away: the same words
  * every time, so people learn that "saved on this phone" means it will sync by itself.
  */
-export function Toast({ message, onHide }: { message: string | null; onHide: () => void }) {
+export function Toast({ message, onHide, tone = "good" }: { message: string | null; onHide: () => void; tone?: "good" | "critical" }) {
   const y = useRef(new Animated.Value(0)).current;
   const [shown, setShown] = useState<string | null>(message);
   useEffect(() => {
     if (!message) return;
     setShown(message);
     Animated.timing(y, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-    const timer = setTimeout(() => Animated.timing(y, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => onHide()), 3200);
+    const timer = setTimeout(() => Animated.timing(y, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => onHide()), tone === "critical" ? 6000 : 3200);
     return () => clearTimeout(timer);
   }, [message]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!message || !shown) return null;
   return (
     <Animated.View
       accessibilityLiveRegion="polite"
-      style={[s.toast, { opacity: y, transform: [{ translateY: y.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}
+      style={[s.toast, tone === "critical" && { backgroundColor: colors.statusCritical }, { opacity: y, transform: [{ translateY: y.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}
     >
-      <View style={s.toastIcon}>
-        <Icon name="check" color={colors.gcGreenDeep} size={18} strokeWidth={2.6} />
+      <View style={[s.toastIcon, tone === "critical" && { backgroundColor: colors.surface }]}>
+        <Icon name={tone === "critical" ? "alert" : "check"} color={tone === "critical" ? colors.statusCritical : colors.gcGreenDeep} size={18} strokeWidth={2.6} />
       </View>
       <Txt color={colors.surface} weight={600} style={{ flex: 1 }}>{shown}</Txt>
     </Animated.View>
@@ -443,16 +503,26 @@ export function useDateLabel() {
  * Pick a day without typing: arrows step a day at a time, with one-tap Today and Yesterday.
  * Dates after `max` (today, by default) cannot be chosen.
  */
-export function DateField({ label, value, onChange, max, todayLabel, yesterdayLabel }: {
-  label?: string; value: string; onChange: (d: string) => void; max: string; todayLabel: string; yesterdayLabel: string;
+export function DateField({ label, value, onChange, max, min, todayLabel, yesterdayLabel }: {
+  label?: string; value: string; onChange: (d: string) => void; max: string; min?: string; todayLabel: string; yesterdayLabel: string;
 }) {
   const fmt = useDateLabel();
+  const kt = useKitT();
+  const atMin = min !== undefined && value <= min;
   const old = Math.abs(Date.parse(max) - Date.parse(value)) > 300 * DAY;
   return (
     <View style={s.field}>
       {label ? <Txt variant="label">{label}</Txt> : null}
       <View style={s.dateRow}>
-        <Pressable accessibilityRole="button" accessibilityLabel="−1" onPress={() => onChange(isoShift(value, -1))} android_ripple={{ color: colors.border }} style={s.stepBtn}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={kt("ux.prevDay")}
+          accessibilityState={{ disabled: atMin }}
+          disabled={atMin}
+          onPress={() => onChange(isoShift(value, -1))}
+          android_ripple={{ color: colors.border }}
+          style={[s.stepBtn, atMin && s.disabled]}
+        >
           <Icon name="chevronLeft" color={colors.gcGreen} strokeWidth={2.4} />
         </Pressable>
         <View style={s.dateMid}>
@@ -461,7 +531,7 @@ export function DateField({ label, value, onChange, max, todayLabel, yesterdayLa
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="+1"
+          accessibilityLabel={kt("ux.nextDay")}
           accessibilityState={{ disabled: value >= max }}
           disabled={value >= max}
           onPress={() => onChange(isoShift(value, 1))}
@@ -557,6 +627,77 @@ export function CheckRow({ label, checked, onChange }: { label: string; checked:
   );
 }
 
+/* --------------------------------------------------------------- dialogs */
+
+export interface DialogAction<V> {
+  label: string;
+  value: V;
+  kind?: "primary" | "secondary" | "ghost" | "danger";
+}
+export interface DialogOptions<V> {
+  title: string;
+  message?: string;
+  body?: ReactNode;
+  actions: DialogAction<V>[];
+}
+
+/** A question over the screen, with full-width answers (easy to hit, no wrapped labels). Back = no answer. */
+export function Dialog<V>({ title, message, body, actions, onClose }: DialogOptions<V> & { onClose: (v: V | null) => void }) {
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={() => onClose(null)} statusBarTranslucent>
+      <Pressable style={s.scrim} onPress={() => onClose(null)} accessibilityLabel={title}>
+        <Pressable style={s.dialog} onPress={() => undefined}>
+          <Txt variant="heading">{title}</Txt>
+          {message ? <Txt>{message}</Txt> : null}
+          {body}
+          <View style={{ gap: space.sm, marginTop: space.xs }}>
+            {actions.map((a, i) => (
+              <Button key={i} label={a.label} kind={a.kind ?? (i === 0 ? "primary" : "secondary")} onPress={() => onClose(a.value)} />
+            ))}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+export type Ask = <V>(opts: DialogOptions<V>) => Promise<V | null>;
+
+/** `ask(...)` shows a Dialog and resolves with the chosen value (null if dismissed); render `node`. */
+export function useDialog(): { ask: Ask; node: ReactNode } {
+  const [open, setOpen] = useState<{ opts: DialogOptions<unknown>; resolve: (v: unknown) => void } | null>(null);
+  const ask = useCallback(<V,>(opts: DialogOptions<V>) => new Promise<V | null>((resolve) => setOpen({ opts: opts as DialogOptions<unknown>, resolve: resolve as (v: unknown) => void })), []) as Ask;
+  const node = open ? (
+    <Dialog
+      {...open.opts}
+      onClose={(v) => {
+        open.resolve(v);
+        setOpen(null);
+      }}
+    />
+  ) : null;
+  return { ask, node };
+}
+
+/**
+ * Back (arrow or Android back) from a form with unsaved input asks first:
+ * "Quitter sans enregistrer ?" — continue typing, or leave and lose it.
+ */
+export function useLeaveGuard(dirty: boolean, leave: () => void, ask: Ask): () => void {
+  const kt = useKitT();
+  return () => {
+    if (!dirty) return leave();
+    void ask({
+      title: kt("ux.leaveTitle"),
+      message: kt("ux.leaveBody"),
+      actions: [
+        { label: kt("ux.keepEditing"), value: false, kind: "primary" },
+        { label: kt("ux.leaveAnyway"), value: true, kind: "danger" },
+      ],
+    }).then((v) => v && leave());
+  };
+}
+
 /* ------------------------------------------------------------ brand bits */
 
 /** Green bar with the GoCongo wordmark, used at the top of the home screen. */
@@ -645,7 +786,7 @@ const s = StyleSheet.create({
   headerStripe: { height: 4 },
   backBar: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", minHeight: touch.minTarget, paddingRight: space.sm },
   actionBar: { flexDirection: "row", gap: space.sm, paddingHorizontal: space.md, paddingTop: space.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: ui.line },
-  button: { minHeight: 52, borderRadius: 12, backgroundColor: colors.gcGreen, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: space.sm, paddingHorizontal: space.md, overflow: "hidden" },
+  button: { minHeight: 52, paddingVertical: 6, borderRadius: 12, backgroundColor: colors.gcGreen, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: space.sm, paddingHorizontal: space.md, overflow: "hidden" },
   buttonSecondary: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.gcGreen },
   buttonGhost: { backgroundColor: "transparent", minHeight: touch.minTarget },
   disabled: { opacity: 0.4 },
@@ -662,6 +803,8 @@ const s = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   notice: { flexDirection: "row", gap: 12, padding: 14, borderRadius: radius.md, alignItems: "flex-start" },
   toast: { position: "absolute", left: space.md, right: space.md, bottom: 92, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.gcGreenDeep, borderRadius: 14, paddingVertical: 14, paddingHorizontal: space.md },
+  scrim: { flex: 1, backgroundColor: "rgba(10,25,15,0.55)", justifyContent: "center", padding: space.md },
+  dialog: { backgroundColor: colors.surface, borderRadius: 18, padding: space.lg, gap: space.sm },
   toastIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.gcLime, alignItems: "center", justifyContent: "center" },
   field: { gap: 6 },
   inputWrap: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 54, borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, backgroundColor: colors.surface },
