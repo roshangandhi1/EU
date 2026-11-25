@@ -3,26 +3,37 @@
  * phone app or the web is not empty. Everything is named "DEMO-…" and is written through the
  * sync engine like real work, so phones receive it and the audit log records it.
  *
- * Removing it voids every demo record (phones then drop them on their next sync) and marks the
- * demo sites inactive. Demo records count in dashboards while they are loaded, so remove them
- * before real reporting.
+ * Demo records are recognised by the loader's own marker, never by name (SEC-10): every record
+ * the loader writes carries device_id DEMO_DEVICE_ID, which no phone can register (device ids are
+ * letters, digits and dashes) and no web session uses ("web:<user>"). A demo site is a site whose
+ * school, plot or borehole record carries that marker, so a real site that happens to be named
+ * "DEMO-…" is never touched.
+ *
+ * Removing it voids every record held under the demo sites (phones then drop them on their next
+ * sync) and marks those sites inactive. Demo records count in dashboards while they are loaded,
+ * so remove them before real reporting. The placeholder photo rows (sha256 "demo") count as
+ * photos day to day, but never as evidence in evidence mode or cut-off exports (DATA-7).
  */
+import { todayDrc } from "@eu/core";
 import { files, sites, type Db } from "@eu/db";
 import { createBorehole, loadTemplates, saveTemplate } from "@eu/boreholes/server";
 import { boreholes as boreholeTable } from "@eu/boreholes/db/schema";
 import { defaultTemplate } from "@eu/boreholes";
-import { commitImport } from "@eu/forestry/server";
+import { commitImport, DEMO_PHOTO_SHA } from "@eu/forestry/server";
+import { plots as plotTable } from "@eu/forestry/db/schema";
 import { areaHa, type ImportCandidate } from "@eu/forestry";
-import { DRC_SCHEME, createSchoolSite, defaultSubjects, maxFor, periodsOf } from "@eu/schools";
+import { DRC_SCHEME, createSchoolSite, defaultSubjects, maxFor, periodsOf, schoolsTables } from "@eu/schools";
 import { handlePush, type SyncContext } from "@eu/sync/server";
 import type { Mutation } from "@eu/sync";
-import { and, eq, inArray, isNull, like } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { MultiPolygon } from "geojson";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyDb = any;
 
 export const DEMO_PREFIX = "DEMO-";
+/** The "device" the demo loader writes as: the marker that identifies demo records. */
+export const DEMO_DEVICE_ID = "demo:loader";
 const SCHOOL_PREFIX = "demo-school-";
 const VOID_REASON = "Demo data removed";
 
@@ -31,12 +42,24 @@ export interface DemoStatus {
   sites: { id: string; name: string; stream: string }[];
 }
 
+/** Sites the demo loader created (whether still active or not). */
+async function demoSiteIds(db: Db): Promise<string[]> {
+  const d = db as AnyDb;
+  const ids = new Set<string>();
+  for (const t of [schoolsTables.schoolSchools, plotTable, boreholeTable] as AnyDb[]) {
+    for (const r of await d.select({ scopeId: t.scopeId }).from(t).where(eq(t.deviceId, DEMO_DEVICE_ID))) ids.add(r.scopeId);
+  }
+  return [...ids];
+}
+
 /** Demo sites still active. */
 export async function demoStatus(db: Db): Promise<DemoStatus> {
+  const ids = await demoSiteIds(db);
+  if (ids.length === 0) return { loaded: false, sites: [] };
   const rows = await (db as AnyDb)
     .select({ id: sites.id, name: sites.name, stream: sites.stream })
     .from(sites)
-    .where(and(like(sites.name, `${DEMO_PREFIX}%`), eq(sites.active, true)));
+    .where(and(inArray(sites.id, ids), eq(sites.active, true)));
   return { loaded: rows.length > 0, sites: rows };
 }
 
@@ -63,8 +86,9 @@ export const BOYS = ["Daniel", "Fiston", "Héritier", "Israël", "Kevin", "Moïs
 const FIRST = GIRLS.flatMap((g, i) => [g, BOYS[i]!]);
 const LAST = ["Kabila", "Mukendi", "Ilunga", "Kasongo", "Mwamba", "Ngoy", "Banza", "Kalenga"];
 
+/** The Haut-Lomami date of a moment (UTC+2). */
 function iso(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return todayDrc(d);
 }
 
 /** The academic year running on `now`: September to early July. */
@@ -76,15 +100,17 @@ function yearFor(now: Date) {
 export type DemoResult = { ok: true; created: string[] } | { ok: false; reason: string; created?: string[] };
 
 /** Loads the demo set. Needs a user who may manage sites, schools, plots and boreholes (a system admin). */
-export async function loadDemo(ctx: SyncContext): Promise<DemoResult> {
-  if (!ctx.permissions.can(ctx.user, "sites.manage", { stream: "platform" })) return { ok: false, reason: "forbidden" };
-  if ((await demoStatus(ctx.db)).loaded) return { ok: false, reason: "already_loaded" };
+export async function loadDemo(userCtx: SyncContext): Promise<DemoResult> {
+  if (!userCtx.permissions.can(userCtx.user, "sites.manage", { stream: "platform" })) return { ok: false, reason: "forbidden" };
+  if ((await demoStatus(userCtx.db)).loaded) return { ok: false, reason: "already_loaded" };
+  // Everything below is written as the demo "device", which marks it as demo data.
+  const ctx: SyncContext = { ...userCtx, deviceId: DEMO_DEVICE_ID };
   const d = ctx.db as AnyDb;
   const now = ctx.now?.() ?? new Date();
   const nowIso = now.toISOString();
   // Codes stay unique if demo data was loaded and removed before.
-  const earlier = await d.select({ id: sites.id }).from(sites).where(like(sites.id, `${SCHOOL_PREFIX}%`));
-  const run = earlier.length + 1;
+  const earlier = (await d.select({ scopeId: schoolsTables.schoolSchools.scopeId }).from(schoolsTables.schoolSchools).where(eq(schoolsTables.schoolSchools.deviceId, DEMO_DEVICE_ID))).length;
+  const run = earlier + 1;
   const sfx = run === 1 ? "" : `-${run}`;
   const created: string[] = [];
   const id = () => crypto.randomUUID();
@@ -103,7 +129,8 @@ export async function loadDemo(ctx: SyncContext): Promise<DemoResult> {
 
   try {
     // Schools: one primary school with a year, a term, six classes, fees and 24 pupils.
-    const schoolId = `${SCHOOL_PREFIX}${run}`;
+    // A fresh id every time, so the loader can never reuse a site someone else created.
+    const schoolId = `${SCHOOL_PREFIX}${run}-${crypto.randomUUID().slice(0, 8)}`;
     await createSchoolSite(ctx.db, { id: schoolId, name: `${DEMO_PREFIX}École primaire Kiabukwa${sfx}`, lat: -8.712, lng: 24.79 });
     const y = yearFor(now);
     const yearId = id();
@@ -177,7 +204,7 @@ export async function loadDemo(ctx: SyncContext): Promise<DemoResult> {
         // A placeholder photo record stands in for the planting photo, so demo hectares count as evidenced.
         const photoId = id();
         await d.insert(files).values({
-          id: photoId, entity: `${p.stream}.planting`, scopeId: made.siteId, mime: "image/jpeg", bytes: 0, sha256: "demo", blobPath: "demo/placeholder.jpg",
+          id: photoId, entity: `${p.stream}.planting`, scopeId: made.siteId, mime: "image/jpeg", bytes: 0, sha256: DEMO_PHOTO_SHA, blobPath: "demo/placeholder.jpg",
           lat: p.lat, lng: p.lng, accuracyM: 5, takenAt: new Date(now.getTime() - 30 * 86_400_000), createdBy: ctx.user.id, deviceId: ctx.deviceId,
         });
         await push([ins(`${p.stream}.planting`, made.siteId, { plantedOn: iso(new Date(now.getTime() - 30 * 86_400_000)), lines: [{ species: p.species, count: p.count }], isGapFilling: false, photos: [photoId], notes: "Demo" })]);
@@ -257,7 +284,7 @@ export function demoMarks(schoolId: string, pupils: { studentId: string; classId
   return out;
 }
 
-/** Voids every record held under a demo site and marks the sites inactive. */
+/** Voids every record held under a site the demo loader created, and marks those sites inactive. */
 export async function removeDemo(ctx: SyncContext): Promise<{ ok: true; voided: number } | { ok: false; reason: string }> {
   if (!ctx.permissions.can(ctx.user, "sites.manage", { stream: "platform" })) return { ok: false, reason: "forbidden" };
   const d = ctx.db as AnyDb;
@@ -277,8 +304,9 @@ export async function removeDemo(ctx: SyncContext): Promise<{ ok: true; voided: 
       mutations.push({ mutationId: crypto.randomUUID(), entity: e.name, recordId: r.id, op: "void", scopeId: r.scopeId, voidReason: VOID_REASON, deviceTime: nowIso });
     }
   }
-  const res = await handlePush(ctx, { deviceNow: nowIso, mutations });
-  const bad = res.results.find((r) => r.status === "rejected");
+  const results = [];
+  for (let i = 0; i < mutations.length; i += 100) results.push(...(await handlePush(ctx, { deviceNow: nowIso, mutations: mutations.slice(i, i + 100) })).results);
+  const bad = results.find((r) => r.status === "rejected");
   if (bad) return { ok: false, reason: bad.reason ?? "rejected" };
   await d.update(sites).set({ active: false }).where(inArray(sites.id, demo.map((s) => s.id)));
   return { ok: true, voided: mutations.length };

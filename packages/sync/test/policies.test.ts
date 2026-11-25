@@ -106,6 +106,8 @@ describe("lww_history", () => {
     b.clock.now = at("2026-12-01T10:00:00Z");
     await a.client.update("test.mark", id, { score: 40 });
     await b.client.update("test.mark", id, { score: 70 });
+    // Both phones' clocks are right; they sync later, at 10:30.
+    a.clock.now = b.clock.now = serverClock.now = at("2026-12-01T10:30:00Z");
     await b.client.sync(); // later edit arrives first
     await a.client.sync(); // earlier edit arrives second and is superseded
     await b.client.sync();

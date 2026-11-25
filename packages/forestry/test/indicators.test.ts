@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeIndicator, miomboRegeneratingHa, type PlotInput } from "../src/indicators";
+import { computeIndicator, miomboRegeneratingHa, withAdmitted, type PlotInput } from "../src/indicators";
 
 const T = (s: string) => new Date(s);
 const stamp = (id: string, captured: string, received = captured) => ({ id, deviceTime: T(captured), serverTime: T(received) });
@@ -136,3 +136,17 @@ describe("2.1.1 miombo, both readings", () => {
     expect(miomboRegeneratingHa(r)).toBe(5);
   });
 });
+
+describe("admitted late records (DATA-5)", () => {
+  it("a late planting counts in evidence mode only once admitted, with its late photo", () => {
+    const p = bambooPlot({ plantings: [{ ...stamp("e1", "2026-09-10T10:00:00Z", "2026-10-20T10:00:00Z"), plantedOn: "2026-09-10", lines: [{ species: "x", count: 4200 }], isGapFilling: false, photos: ["f1"] }] });
+    const up = new Map([["f1", T("2026-10-20T10:05:00Z")]]);
+    const rules = { ...bambooRules, photoUploadedAt: up };
+    const before = computeIndicator([p], "2026-10-16", "evidence", rules);
+    expect(before.hectaresCounted).toBe(0);
+    expect(before.plots[0]!.lateSynced).toEqual(["e1"]);
+    expect(computeIndicator(withAdmitted([p], new Set(["e1"])), "2026-10-16", "evidence", rules).hectaresCounted).toBe(10);
+    expect(computeIndicator(withAdmitted([p], new Set(["other"])), "2026-10-16", "evidence", rules).hectaresCounted).toBe(0);
+  });
+});
+

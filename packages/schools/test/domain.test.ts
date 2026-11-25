@@ -14,6 +14,12 @@ import {
   schoolsFr,
   splitAsAt,
   studentBalance,
+  enrolmentBalance,
+  activeOn,
+  dedupeAbsences,
+  parseWholeNumber,
+  classroom,
+  yearOfDate,
   student,
   payment,
   type Absence,
@@ -246,3 +252,83 @@ describe("i18n", () => {
     expect(keys(schoolsFr).sort()).toEqual(keys(schoolsEn).sort());
   });
 });
+
+describe("fees per academic year (DATA-4 / EDGE-3 / DATA-11)", () => {
+  const y1 = { ...meta(), id: "y1", label: "2026-2027", startsOn: "2026-09-01", endsOn: "2027-07-02" };
+  const y2 = { ...meta(), id: "y2", label: "2027-2028", startsOn: "2027-09-06", endsOn: "2028-07-01" };
+  const years = [y1, y2];
+  const fee = (id: string, academicYearId: string, dueOn: string): Synced<FeeItem> => ({
+    ...meta({ id }), academicYearId, termId: null, name: "Minerval", levels: [3], amount: 10_000, dueOn,
+  });
+  const items = [fee("f1", "y1", "2026-10-01"), fee("f2", "y2", "2027-10-01")];
+  const pay = (amount: number, paidOn: string, feeItemIds: string[] = []): Synced<Payment> => ({
+    ...meta(), studentId: "s1", paidOn, amount, receiptNumber: Number(paidOn.replace(/-/g, "")) % 1000, feeItemIds,
+  });
+
+  it("charges only the fee items of the enrolment's year", () => {
+    const b = studentBalance("s1", 3, items, [], [], "2027-11-01", { academicYearId: "y2", years });
+    expect(b).toMatchObject({ charged: 10_000, overdue: 10_000 });
+    expect(b.lines.map((l) => l.feeItemId)).toEqual(["f2"]);
+    // Without the year (old callers) every item for the level is charged.
+    expect(studentBalance("s1", 3, items, [], [], "2027-11-01").charged).toBe(20_000);
+  });
+
+  it("last year's payments do not offset this year's fees, and holiday payments count for the coming year", () => {
+    const pays = [pay(10_000, "2026-11-05"), pay(4_000, "2027-08-20"), pay(1_000, "2027-09-10", ["f1"])];
+    const y2b = studentBalance("s1", 3, items, [], pays, "2027-11-01", { academicYearId: "y2", years });
+    expect(y2b).toMatchObject({ charged: 10_000, paid: 4_000, balance: 6_000 });
+    const y1b = studentBalance("s1", 3, items, [], pays, "2027-11-01", { academicYearId: "y1", years });
+    expect(y1b).toMatchObject({ charged: 10_000, paid: 11_000, balance: -1_000 });
+    expect(yearOfDate(years, "2027-08-20")).toBe("y2");
+    expect(yearOfDate(years, "2029-01-01")).toBe("y2");
+  });
+
+  it("an all-items exemption applies only in the year it was granted", () => {
+    const ex = { ...meta({ deviceTime: "2026-09-15T08:00:00+02:00" }), studentId: "s1", feeItemId: null, kind: "full" as const, value: 0, reason: "Orphelin" };
+    expect(studentBalance("s1", 3, items, [ex], [], "2027-11-01", { academicYearId: "y1", years }).charged).toBe(0);
+    expect(studentBalance("s1", 3, items, [ex], [], "2027-11-01", { academicYearId: "y2", years }).charged).toBe(10_000);
+  });
+
+  it("enrolments end with their year, and enrolmentBalance bills the class's year", () => {
+    const cls = (id: string, academicYearId: string) => ({ ...meta({ id }), academicYearId, level: 3, section: "A", shift: "morning" as const, classroomId: null });
+    const enr = (id: string, classId: string, academicYearId: string, enrolledOn: string): Synced<Enrolment> => ({
+      ...meta({ id }), studentId: "s1", classId, academicYearId, enrolledOn, leftOn: null, status: "active",
+    });
+    const e1 = enr("e1", "c1", "y1", "2026-09-01");
+    const e2 = enr("e2", "c2", "y2", "2027-09-06");
+    expect(activeOn([e1, e2], "2027-10-01", years).map((e) => e.id)).toEqual(["e2"]);
+    expect(activeOn([e1], "2027-08-01", years)).toEqual([]);
+    expect(activeOn([e1, e2], "2027-10-01").map((e) => e.id)).toEqual(["e1", "e2"]);
+    const d = { classes: [cls("c1", "y1"), cls("c2", "y2")], years, feeItems: items, exemptions: [], payments: [] };
+    expect(enrolmentBalance(d, e2, "2027-11-01").lines.map((l) => l.feeItemId)).toEqual(["f2"]);
+  });
+});
+
+describe("input edges", () => {
+  it("parses whole francs and refuses decimals (EDGE-1)", () => {
+    for (const ok of ["15000", "15 000", "15.000", "15,000", "15\u202f000", "1 500 000", " 15000 "]) expect(parseWholeNumber(ok)).toBe(ok.includes("1 500 000") ? 1_500_000 : 15_000);
+    for (const bad of ["15000,50", "2,5", "1.5", "15,00", "1.500,000", "-5", "abc", "15 00"]) expect(parseWholeNumber(bad)).toBeNaN();
+    expect(parseWholeNumber("")).toBeNull();
+  });
+
+  it("classroom evidence links must be http(s) (SEC-16)", () => {
+    const base = { name: "Salle 1", seatsPerShift: 40, basis: "new", commissionedOn: "2026-09-01", decommissionedOn: null };
+    expect(classroom.safeParse({ ...base, evidenceUrl: "javascript:alert(1)//x" }).success).toBe(false);
+    expect(classroom.safeParse({ ...base, evidenceUrl: "data:text/html,x" }).success).toBe(false);
+    expect(classroom.safeParse({ ...base, evidenceUrl: "https://drive.example.org/x" }).success).toBe(true);
+  });
+
+  it("caps amounts at an int4-safe 2 000 000 000 FC and refuses impossible dates (EDGE-2)", () => {
+    const base = { studentId: uid(), paidOn: "2026-11-15", receiptNumber: 1, feeItemIds: [] };
+    expect(payment.safeParse({ ...base, amount: 2_000_000_000 }).success).toBe(true);
+    expect(payment.safeParse({ ...base, amount: 2_000_000_001 }).success).toBe(false);
+    expect(payment.safeParse({ ...base, amount: 5, paidOn: "2026-02-30" }).success).toBe(false);
+  });
+
+  it("counts each absent pupil once per day across phones (DATA-10)", () => {
+    const a = (dev: string, deviceTime: string, reason: Absence["reason"]): Synced<Absence> => ({ ...meta({ deviceTime }), studentId: "s1", classId: "c1", date: "2026-12-01", reason });
+    const rows = dedupeAbsences([a("p1", "2026-12-01T08:00:00Z", "sick"), a("p2", "2026-12-01T09:00:00Z", "fees"), { ...a("p3", "2026-12-01T10:00:00Z", "work"), voidedAt: "2026-12-01T11:00:00Z" }]);
+    expect(rows.map((r) => r.reason)).toEqual(["fees"]);
+  });
+});
+

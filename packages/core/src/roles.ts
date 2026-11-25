@@ -75,7 +75,8 @@ export class PermissionRegistry {
    * Does `user` hold `action` at `target`?
    * - global assignments cover every site and stream;
    * - stream assignments cover every site in that stream, if the action's stream matches;
-   * - site assignments cover only that site, plus reads of stream-wide records in the site's stream.
+   * - site assignments cover only that site, plus reads of stream-wide records in the site's stream,
+   *   and only for actions of the site's own stream (a borehole site role never holds a bamboo action).
    * Unknown actions are always denied.
    */
   can(user: UserContext, action: string, target: ActionTarget): boolean {
@@ -89,6 +90,9 @@ export class PermissionRegistry {
         case "stream":
           return a.scope.stream === def.stream && a.scope.stream === target.stream;
         case "site":
+          // A site role only counts for actions of its own site's stream (or platform actions).
+          if (a.scope.stream && a.scope.stream !== target.stream) return false;
+          if (def.stream !== "platform" && def.stream !== target.stream) return false;
           if (target.streamWide) return a.scope.stream === target.stream && def.stream === target.stream;
           return target.siteId != null && a.scope.siteId === target.siteId;
       }

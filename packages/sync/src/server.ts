@@ -1,4 +1,5 @@
 import {
+  CLOCK_SKEW_LIMIT_MS,
   isClockSuspect,
   clockSkewMs,
   type ActionTarget,
@@ -53,6 +54,9 @@ export async function handlePush(ctx: SyncContext, req: PushRequest): Promise<Pu
   return { results, serverNow: now.toISOString(), clockSuspect };
 }
 
+/** The reason a mutation gets when the database itself refuses it (overflow, bad date, unique index...). */
+export const DB_REJECT_REASON = "invalid:db";
+
 async function applyOne(ctx: SyncContext, m: Mutation, now: Date, clockSuspect: boolean): Promise<MutationResult> {
   const db = ctx.db as AnyDb;
   return db.transaction(async (tx: AnyDb) => {
@@ -74,18 +78,49 @@ async function applyOne(ctx: SyncContext, m: Mutation, now: Date, clockSuspect: 
     if (claimed.length === 0) {
       const [prev] = await tx.select().from(syncMutations).where(eq(syncMutations.mutationId, m.mutationId));
       const stored = (prev?.result ?? {}) as MutationResult;
-      const entity = ctx.entities.get(m.entity);
-      const record = entity ? await currentRecord(tx, ctx, entity, m.recordId) : undefined;
+      // Answer with the record the mutation was stored for, and only to the user who sent it.
+      const entity = prev && prev.userId === ctx.user.id ? ctx.entities.get(String(prev.entity)) : undefined;
+      const record = entity ? await currentRecord(tx, ctx, entity, String(prev.recordId)) : undefined;
       return { mutationId: m.mutationId, status: "duplicate", reason: stored.status, ...(record ? { record } : {}) };
     }
 
-    const result = await decide(tx, ctx, m, now, clockSuspect);
+    let result: MutationResult;
+    try {
+      // A savepoint per mutation: if the database refuses this one record (an integer overflow, a
+      // date Postgres rejects, a unique index), only this mutation is rejected and the push goes on.
+      result = await tx.transaction((sp: AnyDb) => decide(sp, ctx, m, now, clockSuspect));
+    } catch (err) {
+      const code = dbErrorCode(err);
+      await audit(tx, ctx, m, {
+        op: "rejected",
+        scopeId: m.scopeId,
+        clockSuspect,
+        note: `${DB_REJECT_REASON}${code ? `:${code}` : ""}`,
+        newValues: safeJson(m.fields ?? null),
+      });
+      result = { mutationId: m.mutationId, status: "rejected", reason: DB_REJECT_REASON };
+    }
     await tx
       .update(syncMutations)
       .set({ status: result.status, result: { status: result.status, reason: result.reason, conflicts: result.conflicts } })
       .where(eq(syncMutations.mutationId, m.mutationId));
     return result;
   });
+}
+
+function dbErrorCode(err: unknown): string | undefined {
+  for (let e: unknown = err, i = 0; e && i < 4; i++) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string" && /^[0-9A-Z]{5}$/.test(code)) return code;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
+/** JSON for the audit log, with NUL characters (which Postgres refuses in text and jsonb) removed. */
+function safeJson(v: unknown): unknown {
+  if (v == null) return null;
+  return JSON.parse(JSON.stringify(v).replace(/\\u0000/g, ""));
 }
 
 async function decide(tx: AnyDb, ctx: SyncContext, m: Mutation, now: Date, clockSuspect: boolean): Promise<MutationResult> {
@@ -100,7 +135,19 @@ async function decide(tx: AnyDb, ctx: SyncContext, m: Mutation, now: Date, clock
   const cols = getTableColumns(entity.table) as Record<string, AnyDb>;
   const [existing] = (await tx.select().from(table).where(eq(cols.id, m.recordId)).for("update")) as Row[];
   const target = writeTarget(entity, existing ? String(existing.scopeId) : m.scopeId);
-  const deviceTime = new Date(m.deviceTime);
+  // Device time is self-reported. Never store one more than the allowed skew in the future, and
+  // flag the record when the phone's clock (or this record's own time) looks wrong.
+  const rawDeviceTime = new Date(m.deviceTime);
+  const future = rawDeviceTime.getTime() - now.getTime() > CLOCK_SKEW_LIMIT_MS;
+  const deviceTime = future ? now : rawDeviceTime;
+  const recordSuspect = clockSuspect || future;
+  // lww_history orders edits by device time; a suspect clock is ordered by server receive time.
+  const editTime = recordSuspect ? now : deviceTime;
+  const ruleCtx = (scopeId: string) => ({
+    tx,
+    user: ctx.user,
+    can: (action: string) => ctx.permissions.can(ctx.user, action, writeTarget(entity, scopeId)),
+  });
 
   if (m.op === "insert") {
     const needed = entity.policy === "server_authoritative" ? (entity.actions.configure ?? entity.actions.write) : entity.actions.write;
@@ -110,6 +157,10 @@ async function decide(tx: AnyDb, ctx: SyncContext, m: Mutation, now: Date, clock
     if (scopeProblem) return reject(scopeProblem);
     const parsed = parseFields(entity, cols, m.fields ?? {}, "insert");
     if (!parsed.ok) return reject(parsed.reason);
+    if (entity.validate) {
+      const problem = await entity.validate(ruleCtx(m.scopeId), { op: "insert", recordId: m.recordId, scopeId: m.scopeId, fields: parsed.values });
+      if (problem) return reject(problem);
+    }
     const fieldVersions: Record<string, number> = {};
     if (entity.policy === "field_merge") for (const k of Object.keys(parsed.values)) fieldVersions[k] = 1;
     const row = {
@@ -121,19 +172,21 @@ async function decide(tx: AnyDb, ctx: SyncContext, m: Mutation, now: Date, clock
       deviceTime,
       serverTime: now,
       updatedServerTime: now,
-      editedDeviceTime: deviceTime,
+      editedDeviceTime: editTime,
       version: 1,
       fieldVersions,
-      clockSuspect,
+      clockSuspect: recordSuspect,
     };
     await tx.insert(table).values(row);
-    await audit(tx, ctx, m, { op: "insert", scopeId: m.scopeId, clockSuspect, newValues: toJson(parsed.values) });
+    await audit(tx, ctx, m, { op: "insert", scopeId: m.scopeId, clockSuspect: recordSuspect, newValues: toJson(parsed.values) });
     await logChange(tx, entity.name, m.recordId, m.scopeId, now);
     return applied(tx, ctx, entity, m);
   }
 
   if (!existing) return reject("not_found");
   const scopeId = String(existing.scopeId);
+  // Some entities share a table (bamboo.* and miombo.*): the row must belong to this entity's stream.
+  if (!(await inEntityStream(tx, entity, scopeId))) return reject("scope_wrong_stream");
 
   if (m.op === "void") {
     const needed =
@@ -150,7 +203,7 @@ async function decide(tx: AnyDb, ctx: SyncContext, m: Mutation, now: Date, clock
       .update(table)
       .set({ voidedAt: now, voidReason: reason, version: Number(existing.version) + 1, updatedServerTime: now })
       .where(eq(cols.id, m.recordId));
-    await audit(tx, ctx, m, { op: "void", scopeId, clockSuspect, oldValues: null, newValues: { voidReason: reason } });
+    await audit(tx, ctx, m, { op: "void", scopeId, clockSuspect: recordSuspect, oldValues: null, newValues: { voidReason: reason } });
     await logChange(tx, entity.name, m.recordId, scopeId, now);
     return applied(tx, ctx, entity, m);
   }
@@ -164,19 +217,23 @@ async function decide(tx: AnyDb, ctx: SyncContext, m: Mutation, now: Date, clock
   if (!parsed.ok) return reject(parsed.reason);
   const incoming = parsed.values;
   if (Object.keys(incoming).length === 0) return reject("no_fields");
+  if (entity.validate) {
+    const problem = await entity.validate(ruleCtx(scopeId), { op: "update", recordId: m.recordId, scopeId, fields: incoming, existing });
+    if (problem) return reject(problem);
+  }
 
   if (entity.policy === "lww_history" || entity.policy === "server_authoritative") {
     const lastEdit = new Date(existing.editedDeviceTime as Date | string);
-    if (entity.policy === "lww_history" && deviceTime < lastEdit) {
-      await audit(tx, ctx, m, { op: "superseded", scopeId, clockSuspect, newValues: toJson(incoming) });
+    if (entity.policy === "lww_history" && editTime < lastEdit) {
+      await audit(tx, ctx, m, { op: "superseded", scopeId, clockSuspect: recordSuspect, newValues: toJson(incoming) });
       return { mutationId: m.mutationId, status: "superseded", ...(await recordIfReadable(tx, ctx, entity, m.recordId)) };
     }
     const old = pick(existing, Object.keys(incoming));
     await tx
       .update(table)
-      .set({ ...incoming, version: Number(existing.version) + 1, updatedServerTime: now, editedDeviceTime: deviceTime })
+      .set({ ...incoming, version: Number(existing.version) + 1, updatedServerTime: now, editedDeviceTime: editTime })
       .where(eq(cols.id, m.recordId));
-    await audit(tx, ctx, m, { op: "update", scopeId, clockSuspect, oldValues: toJson(old), newValues: toJson(incoming) });
+    await audit(tx, ctx, m, { op: "update", scopeId, clockSuspect: recordSuspect, oldValues: toJson(old), newValues: toJson(incoming) });
     await logChange(tx, entity.name, m.recordId, scopeId, now);
     return applied(tx, ctx, entity, m);
   }
@@ -212,13 +269,13 @@ async function decide(tx: AnyDb, ctx: SyncContext, m: Mutation, now: Date, clock
     const old = pick(existing, Object.keys(toApply));
     await tx
       .update(table)
-      .set({ ...toApply, fieldVersions: fv, version: Number(existing.version) + 1, updatedServerTime: now, editedDeviceTime: deviceTime })
+      .set({ ...toApply, fieldVersions: fv, version: Number(existing.version) + 1, updatedServerTime: now, editedDeviceTime: editTime })
       .where(eq(cols.id, m.recordId));
-    await audit(tx, ctx, m, { op: "update", scopeId, clockSuspect, oldValues: toJson(old), newValues: toJson(toApply) });
+    await audit(tx, ctx, m, { op: "update", scopeId, clockSuspect: recordSuspect, oldValues: toJson(old), newValues: toJson(toApply) });
     await logChange(tx, entity.name, m.recordId, scopeId, now);
   }
   if (conflicts.length > 0) {
-    await audit(tx, ctx, m, { op: "conflict", scopeId, clockSuspect, newValues: toJson(pick(incoming, conflicts)), note: conflicts.join(",") });
+    await audit(tx, ctx, m, { op: "conflict", scopeId, clockSuspect: recordSuspect, newValues: toJson(pick(incoming, conflicts)), note: conflicts.join(",") });
     return { mutationId: m.mutationId, status: "partial", conflicts, ...(await recordIfReadable(tx, ctx, entity, m.recordId)) };
   }
   return applied(tx, ctx, entity, m);
@@ -238,6 +295,7 @@ async function currentRecord(tx: AnyDb, ctx: SyncContext, entity: EntityDef, id:
   const [row] = (await tx.select().from(entity.table).where(eq(cols.id, id))) as Row[];
   if (!row) return undefined;
   if (!ctx.permissions.can(ctx.user, entity.actions.read, readTarget(entity, String(row.scopeId)))) return undefined;
+  if (!(await inEntityStream(tx, entity, String(row.scopeId)))) return undefined;
   return toWire(row);
 }
 
@@ -289,13 +347,47 @@ async function logChange(tx: AnyDb, entity: string, recordId: string, scopeId: s
   await tx.insert(changeLog).values({ entity, recordId, scopeId, changedAt: now });
 }
 
+/**
+ * The pull cursor carries a fingerprint of the user's role assignments in its low bits:
+ * cursor = seq * 2^20 + fingerprint. When the assignments change (a new school, site or stream),
+ * the fingerprint no longer matches and the feed restarts from the beginning, so records written
+ * before the user could read them are delivered too. Re-delivery is safe: phones keep the newer
+ * version of each record. Phones just store the number they are given.
+ */
+const FP_BITS = 2 ** 20;
+
+export function assignmentsFingerprint(user: UserContext): number {
+  const keys = user.assignments
+    .map((a) => `${a.role}|${a.scope.type}|${"stream" in a.scope ? (a.scope.stream ?? "") : ""}|${a.scope.type === "site" ? a.scope.siteId : ""}`)
+    .sort()
+    .join(";");
+  // FNV-1a, folded to 20 bits; never 0, so a fresh cursor (0) always starts from the beginning.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < keys.length; i++) {
+    h ^= keys.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return (h % (FP_BITS - 1)) + 1;
+}
+
+export function decodeCursor(cursor: number, fingerprint: number): number {
+  if (cursor % FP_BITS !== fingerprint) return 0;
+  return Math.floor(cursor / FP_BITS);
+}
+
+export function encodeCursor(seq: number, fingerprint: number): number {
+  return seq * FP_BITS + fingerprint;
+}
+
 export async function handlePull(ctx: SyncContext, req: PullRequest): Promise<PullResponse> {
   const db = ctx.db as AnyDb;
   const limit = req.limit ?? DEFAULT_PULL_LIMIT;
+  const fp = assignmentsFingerprint(ctx.user);
+  const fromSeq = decodeCursor(req.cursor, fp);
   const batch = (await db
     .select()
     .from(changeLog)
-    .where(gt(changeLog.seq, req.cursor))
+    .where(gt(changeLog.seq, fromSeq))
     .orderBy(asc(changeLog.seq))
     .limit(limit)) as { seq: number; entity: string; recordId: string; scopeId: string }[];
 
@@ -313,11 +405,13 @@ export async function handlePull(ctx: SyncContext, req: PullRequest): Promise<Pu
     const entity = ctx.entities.get(name)!;
     const cols = getTableColumns(entity.table) as Record<string, AnyDb>;
     const rows = (await db.select().from(entity.table).where(and(inArray(cols.id, [...ids])))) as Row[];
-    for (const row of rows) changes.push({ entity: name, record: toWire(row) });
+    let records = rows.map(toWire) as Row[];
+    if (entity.decorate) records = await entity.decorate(db, records);
+    for (const record of records) changes.push({ entity: name, record: record as WireRecord });
   }
 
   const last = batch.at(-1);
-  return { changes, cursor: last ? Number(last.seq) : req.cursor, hasMore: batch.length === limit };
+  return { changes, cursor: encodeCursor(last ? Number(last.seq) : fromSeq, fp), hasMore: batch.length === limit };
 }
 
 export function toWire(row: Row): WireRecord {
@@ -348,6 +442,13 @@ export function writeTarget(entity: EntityDef, scopeId: string): ActionTarget {
 
 function readTarget(entity: EntityDef, scopeId: string): ActionTarget {
   return scopeId === entity.stream ? { stream: entity.stream, siteId: null, streamWide: true } : { stream: entity.stream, siteId: scopeId };
+}
+
+/** Is a record scoped here part of the entity's stream? (The stream itself, or a site of that stream.) */
+async function inEntityStream(tx: AnyDb, entity: EntityDef, scopeId: string): Promise<boolean> {
+  if (scopeId === entity.stream) return true;
+  const [site] = (await tx.select({ stream: sites.stream }).from(sites).where(eq(sites.id, scopeId))) as { stream: string }[];
+  return site?.stream === entity.stream;
 }
 
 /** A new record's scope must be the entity's own stream, or an active site of that stream (and of an allowed kind). */

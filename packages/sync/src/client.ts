@@ -53,13 +53,27 @@ export class DeviceRevokedError extends Error {
   }
 }
 
+/**
+ * The server ended this phone's session but the phone itself is still enrolled: the password was
+ * reset, the user was deactivated, or the token expired (401 {"error":"session_ended"}).
+ * The phone must ask for an online sign-in and KEEP all its data; never wipe on this.
+ */
+export class SessionEndedError extends Error {
+  constructor() {
+    super("session_ended");
+  }
+}
+
 export interface SyncOutcome {
   ok: boolean;
   pushed: number;
   pulled: number;
   clockSuspect: boolean;
   error?: string;
+  /** The phone was removed by an admin (401 device_revoked): local data has been wiped. */
   revoked?: boolean;
+  /** The session ended (password reset, deactivation, expiry): sign in again; nothing was wiped. */
+  sessionEnded?: boolean;
 }
 
 type Fields = Record<string, unknown>;
@@ -207,6 +221,9 @@ export class SyncClient {
       }
       return { ok: true, pushed, pulled, clockSuspect };
     } catch (err) {
+      if (err instanceof SessionEndedError) {
+        return { ok: false, pushed, pulled, clockSuspect, sessionEnded: true, error: err.message };
+      }
       if (err instanceof DeviceRevokedError) {
         await this.store.wipe();
         return { ok: false, pushed, pulled, clockSuspect, revoked: true, error: err.message };

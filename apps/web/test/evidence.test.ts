@@ -5,7 +5,7 @@ import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import { integer, pgTable } from "drizzle-orm/pg-core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { admittedIds, createCutoff, decide, evidenceCsv, lateRecords, nextCutoff, recordDeviceStatus, summarise } from "../lib/evidence";
+import { admittedIds, admittedRecordIds, cutoffOn, createCutoff, decide, evidenceCsv, lateRecords, nextCutoff, recordDeviceStatus, summarise } from "../lib/evidence";
 
 const visits = pgTable("test_visits", { ...syncColumns(), trees: integer("trees").notNull() });
 const visit = defineEntity({
@@ -50,6 +50,10 @@ describe("evidence cut-offs", () => {
     expect(await decide(db, { cutoffId: c.id, entity: visit, recordId: onTime, decision: "admitted", reason: "on time anyway", userId: "admin" })).toEqual({ ok: false, reason: "not_late" });
     expect(await decide(db, { cutoffId: c.id, entity: visit, recordId: late, decision: "admitted", reason: "No network at Kiabukwa that week", userId: "admin" })).toEqual({ ok: true });
     expect(await admittedIds(db, c.id, "test.visit")).toEqual(new Set([late]));
+    // The dashboard's evidence mode for that day applies this cut-off's admissions (DATA-5).
+    expect((await cutoffOn(db, "2026-12-15"))?.id).toBe(c.id);
+    expect(await cutoffOn(db, "2026-12-16")).toBeUndefined();
+    expect(await admittedRecordIds(db, c.id)).toEqual(new Set([late]));
 
     // A changed decision is kept, and both are audited.
     await decide(db, { cutoffId: c.id, entity: visit, recordId: late, decision: "excluded", reason: "Photo missing", userId: "pm" });
@@ -61,9 +65,13 @@ describe("evidence cut-offs", () => {
     ]);
 
     const csv = await evidenceCsv(db, registry, c);
-    expect(csv.split("\n").filter(Boolean)).toHaveLength(3); // header + counted + late
-    expect(csv).toContain(`${onTime},P1,counted`);
-    expect(csv).toContain(`${late},P1,late_excluded`);
+    expect(csv.split("\r\n").filter(Boolean)).toHaveLength(3); // header + counted + late
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    expect(csv).toContain(`"${onTime}","P1","counted"`);
+    expect(csv).toContain(`"${late}","P1","late_excluded"`);
+    const fr = await evidenceCsv(db, registry, c, "fr");
+    expect(fr).toContain(`"${late}";"P1";"en_retard_exclu"`);
+    expect(fr.split("\r\n")[0]).toContain('"statut";"heure_telephone"');
   });
 
   it("tells phones about the next cut-off and stores what they hold unsynced", async () => {

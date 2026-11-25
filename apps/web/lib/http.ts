@@ -28,3 +28,28 @@ export async function readJson(req: Request): Promise<unknown> {
     return undefined;
   }
 }
+
+/** The caller's network address as Vercel reports it (first x-forwarded-for hop). */
+export function clientIp(req: Request): string | null {
+  const fwd = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return fwd || req.headers.get("x-real-ip") || null;
+}
+
+/**
+ * CSRF guard for cookie-setting endpoints (SEC-14). A browser always sends Origin (and
+ * Sec-Fetch-Site) on a POST; a cross-site one is refused. Requests with neither header come from
+ * non-browser clients (phones, scripts), which cannot carry a victim's cookies, and are allowed.
+ */
+export function sameOrigin(req: Request): boolean {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const origin = req.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).host === host;
+    } catch {
+      return false;
+    }
+  }
+  const site = req.headers.get("sec-fetch-site");
+  return !site || site === "same-origin" || site === "none";
+}

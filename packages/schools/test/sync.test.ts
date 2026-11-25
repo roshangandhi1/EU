@@ -50,12 +50,26 @@ const pay = (studentId: string, receiptNumber: number, amount = 10_000) => ({
   feeItemIds: [],
 });
 
+const student = (studentNumber: string) => ({
+  studentNumber, firstName: "Kabange", lastName: "Ilunga", postName: "", sex: "F", dateOfBirth: null, birthYearEstimate: 2017,
+  guardianName: "", guardianPhone: "", village: "",
+});
+
+/** A pupil of SITE and a receipt book (101-200) for the school admin, so the server's payment rules pass. */
+async function seedPayer(): Promise<string> {
+  const m = device("web-manager-seed", manager);
+  const sid = await m.client.create("school.student", SITE, student(`W-${n}`));
+  await m.client.create("school.receipt_book", SITE, { firstNumber: 101, lastNumber: 200, assignedTo: admin.id });
+  await m.client.create("school.receipt_book", SITE, { firstNumber: 201, lastNumber: 300, assignedTo: head.id });
+  await m.client.sync();
+  return sid;
+}
+
 describe("schools entities on the sync engine", () => {
   it("payments are append-only: school admin cannot void, headteacher can, edits are rejected", async () => {
     const a = device("phone-admin", admin);
     const h = device("phone-head", head);
-    const student = uuid();
-    const pid = await a.client.create("school.payment", SITE, pay(student, 101));
+    const pid = await a.client.create("school.payment", SITE, pay(await seedPayer(), 101));
     expect((await a.client.sync()).ok).toBe(true);
 
     await a.client.void("school.payment", pid, "wrong amount");
@@ -160,7 +174,7 @@ describe("schools entities on the sync engine", () => {
   it("server records feed the domain rules: balances and the evidence cut-off", async () => {
     const m = device("web-manager", manager);
     const a = device("phone-admin", admin);
-    const student = uuid();
+    const student = await seedPayer();
     const fid = await m.client.create("school.fee_item", SITE, {
       academicYearId: uuid(), termId: null, name: "Minerval", levels: [3], amount: 30_000, dueOn: "2026-10-01",
     });
@@ -189,5 +203,54 @@ describe("schools entities on the sync engine", () => {
     const split = splitAsAt(payments, "2026-12-16", "evidence");
     expect(split.counted.map((p) => p.receiptNumber)).toEqual([103]);
     expect(split.lateSynced.map((p) => p.receiptNumber)).toEqual([104]);
+  });
+
+  it("enforces the payment rules on the server for every path (SEC-6/DATA-16)", async () => {
+    const a = device("phone-admin", admin);
+    const sid = await seedPayer();
+    const m = device("web-manager", manager);
+    const otherPupil = await m.client.create("school.student", "school-other", student("X-1"));
+    await m.client.sync();
+    await a.client.create("school.payment", SITE, pay(sid, 101)); // ok
+    await a.client.create("school.payment", SITE, pay(sid, 101)); // same receipt again
+    await a.client.create("school.payment", SITE, pay(sid, 250)); // the headteacher's book, not the admin's
+    await a.client.create("school.payment", SITE, pay(sid, 9_999)); // no book at all
+    await a.client.create("school.payment", SITE, pay(otherPupil, 102)); // pupil of another school
+    await a.client.create("school.payment", SITE, { ...pay(sid, 103), feeItemIds: [uuid()] }); // unknown fee item
+    await a.client.create("school.payment", SITE, pay(sid, 104, 3_000_000_000)); // over the int4-safe cap
+    await a.client.sync();
+    expect((await a.store.rejections()).map((r) => r.reason)).toEqual([
+      "already_used",
+      "not_in_assigned_book",
+      "not_in_assigned_book",
+      "student_not_in_school",
+      "fee_item_not_in_school",
+      "invalid:amount:too_big",
+    ]);
+    // Programme staff (school.configure) are not tied to a book, but duplicates are still refused.
+    await m.client.create("school.payment", SITE, pay(sid, 5_000));
+    await m.client.create("school.payment", SITE, pay(sid, 101));
+    await m.client.sync();
+    expect((await m.store.rejections()).map((r) => r.reason)).toEqual(["already_used"]);
+    // A voided receipt number may be reused.
+    const h = device("phone-head", head);
+    await h.client.sync();
+    const first = (await h.store.listServerRecords("school.payment")).find((p) => p.receiptNumber === 101)!;
+    await h.client.void("school.payment", first.id, "wrong pupil");
+    await h.client.sync();
+    await a.client.create("school.payment", SITE, pay(sid, 101));
+    await a.client.sync();
+    expect((await a.store.rejections())).toHaveLength(6);
+  });
+});
+
+describe("school records on the phone carry the site name", () => {
+  it("adds the name from the sites table on pull", async () => {
+    const m = device("web-manager", manager);
+    const id = await m.client.create("school.school", SITE, { siteId: SITE, code: "LUN", locale: "fr", shiftsRunning: ["morning"] });
+    expect((await m.client.sync()).ok).toBe(true);
+    const h = device("phone-head", head);
+    await h.client.sync();
+    expect((await h.store.getServerRecord("school.school", id))?.name).toBe("École Luniemu");
   });
 });

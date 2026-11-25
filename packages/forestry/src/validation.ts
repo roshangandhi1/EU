@@ -1,7 +1,8 @@
 /** Zod schemas shared by phone (validation before save), sync API and web forms. */
 import { z } from "zod";
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** A real calendar date, YYYY-MM-DD (2026-02-30 is refused, so Postgres never sees it). */
+const isoDate = z.iso.date();
 const uuid = z.uuid();
 const siteId = z.string().min(1).max(64);
 const count = z.number().int().min(0).max(1_000_000);
@@ -69,7 +70,7 @@ export const sampleCountSchema = z.object({
 });
 
 export const samplePlotSchema = z.object({
-  pointIndex: z.number().int().min(0),
+  pointIndex: z.number().int().min(0).max(100_000),
   lat: z.number(),
   lng: z.number(),
   gpsAccuracyM: z.number().optional(),
@@ -80,7 +81,7 @@ export const samplePlotSchema = z.object({
 
 export const monitoringVisitSchema = z.object({
   visitedOn: isoDate,
-  sampleSeed: z.number().int().nullable().optional(),
+  sampleSeed: z.number().int().min(-2_000_000_000).max(2_000_000_000).nullable().optional(),
   samples: z.array(samplePlotSchema).default([]),
   meanHeightCm: z.number().min(0).max(3000).nullable().optional(),
   newShootsPerClump: z.number().min(0).max(200).nullable().optional(),
