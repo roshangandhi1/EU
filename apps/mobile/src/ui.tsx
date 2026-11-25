@@ -1,6 +1,6 @@
 import { colors, radius, space, touch } from "@eu/core/tokens";
-import type { ReactNode } from "react";
-import { Image, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
+import { useEffect, type ReactNode } from "react";
+import { BackHandler, Image, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
 
 /**
  * Small, dependency-free building blocks sized for thumbs and cheap screens: no shadows or
@@ -95,6 +95,33 @@ export function BrandBar({ right }: { right?: ReactNode }) {
       <Image source={require("../assets/logo-white.png")} style={s.brandLogo} resizeMode="contain" accessibilityLabel="GoCongo" />
       <View style={s.brandRight}>{right}</View>
     </View>
+  );
+}
+
+/**
+ * Back arrow at the top left of every sub-screen. While it is on screen, the Android back
+ * button does the same thing, so the two always agree.
+ */
+export function BackBar({ onBack, label }: { onBack: () => void; label?: string }) {
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onBack]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label ?? "Back"}
+      onPress={onBack}
+      hitSlop={8}
+      android_ripple={{ color: colors.border, borderless: true }}
+      style={s.backBar}
+    >
+      <Text style={s.backArrow}>←</Text>
+      {label ? <Text style={s.backLabel}>{label}</Text> : null}
+    </Pressable>
   );
 }
 
@@ -208,6 +235,9 @@ const s = StyleSheet.create({
   langText: { fontSize: 14, fontWeight: "700" },
   band: { marginTop: "auto", flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.sm },
   bandText: { color: colors.euBlue, fontSize: 13, fontWeight: "600", flexShrink: 1 },
+  backBar: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", minHeight: touch.minTarget, paddingRight: space.sm, marginLeft: -4 },
+  backArrow: { fontSize: 28, lineHeight: 32, color: colors.gcGreen, fontWeight: "700" },
+  backLabel: { fontSize: 17, color: colors.gcGreen, fontWeight: "700" },
   empty: { alignItems: "center", gap: space.md, paddingVertical: space.xl, paddingHorizontal: space.md },
   emptyIcon: { fontSize: 48 },
   emptyTitle: { fontSize: 20, fontWeight: "700", color: colors.text, textAlign: "center" },

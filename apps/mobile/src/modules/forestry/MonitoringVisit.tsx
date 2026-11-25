@@ -7,7 +7,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Field, Title } from "../../ui";
+import { BackBar, Body, Button, Field, Title } from "../../ui";
 import { getFix, localToday, type Fix } from "../location";
 import { loadSpecies, type PlotLite, type SpeciesOption } from "./data";
 import { PhotoStrip } from "../photos";
@@ -151,6 +151,7 @@ export function MonitoringVisit({ session, stream, plot, onDone }: { session: Se
     const near = d !== null && d <= Math.max(settings.sampleRadiusM, fix?.accuracyM ?? 0);
     return (
       <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
+        <BackBar label={t("forestry.m.back")} onBack={() => onDone(false)} />
         <Title>{t("forestry.visit.new")}</Title>
         <Body tone="muted">
           {t("forestry.plot")} {plot.code} · {t("forestry.visit.sample_n", { n: idx + 1, total: drawn.length })}
@@ -201,6 +202,7 @@ export function MonitoringVisit({ session, stream, plot, onDone }: { session: Se
 
   return (
     <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
+      <BackBar label={t("forestry.m.back")} onBack={() => onDone(false)} />
       <Title>{t("forestry.visit.new")}</Title>
       <Body tone="muted">
         {t("forestry.plot")} {plot.code} · {plot.village}

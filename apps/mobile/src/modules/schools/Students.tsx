@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { deviceId } from "../../secure";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Field, Title } from "../../ui";
+import { BackBar, Body, Button, Field, Title } from "../../ui";
 import { currentYear, live, studentName, today, type SchoolData } from "./data";
 import { Choice, Row, Scroll } from "./parts";
 
@@ -29,6 +29,7 @@ export function Students({ session, data, onBack }: { session: Session; data: Sc
 
   return (
     <Scroll>
+      <BackBar label={t("schools.mobile.back")} onBack={onBack} />
       <Title>{t("schools.student.title")}</Title>
       <Button label={t("schools.mobile.newStudent")} onPress={() => setAdding(true)} />
       <Field label={t("schools.student.search")} value={q} onChangeText={setQ} autoCorrect={false} />
@@ -37,7 +38,6 @@ export function Students({ session, data, onBack }: { session: Session; data: Sc
         const c = classes.get(byStudent.get(s.id)?.classId ?? "");
         return <Row key={s.id} title={studentName(s)} detail={`${s.studentNumber} · ${c ? `${c.level}${c.section}` : ""}${s.pending ? ` · ${t("schools.mobile.pending")}` : ""}`} />;
       })}
-      <Button kind="secondary" label={t("schools.mobile.back")} onPress={onBack} />
     </Scroll>
   );
 }
@@ -82,10 +82,11 @@ function Enrol({ session, data, onDone }: { session: Session; data: SchoolData; 
     onDone();
   };
 
-  if (!year) return <Scroll><Body tone="warning">{t("schools.mobile.needYear")}</Body><Button kind="secondary" label={t("schools.mobile.back")} onPress={onDone} /></Scroll>;
+  if (!year) return <Scroll><BackBar label={t("schools.mobile.back")} onBack={onDone} /><Body tone="warning">{t("schools.mobile.needYear")}</Body></Scroll>;
 
   return (
     <Scroll>
+      <BackBar label={t("schools.mobile.back")} onBack={onDone} />
       <Title>{t("schools.student.add")}</Title>
       {myDevice && !tag && <Body tone="critical">{t("schools.mobile.noTag")}</Body>}
       <Field label={t("schools.student.lastName")} value={f.lastName} onChangeText={set("lastName")} autoCapitalize="characters" />

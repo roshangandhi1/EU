@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Title } from "../../ui";
+import { BackBar, Body, Button, Title } from "../../ui";
 import { addDays, currentYear, live, studentName, today, type SchoolData } from "./data";
 import { Choice, Row, Scroll } from "./parts";
 
@@ -79,10 +79,11 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
     setSaved(true);
   };
 
-  if (!year) return <><Title>{t("schools.attendance.title")}</Title><Body tone="warning">{t("schools.mobile.needYear")}</Body><Button kind="secondary" label={t("schools.mobile.back")} onPress={onBack} /></>;
+  if (!year) return <><BackBar label={t("schools.mobile.back")} onBack={onBack} /><Title>{t("schools.attendance.title")}</Title><Body tone="warning">{t("schools.mobile.needYear")}</Body></>;
 
   return (
     <Scroll>
+      <BackBar label={t("schools.mobile.back")} onBack={onBack} />
       <Title>{t("schools.attendance.title")}</Title>
       <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
         <View style={{ flex: 1 }}><Button kind="secondary" label="‹" onPress={() => setDate(addDays(date, -1))} /></View>
@@ -109,7 +110,6 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
           <Button label={t("schools.attendance.saveRegister")} onPress={() => void save()} disabled={busy || roster.length === 0} />
         </>
       )}
-      <Button kind="secondary" label={t("schools.mobile.back")} onPress={onBack} />
     </Scroll>
   );
 }

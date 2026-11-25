@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Body, Button, Title } from "../../ui";
+import { BackBar, Body, Button, Title } from "../../ui";
 import { getFix, localToday } from "../location";
 import { loadBoreholes, loadSchedule, type BoreholeRow, type Schedule } from "./data";
 import { VisitForm } from "./VisitForm";
@@ -59,6 +59,7 @@ export function BoreholesHome({ session, onBack }: { session: Session; onBack: (
 
   return (
     <ScrollView contentContainerStyle={s.wrap}>
+      <BackBar label={t("forestry.m.back")} onBack={onBack} />
       <Title>{t("boreholes.title")}</Title>
       {flash && <Body tone="good">{flash}</Body>}
       <Button label={t("boreholes.m.find")} onPress={() => void findNearest()} disabled={!rows || rows.length === 0} />
@@ -79,8 +80,6 @@ export function BoreholesHome({ session, onBack }: { session: Session; onBack: (
           </Pressable>
         );
       })}
-      <View style={{ height: space.md }} />
-      <Button kind="secondary" label={t("forestry.m.back")} onPress={onBack} />
     </ScrollView>
   );
 }

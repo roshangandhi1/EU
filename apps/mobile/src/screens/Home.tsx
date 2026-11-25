@@ -8,7 +8,7 @@ import { API_BASE } from "../config";
 import { LocaleContext, useT } from "../i18n";
 import { openModule, useModuleCounts, type ModuleCounts } from "../modules/field";
 import type { Session } from "../session";
-import { Body, BrandBar, Button, Card, EmptyState, EuBand, LanguageSwitch, Pill, Screen, Subtitle, Title, TOP, ui } from "../ui";
+import { BackBar, Body, BrandBar, Button, Card, EmptyState, EuBand, LanguageSwitch, Pill, Screen, Subtitle, TOP, Title, ui } from "../ui";
 
 const ICON: Record<ModuleKey, string> = { schools: "🏫", boreholes: "💧", bamboo: "🎋", miombo: "🌳" };
 const WEB_PATH: Record<ModuleKey, string> = { schools: "schools", boreholes: "boreholes", bamboo: "forestry/bamboo", miombo: "forestry/miombo" };
@@ -179,9 +179,7 @@ function EmptyModule({ session, module, counts, onBack }: { session: Session; mo
   const total = counts ? MODULES.reduce((n, m) => n + counts[m], 0) : null;
   return (
     <Screen scroll>
-      <Pressable accessibilityRole="button" onPress={onBack} style={s.back}>
-        <Text style={s.backText}>‹ {t("app.back")}</Text>
-      </Pressable>
+      <BackBar label={t("app.back")} onBack={onBack} />
       <Title>{t(`app.${module}`)}</Title>
       <Card accent={streamAccent[module]}>
         <EmptyState icon={ICON[module]} title={t("app.emptyTitle")}>
@@ -218,6 +216,4 @@ const s = StyleSheet.create({
   tileDetail: { fontSize: 14, color: colors.textMuted },
   lock: { minHeight: 36, minWidth: 40, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, borderRadius: 999, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.6)" },
   lockText: { color: colors.surface, fontWeight: "700", fontSize: 14 },
-  back: { minHeight: 44, justifyContent: "center", alignSelf: "flex-start" },
-  backText: { color: colors.gcGreen, fontSize: 17, fontWeight: "700" },
 });
