@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "GoCongo",
+    "slug": "gocongo-eu",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "cd.gocongo.eu",
+      "versionCode": 1,
+      "permissions": []
+    },
+    "plugins": [
+      ["expo-sqlite", { "useSQLCipher": true }],
+      "expo-secure-store",
+      "expo-localization"
+    ],
+    "extra": {
+      "apiBase": "https://eu2-roan.vercel.app"
+    }
+  }
+}
