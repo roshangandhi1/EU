@@ -47,3 +47,13 @@ One history in `packages/db/migrations`. Generate with `npm run db:generate` onl
 ## Branches
 
 `claude/<area>-*`, pull requests into `main`, CI green, squash-merge.
+
+## Android app (apps/mobile)
+
+- Expo SDK 58. It sits **outside** the root npm workspaces, so Vercel installs stay lean: run `npm ci` inside `apps/mobile`.
+- Metro resolves `@eu/core` and `@eu/sync` straight from `packages/` TypeScript source (`metro.config.js`). The app may import only browser-safe entry points: `@eu/core`, `@eu/core/i18n`, `@eu/core/tokens`, `@eu/sync/client`, `@eu/sync/sql-store`. Never import `@eu/sync/server` or `@eu/db`.
+- Storage: `SqlStore` (the same code the sync harness tests) over expo-sqlite with SQLCipher. The 256-bit key is generated on first launch and kept in secure storage.
+- Sign-in: email and password once online, which registers the phone and gets a 180-day device token. After that, a 4–6 digit PIN. Five wrong PINs force an online sign-in, and unsynced work is kept. A different user cannot sign in while the previous user's work is unsynced. A revoked device is wiped.
+- Sync runs on unlock, when the app returns to the foreground, every 5 minutes, and when the network comes back. The home screen shows pending, rejected and clock warnings.
+- Module screens go in `apps/mobile/src/modules/<stream>/`. They read and write only through `session.client`.
+- Build: `eas build -p android --profile preview` produces a signed APK for private distribution. This needs an Expo account, which is not set up yet.
