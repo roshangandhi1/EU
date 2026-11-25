@@ -14,7 +14,7 @@ import { handlePull, handlePush } from "@eu/sync/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   activeOn, attendanceRate, checkReceiptNumber, classDay, createSchoolSite, enrolmentBreakdown, findLikelyDuplicates, loadSchool,
-  nextStudentNumber, placesAsAt, planRegister, schoolsActions, schoolsEntities, splitAsAt, studentBalance, tagForDevice, type Absence,
+  nextStudentNumber, placesAsAt, planRegister, schoolsActions, schoolsEntities, splitAsAt, studentBalance, tagForDevice, type Absence, type Synced,
 } from "../src";
 
 const permissions = new PermissionRegistry().register(platformActions).register(schoolsActions);
@@ -39,7 +39,7 @@ function device(id: string, user: UserContext) {
   const store = new MemoryStore();
   const client = new SyncClient(store, transport, { newId: uuid, now: () => new Date(server.now) });
   const list = async <T>(entity: string) =>
-    (await client.list(entity)).map((r) => ({ voidedAt: null, serverTime: null, deviceTime: server.now.toISOString(), ...r })) as unknown as Array<T & { id: string; voidedAt: string | null; serverTime: string | null; deviceTime: string }>;
+    (await client.list(entity)).map((r) => ({ voidedAt: null, serverTime: null, deviceTime: server.now.toISOString(), ...r })) as unknown as Synced<T>[];
   return { id, store, client, list };
 }
 
@@ -112,9 +112,8 @@ describe("a month at École Luniemu", () => {
   it("3. registers are typed up on one phone and corrected on the other", async () => {
     server.now = new Date("2026-10-05T08:00:00Z");
     const day = "2026-10-05";
-    type Abs = Absence & { id: string; voidedAt: string | null; serverTime: string | null; deviceTime: string };
     const write = async (d: typeof A, absent: Map<string, Absence["reason"]>) => {
-      const ops = planRegister(ids.p1m!, day, await d.list<Abs>("school.absence"), await d.list<{ classId: string; date: string }>("school.register") as never, absent);
+      const ops = planRegister(ids.p1m!, day, await d.list<Absence>("school.absence"), await d.list<{ classId: string; date: string }>("school.register"), absent);
       for (const o of ops) {
         if (o.op === "create_register") await d.client.create("school.register", SITE, { classId: ids.p1m, date: day });
         else if (o.op === "create_absence") await d.client.create("school.absence", SITE, { studentId: o.studentId, classId: ids.p1m, date: day, reason: o.reason });
