@@ -48,6 +48,7 @@ export default async function Attendance({ params, searchParams }: { params: Pro
           .sort((a, b) => studentName(a).localeCompare(studentName(b)));
         const day = classDay(selected.id, date, d.enrolments, d.absences, d.registers);
         const absent = new Set(day.absentStudentIds);
+        const reasonOf = new Map(d.absences.filter((a) => !a.voidedAt && a.classId === selected.id && a.date === date).map((a) => [a.studentId, a.reason]));
         return (
           <form action={saveRegister}>
             <h2>{classLabel(selected, tr)} · {date}</h2>
@@ -68,7 +69,7 @@ export default async function Attendance({ params, searchParams }: { params: Pro
                   key: "reason",
                   header: tr("attendance.reason"),
                   render: (x) => (
-                    <select name={`reason-${x.id}`} defaultValue="unknown" aria-label={tr("attendance.reason")}>
+                    <select name={`reason-${x.id}`} defaultValue={reasonOf.get(x.id) ?? "unknown"} aria-label={tr("attendance.reason")}>
                       {absenceReason.options.map((r) => <option key={r} value={r}>{tr(`attendance.reasons.${r}`)}</option>)}
                     </select>
                   ),
