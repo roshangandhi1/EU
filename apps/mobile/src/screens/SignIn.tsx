@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Body, Button, EuBand, Field, Screen, Title } from "../ui";
+import { Body, Button, Field } from "../ui";
 import { useT } from "../i18n";
 import type { Session } from "../session";
+import { AuthLayout } from "./AuthLayout";
 
 export function SignIn({ session }: { session: Session }) {
   const t = useT();
@@ -17,13 +18,11 @@ export function SignIn({ session }: { session: Session }) {
   };
 
   return (
-    <Screen>
-      <Title>{t("common.appName")}</Title>
+    <AuthLayout title={t("app.welcome")} intro={t("app.signInIntro")}>
       {error && <Body tone="critical">{t(error)}</Body>}
-      <Field label={t("common.email")} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
-      <Field label={t("common.password")} value={password} onChangeText={setPassword} secureTextEntry />
+      <Field label={t("common.email")} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" textContentType="emailAddress" returnKeyType="next" />
+      <Field label={t("common.password")} value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" returnKeyType="go" onSubmitEditing={() => email && password && !busy && void submit()} />
       <Button label={busy ? t("common.loading") : t("common.signIn")} onPress={submit} disabled={busy || !email || !password} />
-      <EuBand text={t("common.fundedByEu")} />
-    </Screen>
+    </AuthLayout>
   );
 }

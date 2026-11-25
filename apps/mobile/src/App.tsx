@@ -1,6 +1,7 @@
 import type { Locale } from "@eu/core/i18n";
 import { isLocale } from "@eu/core/i18n";
 import { StatusBar } from "expo-status-bar";
+import "./strings";
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { Body, Screen } from "./ui";
 import { deviceLocale, LocaleContext } from "./i18n";
@@ -41,7 +42,7 @@ export default function App() {
 
   return (
     <LocaleContext.Provider value={{ locale, setLocale }}>
-      <StatusBar style="dark" />
+      <StatusBar style={session.phase === "home" || session.phase === "signIn" || session.phase === "setPin" || session.phase === "unlock" ? "light" : "dark"} />
       {screen}
     </LocaleContext.Provider>
   );

@@ -1,3 +1,4 @@
+import type { RoleAssignment } from "@eu/core";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 
@@ -11,6 +12,7 @@ const K = {
   pinFailures: "eu.pinFailures",
   dbKey: "eu.dbKey",
   locale: "eu.locale",
+  roles: "eu.roles", // JSON role assignments, to choose which home tiles to show offline
 } as const;
 
 const get = (k: string) => SecureStore.getItemAsync(k);
@@ -50,6 +52,19 @@ export async function savedUser(): Promise<{ id: string; name: string } | null> 
 export async function saveUser(u: { id: string; name: string }): Promise<void> {
   await Promise.all([set(K.userId, u.id), set(K.userName, u.name)]);
 }
+
+/** The signed-in person's role assignments, kept so the home screen works offline. */
+export const savedRoles = {
+  get: async (): Promise<RoleAssignment[] | undefined> => {
+    try {
+      const raw = await get(K.roles);
+      return raw ? (JSON.parse(raw) as RoleAssignment[]) : undefined;
+    } catch {
+      return undefined;
+    }
+  },
+  set: (r: RoleAssignment[]) => set(K.roles, JSON.stringify(r)),
+};
 
 export const savedLocale = { get: () => get(K.locale), set: (v: string) => set(K.locale, v) };
 
