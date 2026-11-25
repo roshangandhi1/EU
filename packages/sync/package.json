@@ -6,9 +6,13 @@
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
     "./client": "./src/client.ts",
-    "./memory-store": "./src/memory-store.ts"
+    "./memory-store": "./src/memory-store.ts",
+    "./sql-store": "./src/sql-store.ts"
   },
-  "scripts": { "test": "vitest run", "typecheck": "tsc -p ." },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
   "dependencies": {
     "@eu/core": "*",
     "@eu/db": "*",

@@ -8,7 +8,7 @@
 import { auditLog, syncMutations, type Db } from "@eu/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { toWire } from "../src/server";
-import { adminA, headA, headB, makeDevice, marks, people, readings, rng, serverClock, setupDb, sysadmin, type Device } from "./fixtures";
+import { adminA, headA, headB, makeDevice, marks, openStore, people, readings, rng, serverClock, setupDb, sysadmin, type Device, type StoreKind } from "./fixtures";
 
 const SEEDS = (process.env.SYNC_FUZZ_SEEDS ?? "1,2,3,4,5,6").split(",").map(Number);
 const STEPS = Number(process.env.SYNC_FUZZ_STEPS ?? 120);
@@ -24,16 +24,18 @@ afterEach(async () => close());
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const all = async (table: unknown) => ((await (db as any).select().from(table)) as Record<string, unknown>[]);
 
-describe("sync fuzz harness", () => {
+const STORES: StoreKind[] = ["memory", "sqlite"];
+
+describe.each(STORES)("sync fuzz harness (%s phone store)", (kind) => {
   for (const seed of SEEDS) {
     it(`seed ${seed}: no loss, no duplicates, all phones converge`, async () => {
       const r = rng(seed);
       const pick = <T,>(xs: T[]): T => xs[Math.floor(r() * xs.length)]!;
       const devices: (Device & { scope: string })[] = [
-        { ...makeDevice(db, "phone-a1", headA, r, 1), scope: "A" },
-        { ...makeDevice(db, "phone-a2", adminA, r, 2), scope: "A" },
-        { ...makeDevice(db, "phone-b1", headB, r, 3), scope: "B" },
-        { ...makeDevice(db, "web-admin", sysadmin, r, 4), scope: "A" },
+        { ...makeDevice(db, "phone-a1", headA, r, 1, await openStore(kind)), scope: "A" },
+        { ...makeDevice(db, "phone-a2", adminA, r, 2, await openStore(kind)), scope: "A" },
+        { ...makeDevice(db, "phone-b1", headB, r, 3, await openStore(kind)), scope: "B" },
+        { ...makeDevice(db, "web-admin", sysadmin, r, 4, await openStore(kind)), scope: "A" },
       ];
       devices.forEach((d, i) => (d.clock.now = new Date(Date.parse("2026-12-01T08:00:00Z") + i * 7)));
 
