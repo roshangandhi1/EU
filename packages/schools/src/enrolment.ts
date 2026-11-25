@@ -1,10 +1,21 @@
-import type { Enrolment, SchoolClass, Sex, Shift, Student, Synced } from "./model";
+import type { AcademicYear, Enrolment, SchoolClass, Sex, Shift, Student, Synced } from "./model";
 
-/** Enrolments active on a date: enrolled on or before it, not left before it, not voided. */
-export function activeOn<E extends Synced<Enrolment>>(enrolments: readonly E[], date: string): E[] {
-  return enrolments.filter(
-    (e) => !e.voidedAt && e.enrolledOn <= date && (e.leftOn === null || e.leftOn > date),
-  );
+/**
+ * Enrolments active on a date: enrolled on or before it, not left before it, not voided.
+ * Pass the school's academic years and an enrolment also ends when its year ends (DATA-11):
+ * last year's pupils are not counted or billed in the new year until they are re-enrolled.
+ */
+export function activeOn<E extends Synced<Enrolment>>(
+  enrolments: readonly E[],
+  date: string,
+  years?: readonly Pick<Synced<AcademicYear>, "id" | "endsOn">[],
+): E[] {
+  const ends = new Map((years ?? []).map((y) => [y.id, y.endsOn]));
+  return enrolments.filter((e) => {
+    if (e.voidedAt || e.enrolledOn > date || (e.leftOn !== null && e.leftOn <= date)) return false;
+    const end = ends.get(e.academicYearId);
+    return end === undefined || date <= end;
+  });
 }
 
 export interface EnrolmentBreakdown {

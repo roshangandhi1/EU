@@ -10,8 +10,10 @@ import { z } from "zod";
 export const id = z.uuid();
 export const isoDate = z.iso.date(); // YYYY-MM-DD
 export const isoDateTime = z.iso.datetime({ offset: true });
-/** Whole Congolese francs. Integers only: no fractional amounts. */
-export const cdf = z.number().int().nonnegative();
+/** Largest amount or count accepted anywhere: fits a Postgres integer (int4) with room to spare. */
+export const MAX_INT = 2_000_000_000;
+/** Whole Congolese francs. Integers only: no fractional amounts; at most 2 000 000 000 FC. */
+export const cdf = z.number().int().nonnegative().max(MAX_INT);
 
 export interface SyncMeta {
   id: string;
@@ -80,11 +82,12 @@ export type SchoolClass = z.infer<typeof schoolClass>;
  */
 export const classroom = z.object({
   name: z.string().min(1),
-  seatsPerShift: z.number().int().positive(),
+  seatsPerShift: z.number().int().positive().max(1000),
   basis: z.enum(["baseline", "new"]),
   commissionedOn: isoDate,
   decommissionedOn: isoDate.nullable(),
-  evidenceUrl: z.url().nullable(),
+  /** A web link to the evidence (http or https only). */
+  evidenceUrl: z.url({ protocol: /^https?$/ }).nullable(),
 });
 export type Classroom = z.infer<typeof classroom>;
 
@@ -149,14 +152,14 @@ export const exemption = z.object({
   studentId: id,
   feeItemId: id.nullable(), // null = applies to every item
   kind: z.enum(["full", "percent", "fixed"]),
-  value: z.number().int().nonnegative(), // percent 0-100, or CDF for fixed
+  value: z.number().int().nonnegative().max(MAX_INT), // percent 0-100, or CDF for fixed
   reason: z.string().min(1),
 });
 export type Exemption = z.infer<typeof exemption>;
 
 export const receiptBook = z.object({
-  firstNumber: z.number().int().positive(),
-  lastNumber: z.number().int().positive(),
+  firstNumber: z.number().int().positive().max(MAX_INT),
+  lastNumber: z.number().int().positive().max(MAX_INT),
   assignedTo: id,
 });
 export type ReceiptBook = z.infer<typeof receiptBook>;
@@ -180,7 +183,7 @@ export const payment = z.object({
   studentId: id,
   paidOn: isoDate,
   amount: cdf.positive(),
-  receiptNumber: z.number().int().positive(),
+  receiptNumber: z.number().int().positive().max(MAX_INT),
   /** Fee items this payment is allocated to, in order; any remainder is credit. */
   feeItemIds: z.array(id),
 });

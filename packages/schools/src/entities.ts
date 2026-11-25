@@ -1,6 +1,7 @@
 import { defineEntity } from "@eu/sync";
 import * as m from "./model";
 import * as t from "./db/schema";
+import { validatePayment } from "./queries";
 
 const config = { read: "school.read", write: "school.configure", configure: "school.configure" } as const;
 
@@ -22,5 +23,5 @@ export const schoolsEntities = [
   defineEntity({ name: "school.exemption", stream: "schools", table: t.schoolExemptions, schema: m.exemption, policy: "append_only", actions: { read: "school.read", write: "school.configure" }, label: { en: "Exemption", fr: "Exonération" } }),
   defineEntity({ name: "school.absence", stream: "schools", table: t.schoolAbsences, schema: m.absence, policy: "lww_history", actions: { read: "school.read", write: "attendance.write" }, label: { en: "Absence", fr: "Absence" } }),
   defineEntity({ name: "school.register", stream: "schools", table: t.schoolRegisters, schema: m.registerTaken, policy: "lww_history", actions: { read: "school.read", write: "attendance.write" }, label: { en: "Register taken", fr: "Appel fait" } }),
-  defineEntity({ name: "school.payment", stream: "schools", table: t.schoolPayments, schema: m.payment, policy: "append_only", actions: { read: "school.read", write: "payment.write", void: "payment.void" }, label: { en: "Payment", fr: "Paiement" } }),
+  defineEntity({ name: "school.payment", stream: "schools", table: t.schoolPayments, schema: m.payment, policy: "append_only", actions: { read: "school.read", write: "payment.write", void: "payment.void" }, label: { en: "Payment", fr: "Paiement" }, validate: validatePayment }),
 ];

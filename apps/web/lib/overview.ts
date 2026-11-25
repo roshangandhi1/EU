@@ -6,7 +6,7 @@ import { loadBoreholes, loadTemplates } from "@eu/boreholes/server";
 import { populationEstimates } from "@eu/boreholes/db/schema";
 import { areaHa, computeIndicator, type ForestryStream } from "@eu/forestry";
 import { loadSettings, loadStream, photoUploads, rulesFrom } from "@eu/forestry/server";
-import { loadSchool } from "@eu/schools";
+import { activeOn, classDay, loadSchool } from "@eu/schools";
 import type { Principal } from "./auth";
 import { db } from "./http";
 import { navAccess, type NavAccess } from "./nav";
@@ -108,14 +108,15 @@ export async function loadOverview(me: Principal): Promise<Overview> {
           for (const s of list) {
             const data = await loadSchool(db(), s.id);
             if (!data) continue;
-            const active = data.enrolments.filter((e) => !e.voidedAt && e.status === "active" && !e.leftOn).length;
+            // Pupils enrolled today, in this year's classes only (DATA-11).
+            const active = activeOn(data.enrolments, today, data.years).length;
             pupils += active;
-            const reg = data.registers.filter((r) => !r.voidedAt && r.date === today);
-            if (reg.length) {
-              const classIds = new Set(reg.map((r) => r.classId));
-              const enrolled = data.enrolments.filter((e) => !e.voidedAt && e.status === "active" && classIds.has(e.classId)).length;
-              marked += enrolled;
-              absent += data.absences.filter((a) => !a.voidedAt && a.date === today).length;
+            // classDay counts each absent pupil once, however many phones recorded them (DATA-10).
+            const classIds = new Set(data.registers.filter((r) => !r.voidedAt && r.date === today).map((r) => r.classId));
+            for (const classId of classIds) {
+              const day = classDay(classId, today, data.enrolments, data.absences, data.registers, data.years);
+              marked += day.enrolled;
+              absent += day.absent;
             }
             const site = siteRows.find((r: any) => r.id === s.id);
             if (site?.lat != null && site?.lng != null) {

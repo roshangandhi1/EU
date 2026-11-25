@@ -1,5 +1,6 @@
 import { auditLog, devices, evidenceCutoffs, evidenceDecisions, type Db } from "@eu/db";
 import type { EntityDef, EntityRegistry } from "@eu/sync";
+import { toCsv, yes, type CsvLocale } from "./csv";
 import { and, asc, eq, getTableColumns, gt, isNull, lte, or, sql } from "drizzle-orm";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,17 +158,25 @@ export async function decide(
   return { ok: true };
 }
 
-const csvCell = (v: unknown) => {
-  const s = v instanceof Date ? v.toISOString() : v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+const EVIDENCE_HEADERS = {
+  en: ["entity", "record_id", "scope_id", "status", "device_time", "server_time", "device_id", "created_by", "clock_suspect", "decision_reason"],
+  fr: ["type_enregistrement", "id_enregistrement", "site", "statut", "heure_telephone", "heure_serveur", "telephone", "cree_par", "horloge_douteuse", "motif_decision"],
+};
+const EVIDENCE_STATUS_FR: Record<string, string> = {
+  counted: "compte",
+  late_admitted: "en_retard_admis",
+  late_pending: "en_retard_a_examiner",
+  late_excluded: "en_retard_exclu",
 };
 
 /**
  * One row per record captured by the cut-off, across all record types, with its evidence status:
  * counted (server had it by the cut-off), late_admitted, late_pending or late_excluded.
+ * Formula-safe, with a BOM; French headers and ";" separators for locale "fr".
  */
-export async function evidenceCsv(db: Db, registry: EntityRegistry, cutoff: Cutoff): Promise<string> {
-  const lines = [["entity", "record_id", "scope_id", "status", "device_time", "server_time", "device_id", "created_by", "clock_suspect", "decision_reason"].join(",")];
+export async function evidenceCsv(db: Db, registry: EntityRegistry, cutoff: Cutoff, locale: CsvLocale = "en"): Promise<string> {
+  const status = (s: string) => (locale === "fr" ? (EVIDENCE_STATUS_FR[s] ?? s) : s);
+  const rows: unknown[][] = [EVIDENCE_HEADERS[locale]];
   for (const entity of registry.all()) {
     const cols = getTableColumns(entity.table) as AnyDb;
     const counted = (await (db as AnyDb)
@@ -176,15 +185,11 @@ export async function evidenceCsv(db: Db, registry: EntityRegistry, cutoff: Cuto
       .where(and(capturedBy(cols, cutoff.cutoffAt), lte(cols.serverTime, cutoff.cutoffAt)))
       .orderBy(asc(cols.serverTime))) as AnyDb[];
     for (const r of counted)
-      lines.push([entity.name, r.id, r.scopeId, "counted", r.deviceTime, r.serverTime, r.deviceId, r.createdBy, r.clockSuspect, ""].map(csvCell).join(","));
+      rows.push([entity.name, r.id, r.scopeId, status("counted"), r.deviceTime, r.serverTime, r.deviceId, r.createdBy, yes(r.clockSuspect, locale), ""]);
     for (const l of await lateRecords(db, entity, cutoff))
-      lines.push(
-        [entity.name, l.recordId, l.scopeId, `late_${l.decision ?? "pending"}`, l.deviceTime, l.serverTime, l.deviceId, l.createdBy, l.clockSuspect, l.reason ?? ""]
-          .map(csvCell)
-          .join(","),
-      );
+      rows.push([entity.name, l.recordId, l.scopeId, status(`late_${l.decision ?? "pending"}`), l.deviceTime, l.serverTime, l.deviceId, l.createdBy, yes(l.clockSuspect, locale), l.reason ?? ""]);
   }
-  return lines.join("\n") + "\n";
+  return toCsv(rows, locale);
 }
 
 /** Phones report what they still hold unsynced on every sync. */

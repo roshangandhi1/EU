@@ -61,9 +61,13 @@ describe("evidence cut-offs", () => {
     ]);
 
     const csv = await evidenceCsv(db, registry, c);
-    expect(csv.split("\n").filter(Boolean)).toHaveLength(3); // header + counted + late
-    expect(csv).toContain(`${onTime},P1,counted`);
-    expect(csv).toContain(`${late},P1,late_excluded`);
+    expect(csv.split("\r\n").filter(Boolean)).toHaveLength(3); // header + counted + late
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    expect(csv).toContain(`"${onTime}","P1","counted"`);
+    expect(csv).toContain(`"${late}","P1","late_excluded"`);
+    const fr = await evidenceCsv(db, registry, c, "fr");
+    expect(fr).toContain(`"${late}";"P1";"en_retard_exclu"`);
+    expect(fr.split("\r\n")[0]).toContain('"statut";"heure_telephone"');
   });
 
   it("tells phones about the next cut-off and stores what they hold unsynced", async () => {
