@@ -15,3 +15,20 @@ describe("phone geometry", () => {
     expect(distanceToGeomM(-8, 25.02, geom)).toBeGreaterThan(1000);
   });
 });
+
+import turfArea from "@turf/area";
+import { areaHa } from "../src/geo/area";
+describe("pure area", () => {
+  it("matches @turf/area", () => {
+    expect(areaHa(geom)).toBeCloseTo(turfArea(geom as never) / 10_000, 9);
+  });
+});
+
+import { bearingDeg, compass } from "../src/geo/pip";
+describe("bearing", () => {
+  it("points the right way", () => {
+    expect(compass(bearingDeg(-8, 25, -7.99, 25))).toBe("N");
+    expect(compass(bearingDeg(-8, 25, -8, 25.01))).toBe("E");
+    expect(compass(bearingDeg(-8, 25, -8.01, 24.99))).toBe("SW");
+  });
+});

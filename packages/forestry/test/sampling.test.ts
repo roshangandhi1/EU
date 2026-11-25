@@ -43,3 +43,19 @@ describe("sampling", () => {
     expect(withNat.survivalPct!.value).toBeCloseTo((10 / 12) * 100, 5); // natural excluded from survival
   });
 });
+
+import { monitoringVisitSchema } from "../src/validation";
+import { defaultSettings } from "../src/defaults";
+describe("phone visit payload", () => {
+  it("drawn points become a valid monitoring visit", () => {
+    const geom = { type: "MultiPolygon" as const, coordinates: [[[[25, -8], [25.01, -8], [25.01, -7.99], [25, -7.99], [25, -8]]]] };
+    const pts = placeSamplePoints(geom, 42, defaultSettings.miombo);
+    const samples = pts.map((p, i) => ({
+      pointIndex: p.pointIndex, lat: p.lat, lng: p.lng, radiusM: 10,
+      counts: i === 0 ? [] : [{ species: "pterocarpus_angolensis", alive: 3, dead: 1, naturalAlive: 2 }],
+      ...(i === 0 ? { skipped: "flooded" as const } : {}),
+    }));
+    const v = monitoringVisitSchema.parse({ visitedOn: "2026-12-10", sampleSeed: 42, samples, threats: ["fire"], weeding: null, photos: [], notes: null });
+    expect(v.samples.length).toBe(pts.length);
+  });
+});

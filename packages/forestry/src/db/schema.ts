@@ -11,6 +11,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { syncColumns } from "../platform";
 import { multiPolygon, point } from "./geometry";
+import type { PlantingLine, SamplePlot } from "../types";
+export type { PlantingLine, SampleCount, SamplePlot } from "../types";
 
 export const forestryStream = pgEnum("forestry_stream", ["bamboo", "miombo"]);
 
@@ -72,7 +74,6 @@ export const boundaryApprovals = pgTable("forestry_boundary_approvals", {
   note: text("note"),
 }, (t) => [index("forestry_approvals_site_idx").on(t.scopeId)]);
 
-export type PlantingLine = { species: string; count: number; batchId?: string; natural?: false };
 
 /** Planting events. Append-only. */
 export const plantingEvents = pgTable("forestry_planting_events", {
@@ -87,25 +88,7 @@ export const plantingEvents = pgTable("forestry_planting_events", {
   notes: text("notes"),
 }, (t) => [index("forestry_planting_site_idx").on(t.scopeId, t.plantedOn)]);
 
-export type SampleCount = {
-  species: string;
-  alive: number;
-  dead: number;
-  /** Miombo: natural regenerants counted separately from planted stock. */
-  naturalAlive?: number;
-  heightClass?: "lt50cm" | "50_150cm" | "150_300cm" | "gt300cm";
-};
 
-export type SamplePlot = {
-  /** Index of the app-generated point for this visit, so the same draw can be reproduced. */
-  pointIndex: number;
-  lat: number;
-  lng: number;
-  gpsAccuracyM?: number;
-  radiusM: number;
-  counts: SampleCount[];
-  skipped?: "inaccessible" | "flooded" | "other";
-};
 
 /** Monitoring visits. Append-only. */
 export const monitoringVisits = pgTable("forestry_monitoring_visits", {

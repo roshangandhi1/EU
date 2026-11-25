@@ -4,6 +4,9 @@
  */
 export * from "./validation";
 export * from "./geo/pip";
+export * from "./geo/area";
+export * from "./sampling";
+export type * from "./types";
 export { defaultSettings } from "./defaults";
 export { strings as forestryStrings, registerForestryStrings } from "./i18n";
 export { fa, FORESTRY_STREAMS, type ForestryStream } from "./actions";
