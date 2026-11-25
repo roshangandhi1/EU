@@ -168,7 +168,7 @@ const s = StyleSheet.create({
   screen: { padding: space.md, paddingTop: TOP, gap: space.md, flexGrow: 1 },
   bare: { padding: 0, paddingTop: 0, gap: 0 },
   title: { fontSize: 22, fontWeight: "700", color: colors.gcGreen },
-  subtitle: { fontSize: 13, fontWeight: "700", color: colors.textMuted, letterSpacing: 0.8, textTransform: "uppercase" },
+  subtitle: { fontSize: 17, fontWeight: "700", color: colors.text },
   body: { fontSize: touch.bodyText, lineHeight: 22 },
   button: {
     minHeight: 52,
@@ -201,7 +201,7 @@ const s = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   pillText: { fontSize: 14, fontWeight: "700" },
   brandBar: { backgroundColor: colors.gcGreen, paddingTop: TOP, paddingBottom: space.md, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center" },
-  brandLogo: { width: 132, height: 44 },
+  brandLogo: { width: 112, height: 38 },
   brandRight: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: space.sm },
   lang: { flexDirection: "row", borderWidth: 1.5, borderColor: colors.gcGreen, borderRadius: 999, overflow: "hidden" },
   langItem: { minWidth: 44, minHeight: 36, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
