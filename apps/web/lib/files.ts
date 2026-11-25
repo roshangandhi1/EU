@@ -95,14 +95,23 @@ export async function acceptUpload(ctx: FileContext, meta: FileMeta, bytes: Uint
   return { status: "uploaded", id: meta.id };
 }
 
-/** For indicators and evidence exports: which of these file ids have arrived (optionally by a cut-off). */
-export async function uploadedFileIds(db: Db, ids: string[], cutoff?: Date): Promise<Set<string>> {
+/**
+ * For indicators and evidence exports: which of these file ids have arrived (optionally by a
+ * cut-off). Pass the record's `scopeId` and only photos uploaded for that site count (SEC-5): a
+ * photo of one site never evidences another. With a cut-off (evidence), demo placeholder photos
+ * never count (DATA-7).
+ */
+export async function uploadedFileIds(db: Db, ids: string[], cutoff?: Date, scopeId?: string): Promise<Set<string>> {
   if (ids.length === 0) return new Set();
-  const rows = (await (db as AnyDb).select({ id: files.id, uploadedAt: files.uploadedAt }).from(files).where(inArray(files.id, ids))) as {
-    id: string;
-    uploadedAt: Date;
-  }[];
-  return new Set(rows.filter((r) => !cutoff || r.uploadedAt <= cutoff).map((r) => r.id));
+  const rows = (await (db as AnyDb)
+    .select({ id: files.id, uploadedAt: files.uploadedAt, scopeId: files.scopeId, sha256: files.sha256 })
+    .from(files)
+    .where(inArray(files.id, ids))) as { id: string; uploadedAt: Date; scopeId: string; sha256: string }[];
+  return new Set(
+    rows
+      .filter((r) => (!cutoff || r.uploadedAt <= cutoff) && (scopeId === undefined || r.scopeId === scopeId) && !(cutoff && r.sha256 === "demo"))
+      .map((r) => r.id),
+  );
 }
 
 /** May this user see the file? Same rule as the records it belongs to. */

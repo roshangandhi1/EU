@@ -53,4 +53,17 @@ describe("borehole admin", () => {
     expect(counted).toBe(1);
     expect(rows[0]!.due.find((x) => x.taskKey === "flow_measure")!.dueOn).toBe("2026-12-01");
   });
+
+  it("only leads publish a borehole; codes are unique in any case; refused creates leave no site (SEC-7, EDGE-7, SEC-18)", async () => {
+    const { sites } = await import("@eu/db");
+    const r = await createBorehole(ctx(lead), { code: "bh-009", village: "Luniemu" });
+    if (!r.ok) throw new Error(r.reason);
+    expect(await createBorehole(ctx(lead), { code: "BH-009", village: "X" })).toEqual({ ok: false, reason: "already_exists" });
+    expect((await createBorehole(ctx(lead), { code: "BH-010", village: "" })).ok).toBe(false); // village required
+    expect(await db.select().from(sites)).toHaveLength(1);
+    expect(await updateBorehole(ctx(tech), r.siteId, { publicVisible: true })).toMatchObject({ ok: false, reason: "forbidden_field" });
+    expect((await updateBorehole(ctx(tech), r.siteId, { notes: "pump ok" })).ok).toBe(true);
+    expect((await updateBorehole(ctx(lead), r.siteId, { publicVisible: true })).ok).toBe(true);
+  });
 });
+

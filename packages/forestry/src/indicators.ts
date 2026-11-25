@@ -48,8 +48,18 @@ export interface IndicatorRules {
    * has not uploaded yet is not evidence; in evidence mode it must also have arrived by the as-at date.
    * Without it, any referenced photo counts (unit tests, previews).
    */
-  photoUploadedAt?: Map<string, Date>;
+  photoUploadedAt?: PhotoUploads;
 }
+
+/**
+ * When each photo reached the server, keyed by file id. The server version also says which plot
+ * (site) each photo was uploaded for, and which are demo placeholders:
+ * - a photo counts only for a record of the same plot (SEC-5/DATA-17), so one real photo can
+ *   never evidence another plot;
+ * - demo placeholder photos never count in evidence mode (DATA-7); they still count in
+ *   "captured" mode so the demo dashboard is not empty.
+ */
+export type PhotoUploads = Map<string, Date> & { scopeOf?: Map<string, string>; demo?: Set<string> };
 
 export type PlotOutcome =
   | "counted"
@@ -130,7 +140,10 @@ export function evaluatePlot(p: PlotInput, asAt: string, mode: CountingMode, rul
   const isEvidence = (id: string) => {
     if (!up) return true;
     const t = up.get(id);
-    return !!t && (mode === "captured" || t <= at);
+    if (!t) return false;
+    if (up.scopeOf && up.scopeOf.get(id) !== p.siteId) return false;
+    if (mode === "evidence" && up.demo?.has(id)) return false;
+    return mode === "captured" || t <= at;
   };
   const hasPhoto = plantings.some((e) => e.photos.some(isEvidence)) || visits.some((v) => v.photos.some((p) => isEvidence(p.fileId)));
 

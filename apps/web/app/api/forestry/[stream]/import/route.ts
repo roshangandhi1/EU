@@ -1,11 +1,10 @@
-import { commitImport } from "@eu/forestry/server";
-import { fa, previewKmzOrKml, type ForestryStream } from "@eu/forestry";
+import { commitImport, previewImport } from "@eu/forestry/server";
+import { fa, ImportFileError, MAX_IMPORT_BYTES, type ForestryStream } from "@eu/forestry";
 import { authenticate, db, json } from "@/lib/http";
 import { entities, permissions } from "@/lib/registry";
 import { isIsoDate } from "@/lib/dates";
 
 export const maxDuration = 60;
-const MAX_BYTES = 20 * 1024 * 1024;
 
 /**
  * POST multipart/form-data: file (KMZ/KML), action = "preview" | "commit".
@@ -23,15 +22,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ stream:
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!form || !(file instanceof File)) return json({ error: "file_required" }, 400);
-  if (file.size > MAX_BYTES) return json({ error: "file_too_large" }, 413);
+  if (file.size > MAX_IMPORT_BYTES) return json({ error: "file_too_large" }, 413);
   const name = file.name || "upload.kmz";
   if (!/\.(kmz|kml)$/i.test(name)) return json({ error: "unsupported_format" }, 400);
 
   let preview;
   try {
-    preview = await previewKmzOrKml(name, new Uint8Array(await file.arrayBuffer()));
-  } catch {
-    return json({ error: "unreadable_file" }, 400);
+    preview = await previewImport(db(), s, name, new Uint8Array(await file.arrayBuffer()));
+  } catch (err) {
+    // kml_too_large, no_kml_in_kmz, too_many_placemarks, file_too_large; anything else is unreadable.
+    return json({ error: err instanceof ImportFileError ? err.code : "unreadable_file" }, 400);
   }
   if (form.get("action") !== "commit") return json(preview);
 
