@@ -1,0 +1,232 @@
+import { activeOn, colKey, feeGrid, feeNames, formatCdf, LEVELS, live } from "@eu/schools";
+import Link from "next/link";
+import { Icon } from "@/components/icons";
+import { Notice } from "@/components/ui";
+import { can, mySchools, schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
+import { Flash, param, type SP } from "../../../flash";
+import { classLabel, studentName } from "../../labels";
+import { bulkExempt, copyFees, saveFeeSchedule } from "./actions";
+
+/** Fee schedule: levels down the side, terms across, one amount per cell. */
+export default async function FeeSchedule({ params, searchParams }: { params: Promise<{ locale: string; siteId: string }>; searchParams: SP }) {
+  const p = await params;
+  const sp = await searchParams;
+  const { me, locale } = await signedIn(p.locale);
+  const tr = trFor(locale);
+  if (!can(me, "school.configure", p.siteId)) return <Notice tone="warning">{tr("setup.configureOnly")}</Notice>;
+  const d = await schoolFor(me, p.siteId);
+  const fc = (n: number) => formatCdf(n, locale);
+  const base = `/${locale}/schools/${p.siteId}/setup`;
+  const date = today();
+
+  const years = live(d.years).sort((a, b) => (a.startsOn < b.startsOn ? 1 : -1));
+  const current = years.find((y) => y.startsOn <= date && y.endsOn >= date) ?? years[0];
+  const year = years.find((y) => y.id === param(sp, "year")) ?? current;
+
+  if (!year) {
+    return (
+      <div className="empty-state">
+        <div className="es-icon"><Icon name="coins" size={28} /></div>
+        <h3>{tr("feeGrid.noYear")}</h3>
+        <p>{tr("feeGrid.noYearText")}</p>
+        <div className="es-actions"><Link className="btn" href={base}>{tr("feeGrid.toSetup")}</Link></div>
+      </div>
+    );
+  }
+
+  const names = feeNames(d.feeItems, year.id);
+  const fee = param(sp, "fee") && param(sp, "fee") !== "__new" ? param(sp, "fee") : param(sp, "fee") === "__new" ? "" : (names[0] ?? "");
+  const terms = live(d.terms).filter((t) => t.academicYearId === year.id).sort((a, b) => a.number - b.number);
+  const columns: { termId: string | null; label: string }[] = [{ termId: null, label: tr("feeGrid.wholeYear") }, ...terms.map((t) => ({ termId: t.id, label: tr("feeGrid.term", { n: t.number }) }))];
+  const g = feeGrid(d.feeItems, year.id, fee);
+  const cell = (c: string, l: number) => g.amounts.get(`${c}:${l}`);
+  const levelTotal = (l: number) => columns.reduce((n, c) => n + (cell(colKey(c.termId), l) ?? 0), 0);
+  const hidden = (
+    <>
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="siteId" value={p.siteId} />
+      <input type="hidden" name="yearId" value={year.id} />
+    </>
+  );
+
+  // Copy sources: every year at every school this user may configure, except the one shown.
+  const sources: { value: string; label: string }[] = [];
+  for (const s of await mySchools(me)) {
+    if (!can(me, "school.configure", s.id)) continue;
+    const sd = s.id === p.siteId ? d : await schoolFor(me, s.id);
+    for (const y of live(sd.years)) {
+      if (s.id === p.siteId && y.id === year.id) continue;
+      if (!live(sd.feeItems).some((i) => i.academicYearId === y.id)) continue;
+      sources.push({ value: `${s.id}|${y.id}`, label: `${s.name} · ${y.label}` });
+    }
+  }
+
+  // Pupils for bulk exemptions.
+  const cls = param(sp, "class");
+  const students = new Map(d.students.map((s) => [s.id, s]));
+  const classes = new Map(d.classes.map((c) => [c.id, c]));
+  const pupils = activeOn(d.enrolments, date)
+    .filter((e) => !cls || e.classId === cls)
+    .map((e) => ({ s: students.get(e.studentId), c: classes.get(e.classId) }))
+    .filter((r): r is { s: NonNullable<typeof r.s>; c: NonNullable<typeof r.c> } => !!r.s && !!r.c)
+    .sort((a, b) => a.c.level - b.c.level || studentName(a.s).localeCompare(studentName(b.s)));
+  const exempted = new Set(live(d.exemptions).map((e) => e.studentId));
+  const yearItems = live(d.feeItems).filter((i) => i.academicYearId === year.id);
+  const yearClasses = live(d.classes).filter((c) => c.academicYearId === year.id).sort((a, b) => a.level - b.level || a.section.localeCompare(b.section));
+
+  // Messages from the actions.
+  const saved = param(sp, "fee_saved").split(".");
+  const errors: Record<string, string> = { fee_amount: tr("feeGrid.badAmount"), fee_due: tr("feeGrid.needDue"), fee_pupils: tr("feeGrid.choosePupils") };
+  const err = errors[param(sp, "error")];
+
+
+  return (
+    <div className="stack">
+      {err ? <Notice tone="error">{err}</Notice> : <Flash sp={sp} tr={tr} />}
+      {saved.length === 3 && <Notice tone="success">{tr("feeGrid.saved", { created: saved[0]!, updated: saved[1]!, voided: saved[2]! })}</Notice>}
+      {param(sp, "fee_nothing") && <Notice>{tr("feeGrid.nothing")}</Notice>}
+      {param(sp, "fee_copied") && <Notice tone="success">{tr("feeGrid.copied", { count: param(sp, "fee_copied") })}</Notice>}
+      {param(sp, "fee_skipped") && <Notice tone="warning">{tr("feeGrid.copySkipped", { names: param(sp, "fee_skipped") })}</Notice>}
+      {param(sp, "fee_noterm") && <Notice tone="warning">{tr("feeGrid.copyNoTerm", { count: param(sp, "fee_noterm") })}</Notice>}
+      {param(sp, "fee_terms") && <Notice>{tr("feeGrid.copyTerms", { count: param(sp, "fee_terms") })}</Notice>}
+      {param(sp, "fee_exempted") && <Notice tone="success">{tr("feeGrid.exempted", { count: param(sp, "fee_exempted") })}</Notice>}
+
+      <section className="card">
+        <div className="card-head">
+          <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon name="coins" size={20} />{tr("feeGrid.title")}</h2>
+          <Link className="btn ghost sm" href={base}>{tr("nav.setup")}</Link>
+        </div>
+        <p className="muted">{tr("feeGrid.intro")}</p>
+        <form method="get" className="row">
+          <label>{tr("feeGrid.year")}
+            <select name="year" defaultValue={year.id}>{years.map((y) => <option key={y.id} value={y.id}>{y.label}</option>)}</select>
+          </label>
+          <label>{tr("feeGrid.fee")}
+            <select name="fee" defaultValue={fee || "__new"}>
+              {names.map((n) => <option key={n} value={n}>{n}</option>)}
+              <option value="__new">+ {tr("feeGrid.newFee")}</option>
+            </select>
+          </label>
+          <button className="btn secondary" type="submit">{tr("feeGrid.show")}</button>
+        </form>
+
+        <form action={saveFeeSchedule} style={{ marginTop: 16 }}>
+          {hidden}
+          <input type="hidden" name="fee" value={fee} />
+          {!fee && (
+            <div className="row" style={{ marginBottom: 12 }}>
+              <label>{tr("feeGrid.newFee")}<input name="newFee" required placeholder={tr("feeGrid.newFeeHint")} /></label>
+            </div>
+          )}
+          <div className="fee-grid-wrap" style={{ overflowX: "auto" }}>
+            <table className="grid fee-grid">
+              <thead>
+                <tr>
+                  <th>{tr("common.level")}</th>
+                  {columns.map((c) => <th key={colKey(c.termId)} className="num">{c.label}</th>)}
+                  <th className="num">{tr("feeGrid.yearTotal")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="muted" style={{ verticalAlign: "middle" }}>{tr("feeGrid.due")}</td>
+                  {columns.map((c) => (
+                    <td key={colKey(c.termId)} className="num">
+                      <input className="field-input" type="date" name={`due:${colKey(c.termId)}`} defaultValue={g.dues.get(colKey(c.termId)) ?? ""} aria-label={`${tr("feeGrid.due")} · ${c.label}`} />
+                    </td>
+                  ))}
+                  <td />
+                </tr>
+                {LEVELS.map((l) => (
+                  <tr key={l}>
+                    <th scope="row" style={{ position: "static", background: "transparent", fontSize: 14.5, color: "var(--text)", verticalAlign: "middle" }}>{tr("levelName", { n: l })}</th>
+                    {columns.map((c) => {
+                      const k = colKey(c.termId);
+                      return (
+                        <td key={k} className="num">
+                          <input className="field-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l)?.toString() ?? ""} placeholder="—" aria-label={`${tr("levelName", { n: l })} · ${c.label} (FC)`} style={{ textAlign: "right", minWidth: 110 }} />
+                        </td>
+                      );
+                    })}
+                    <td className="num" style={{ verticalAlign: "middle", fontWeight: 600 }}>{levelTotal(l) ? fc(levelTotal(l)) : <span className="muted">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="row" style={{ justifyContent: "flex-end" }}>
+            <button className="btn" type="submit">{tr("feeGrid.save")}</button>
+          </div>
+        </form>
+      </section>
+
+      <section className="card">
+        <div className="card-head"><h2>{tr("feeGrid.copyTitle")}</h2></div>
+        <p className="muted">{tr("feeGrid.copyIntro", { year: year.label })}</p>
+        {sources.length === 0 ? (
+          <p className="muted">{tr("feeGrid.copyNone")}</p>
+        ) : (
+          <form action={copyFees} className="row">
+            {hidden}
+            <label>{tr("feeGrid.copyFrom")}
+              <select name="source" required>{sources.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
+            </label>
+            <button className="btn secondary" type="submit">{tr("feeGrid.copy")}</button>
+          </form>
+        )}
+      </section>
+
+      <section className="card">
+        <div className="card-head"><h2>{tr("feeGrid.exemptTitle")}</h2></div>
+        <p className="muted">{tr("feeGrid.exemptIntro")}</p>
+        <form method="get" className="row">
+          <input type="hidden" name="year" value={year.id} />
+          {fee && <input type="hidden" name="fee" value={fee} />}
+          <label>{tr("feeGrid.filterClass")}
+            <select name="class" defaultValue={cls}>
+              <option value="">{tr("feeGrid.allClasses")}</option>
+              {yearClasses.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr)}</option>)}
+            </select>
+          </label>
+          <button className="btn secondary" type="submit">{tr("feeGrid.show")}</button>
+        </form>
+        {pupils.length === 0 ? (
+          <p className="muted">{tr("common.none")}</p>
+        ) : (
+          <form action={bulkExempt} className="stack" style={{ marginTop: 12 }}>
+            {hidden}
+            {fee && <input type="hidden" name="fee" value={fee} />}
+            <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius-md, 8px)" }}>
+              <table className="grid">
+                <tbody>
+                  {pupils.map(({ s, c }) => (
+                    <tr key={s.id}>
+                      <td style={{ width: 44 }}><input type="checkbox" name="studentId" value={s.id} aria-label={studentName(s)} style={{ width: 22, height: 22 }} /></td>
+                      <td>{studentName(s)} <span className="muted">· {s.studentNumber}</span></td>
+                      <td>{classLabel(c, tr)}</td>
+                      <td>{exempted.has(s.id) && <span className="pill warn">{tr("feeGrid.already")}</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="row">
+              <label>{tr("setup.feeName")}
+                <select name="feeItemId" defaultValue="">
+                  <option value="">{tr("feeGrid.allFees")}</option>
+                  {yearItems.map((i) => <option key={i.id} value={i.id}>{i.name} · {i.levels.join(", ")} · {fc(i.amount)}</option>)}
+                </select>
+              </label>
+              <label className="narrow">{tr("setup.kind")}
+                <select name="kind" defaultValue="full">{(["full", "percent", "fixed"] as const).map((k) => <option key={k} value={k}>{tr(`setup.kinds.${k}`)}</option>)}</select>
+              </label>
+              <label className="narrow">{tr("setup.value")}<input name="value" inputMode="numeric" placeholder="0" /></label>
+              <label>{tr("setup.reason")}<input name="reason" required /></label>
+              <button className="btn" type="submit">{tr("feeGrid.exempt")}</button>
+            </div>
+          </form>
+        )}
+      </section>
+    </div>
+  );
+}
