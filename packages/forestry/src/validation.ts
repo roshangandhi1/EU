@@ -42,6 +42,13 @@ export const boundarySchema = z.object({
   gpsAccuracyM: z.number().nullable().optional(),
 });
 
+export const boundaryApprovalSchema = z.object({
+  boundaryId: uuid,
+  effectiveFrom: isoDate,
+  checkedAgainst: z.string().max(200).nullable().optional(),
+  note: z.string().max(4000).nullable().optional(),
+});
+
 export const plantingEventSchema = z.object({
   plantedOn: isoDate,
   lines: z.array(z.object({ species: z.string().min(1), count: count.min(1), batchId: uuid.optional() })).min(1),

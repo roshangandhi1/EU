@@ -7,7 +7,8 @@ const stamp = (id: string, captured: string, received = captured) => ({ id, devi
 function bambooPlot(over: Partial<PlotInput> = {}): PlotInput {
   return {
     siteId: "p1", code: "KBK-B-001", stream: "bamboo",
-    boundaries: [{ ...stamp("b1", "2026-08-01T10:00:00Z"), areaHa: 10, authoritative: true, authoritativeFrom: "2026-08-01" }],
+    boundaries: [{ ...stamp("b1", "2026-08-01T10:00:00Z"), areaHa: 10 }],
+    approvals: [{ ...stamp("a1", "2026-08-01T11:00:00Z"), boundaryId: "b1", effectiveFrom: "2026-08-01" }],
     plantings: [{ ...stamp("e1", "2026-09-10T10:00:00Z"), plantedOn: "2026-09-10", lines: [{ species: "bambusa_vulgaris", count: 4200 }], isGapFilling: false, photos: ["f1"] }],
     visits: [],
     ...over,
@@ -50,17 +51,26 @@ describe("2.2.1 bamboo", () => {
   });
 
   it("needs an authoritative boundary in force on the date", () => {
-    const p = bambooPlot({ boundaries: [{ ...stamp("b1", "2026-08-01T10:00:00Z"), areaHa: 10, authoritative: false, authoritativeFrom: null }] });
+    const p = bambooPlot({ approvals: [] });
     expect(computeIndicator([p], "2026-10-16", "captured", bambooRules).plots[0]!.outcome).toBe("no_authoritative_boundary");
   });
 
   it("uses the boundary version in force at the as-at date", () => {
-    const p = bambooPlot({ boundaries: [
-      { ...stamp("b1", "2026-08-01T10:00:00Z"), areaHa: 10, authoritative: true, authoritativeFrom: "2026-08-01" },
-      { ...stamp("b2", "2028-01-01T10:00:00Z"), areaHa: 20, authoritative: true, authoritativeFrom: "2028-01-01" },
-    ] });
+    const p = bambooPlot({
+      boundaries: [{ ...stamp("b1", "2026-08-01T10:00:00Z"), areaHa: 10 }, { ...stamp("b2", "2028-01-01T10:00:00Z"), areaHa: 20 }],
+      approvals: [
+        { ...stamp("a1", "2026-08-01T11:00:00Z"), boundaryId: "b1", effectiveFrom: "2026-08-01" },
+        { ...stamp("a2", "2028-01-01T11:00:00Z"), boundaryId: "b2", effectiveFrom: "2028-01-01" },
+      ],
+    });
     expect(computeIndicator([p], "2027-06-01", "captured", bambooRules).plots[0]!.areaHa).toBe(10);
     expect(computeIndicator([p], "2028-06-01", "captured", bambooRules).plots[0]!.areaHa).toBe(20);
+  });
+
+  it("a voided approval withdraws the boundary", () => {
+    const p = bambooPlot();
+    p.approvals[0]!.voidedAt = T("2026-09-01T00:00:00Z");
+    expect(computeIndicator([p], "2026-10-16", "captured", bambooRules).plots[0]!.outcome).toBe("no_authoritative_boundary");
   });
 
   it("evidence mode: synced after cut-off is listed, not counted, until accepted", () => {
@@ -93,7 +103,8 @@ describe("2.1.1 miombo, both readings", () => {
   });
   const plot: PlotInput = {
     siteId: "m1", code: "MLB-M-001", stream: "miombo",
-    boundaries: [{ ...stamp("b", "2026-12-01T10:00:00Z"), areaHa: 5, authoritative: true, authoritativeFrom: "2026-12-01" }],
+    boundaries: [{ ...stamp("b", "2026-12-01T10:00:00Z"), areaHa: 5 }],
+    approvals: [{ ...stamp("a", "2026-12-01T11:00:00Z"), boundaryId: "b", effectiveFrom: "2026-12-01" }],
     plantings: [{ ...stamp("e", "2026-12-15T10:00:00Z"), plantedOn: "2026-12-15", isGapFilling: false, photos: ["f"],
       lines: [{ species: "pterocarpus_angolensis", count: 1000 }, { species: "afzelia_quanzensis", count: 600 }, { species: "eucalyptus", count: 5000 }] }],
     visits: [{ ...stamp("v", "2027-06-01T10:00:00Z"), visitedOn: "2027-06-01", photos: [], samples: [sample(8, 2), sample(9, 1)] }],

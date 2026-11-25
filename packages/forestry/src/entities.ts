@@ -37,6 +37,8 @@ function forStream(s: ForestryStream) {
       actions: { read, write: fa(s, "plot.propose") }, label: L("plot", "parcelle") }),
     defineEntity({ name: `${s}.boundary`, stream: s, table: t.plotBoundaries, schema: v.boundarySchema, policy: "append_only",
       actions: { read, write: fa(s, "boundary.write"), void: voidA }, label: L("plot boundary", "limite de parcelle") }),
+    defineEntity({ name: `${s}.boundary_approval`, stream: s, table: t.boundaryApprovals, schema: v.boundaryApprovalSchema, policy: "append_only",
+      actions: { read, write: fa(s, "boundary.approve"), void: fa(s, "boundary.approve") }, label: L("boundary approval", "validation de limite") }),
     defineEntity({ name: `${s}.planting`, stream: s, table: t.plantingEvents, schema: v.plantingEventSchema, policy: "append_only",
       actions: { read, write: fa(s, "planting.write"), void: voidA }, label: L("planting", "plantation") }),
     defineEntity({ name: `${s}.visit`, stream: s, table: t.monitoringVisits, schema: v.monitoringVisitSchema, policy: "append_only",

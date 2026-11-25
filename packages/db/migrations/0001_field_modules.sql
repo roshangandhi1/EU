@@ -170,6 +170,26 @@ CREATE TABLE "borehole_visits" (
 	"notes" text
 );
 --> statement-breakpoint
+CREATE TABLE "forestry_boundary_approvals" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"scope_id" text NOT NULL,
+	"created_by" text NOT NULL,
+	"device_id" text NOT NULL,
+	"device_time" timestamp with time zone NOT NULL,
+	"server_time" timestamp with time zone NOT NULL,
+	"updated_server_time" timestamp with time zone NOT NULL,
+	"edited_device_time" timestamp with time zone NOT NULL,
+	"version" integer DEFAULT 1 NOT NULL,
+	"field_versions" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"clock_suspect" boolean DEFAULT false NOT NULL,
+	"voided_at" timestamp with time zone,
+	"void_reason" text,
+	"boundary_id" uuid NOT NULL,
+	"effective_from" date NOT NULL,
+	"checked_against" text,
+	"note" text
+);
+--> statement-breakpoint
 CREATE TABLE "forestry_settings" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"scope_id" text NOT NULL,
@@ -354,14 +374,9 @@ CREATE TABLE "forestry_plot_boundaries" (
 	"voided_at" timestamp with time zone,
 	"void_reason" text,
 	"geom" jsonb NOT NULL,
-	"bbox" jsonb NOT NULL,
 	"source" "forestry_boundary_source" NOT NULL,
 	"source_ref" text,
-	"gps_accuracy_m" double precision,
-	"area_ha" numeric(12, 4),
-	"authoritative" boolean DEFAULT false NOT NULL,
-	"authoritative_from" date,
-	"approved_by" text
+	"gps_accuracy_m" double precision
 );
 --> statement-breakpoint
 CREATE TABLE "forestry_plots" (
@@ -423,6 +438,7 @@ CREATE UNIQUE INDEX "borehole_site_unique" ON "borehole_attributes" USING btree 
 CREATE INDEX "borehole_village_idx" ON "borehole_attributes" USING btree ("village");--> statement-breakpoint
 CREATE INDEX "borehole_tmpl_key_idx" ON "borehole_maintenance_templates" USING btree ("template_key","template_version");--> statement-breakpoint
 CREATE INDEX "borehole_visits_site_idx" ON "borehole_visits" USING btree ("scope_id","visited_on");--> statement-breakpoint
+CREATE INDEX "forestry_approvals_site_idx" ON "forestry_boundary_approvals" USING btree ("scope_id");--> statement-breakpoint
 CREATE INDEX "forestry_visits_site_idx" ON "forestry_monitoring_visits" USING btree ("scope_id","visited_on");--> statement-breakpoint
 CREATE INDEX "forestry_planting_site_idx" ON "forestry_planting_events" USING btree ("scope_id","planted_on");--> statement-breakpoint
 CREATE INDEX "forestry_boundaries_site_idx" ON "forestry_plot_boundaries" USING btree ("scope_id");--> statement-breakpoint

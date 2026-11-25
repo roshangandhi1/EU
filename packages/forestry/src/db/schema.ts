@@ -47,23 +47,30 @@ export const plots = pgTable("forestry_plots", {
 }, (t) => [uniqueIndex("forestry_plots_site_unique").on(t.scopeId), index("forestry_plots_stream_idx").on(t.stream)]);
 
 /**
- * Versioned plot boundaries. Append-only; exactly one per plot may be authoritative at a time
- * (enforced in server code when promoting). Area is computed by the server in an equal-area
- * projection, never trusted from the phone.
+ * Plot boundaries, append-only and versioned. A boundary counts for indicators only once a stream
+ * lead approves it (see boundaryApprovals), typically after checking it against imagery.
+ * Area is computed on the server from the geometry (geodesic), never taken from the phone.
  */
 export const plotBoundaries = pgTable("forestry_plot_boundaries", {
   ...syncColumns(),
   geom: multiPolygon("geom").notNull(),
-  /** [minLng, minLat, maxLng, maxLat], for map fitting and cheap overlap pre-checks. */
-  bbox: jsonb("bbox").$type<[number, number, number, number]>().notNull(),
   source: boundarySource("source").notNull(),
   sourceRef: text("source_ref"), // file name / KML placemark id / imagery layer id
   gpsAccuracyM: doublePrecision("gps_accuracy_m"), // phone walks only
-  areaHa: numeric("area_ha", { precision: 12, scale: 4 }), // server-computed
-  authoritative: boolean("authoritative").notNull().default(false),
-  authoritativeFrom: date("authoritative_from"), // as-at reports use the boundary in force on the date
-  approvedBy: text("approved_by"),
 }, (t) => [index("forestry_boundaries_site_idx").on(t.scopeId)]);
+
+/**
+ * Approval of a boundary as the plot's authoritative one from a date. Append-only, so the history
+ * of which shape was in force when is never lost; a later approval supersedes an earlier one from
+ * its effective date. Voiding an approval withdraws it.
+ */
+export const boundaryApprovals = pgTable("forestry_boundary_approvals", {
+  ...syncColumns(),
+  boundaryId: uuid("boundary_id").notNull(),
+  effectiveFrom: date("effective_from").notNull(),
+  checkedAgainst: text("checked_against"), // imagery layer id or "field survey"
+  note: text("note"),
+}, (t) => [index("forestry_approvals_site_idx").on(t.scopeId)]);
 
 export type PlantingLine = { species: string; count: number; batchId?: string; natural?: false };
 

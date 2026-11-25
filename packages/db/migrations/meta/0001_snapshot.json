@@ -1,5 +1,5 @@
 {
-  "id": "3acc37cc-4610-447e-93e5-2132dc89742f",
+  "id": "864feca9-6314-4abc-9cd9-1a1a25729afc",
   "prevId": "8969e527-1265-4d59-aa47-55c57d9cecf1",
   "version": "7",
   "dialect": "postgresql",
@@ -1909,6 +1909,140 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.forestry_boundary_approvals": {
+      "name": "forestry_boundary_approvals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "scope_id": {
+          "name": "scope_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_time": {
+          "name": "device_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "server_time": {
+          "name": "server_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_server_time": {
+          "name": "updated_server_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "edited_device_time": {
+          "name": "edited_device_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "field_versions": {
+          "name": "field_versions",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "clock_suspect": {
+          "name": "clock_suspect",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "voided_at": {
+          "name": "voided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "void_reason": {
+          "name": "void_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "boundary_id": {
+          "name": "boundary_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked_against": {
+          "name": "checked_against",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "forestry_approvals_site_idx": {
+          "name": "forestry_approvals_site_idx",
+          "columns": [
+            {
+              "expression": "scope_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.forestry_settings": {
       "name": "forestry_settings",
       "schema": "",
@@ -3054,12 +3188,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "bbox": {
-          "name": "bbox",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
         "source": {
           "name": "source",
           "type": "forestry_boundary_source",
@@ -3076,31 +3204,6 @@
         "gps_accuracy_m": {
           "name": "gps_accuracy_m",
           "type": "double precision",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "area_ha": {
-          "name": "area_ha",
-          "type": "numeric(12, 4)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "authoritative": {
-          "name": "authoritative",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "authoritative_from": {
-          "name": "authoritative_from",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_by": {
-          "name": "approved_by",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         }

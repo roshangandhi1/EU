@@ -29,7 +29,8 @@ export interface PlotInput {
   code: string;
   stream: "bamboo" | "miombo";
   targetDensityPerHa?: number | null;
-  boundaries: (Stamped & { areaHa: number; authoritative: boolean; authoritativeFrom: string | null; geom?: MultiPolygon })[];
+  boundaries: (Stamped & { areaHa: number; geom?: MultiPolygon })[];
+  approvals: (Stamped & { boundaryId: string; effectiveFrom: string })[];
   plantings: (Stamped & { plantedOn: string; lines: PlantingLine[]; isGapFilling: boolean; photos: string[] })[];
   visits: (Stamped & { visitedOn: string; samples: SamplePlot[]; photos: { fileId: string }[] })[];
 }
@@ -82,12 +83,18 @@ function inScope<T extends Stamped>(r: T, asAt: Date, mode: CountingMode): "in" 
   return "late";
 }
 
-/** The authoritative boundary in force on the as-at date (latest authoritativeFrom on or before it). */
+/**
+ * The boundary in force on the as-at date: the one named by the latest approval whose effective
+ * date is on or before it (approvals that are voided, or not yet in scope for the mode, are ignored).
+ */
 export function boundaryAsAt(p: PlotInput, asAt: string, mode: CountingMode) {
   const at = endOfDay(asAt);
-  return p.boundaries
-    .filter((b) => b.authoritative && b.authoritativeFrom && b.authoritativeFrom <= asAt && inScope(b, at, mode) === "in")
-    .sort((a, b) => (a.authoritativeFrom! < b.authoritativeFrom! ? 1 : -1))[0];
+  const approval = p.approvals
+    .filter((a) => a.effectiveFrom <= asAt && inScope(a, at, mode) === "in")
+    .sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? 1 : a.effectiveFrom > b.effectiveFrom ? -1 : b.deviceTime.getTime() - a.deviceTime.getTime()))[0];
+  if (!approval) return undefined;
+  const b = p.boundaries.find((x) => x.id === approval.boundaryId);
+  return b && inScope(b, at, mode) === "in" ? b : undefined;
 }
 
 export function evaluatePlot(p: PlotInput, asAt: string, mode: CountingMode, rules: IndicatorRules): PlotResult {

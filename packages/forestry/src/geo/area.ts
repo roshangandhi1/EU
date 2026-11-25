@@ -2,9 +2,9 @@ import turfArea from "@turf/area";
 import type { MultiPolygon, Polygon } from "geojson";
 
 /**
- * Geodesic area in hectares. Used for previews on phone and web only;
- * the authoritative figure is ST_Area(geom::geography) computed by the server.
- * Both are geodesic, so they agree closely (tested).
+ * Geodesic area in hectares (spherical model, within about 0.3% of the ellipsoid at DRC latitudes).
+ * The phone uses it for previews; the server recomputes it from the stored geometry for every
+ * indicator, so a phone can never supply its own area.
  */
 export function areaHa(geom: Polygon | MultiPolygon): number {
   return turfArea(geom) / 10_000;
