@@ -121,4 +121,5 @@ export const platformActions: ActionMap = {
   "sites.manage": { stream: "platform", roles: ["system_admin", "programme_manager"] },
   "devices.manage": { stream: "platform", roles: ["system_admin", "programme_manager"] },
   "audit.read": { stream: "platform", roles: ["system_admin", "programme_manager"] },
+  "evidence.manage": { stream: "platform", roles: ["system_admin", "programme_manager"] },
 };

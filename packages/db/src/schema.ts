@@ -57,6 +57,10 @@ export const devices = pgTable("devices", {
   lastSkewMs: integer("last_skew_ms"),
   appVersion: text("app_version"),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  /** What the phone last said it still holds unsynced (so an admin is warned before revoking). */
+  pendingChanges: integer("pending_changes"),
+  pendingPhotos: integer("pending_photos"),
+  statusAt: timestamp("status_at", { withTimezone: true }),
 });
 
 /** Web sessions and device tokens. Only a SHA-256 hash of the token is stored. */
@@ -197,4 +201,33 @@ export const files = pgTable(
     uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("files_scope").on(t.scopeId)],
+);
+
+/** Evidence cut-offs: an assessor counts only what the server had received by `cutoffAt`. */
+export const evidenceCutoffs = pgTable("evidence_cutoffs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  label: text("label").notNull(),
+  cutoffAt: timestamp("cutoff_at", { withTimezone: true }).notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * A reviewer's decision on a record captured before a cut-off but synced after it.
+ * Only "admitted" records join the evidence count; every decision carries a reason and is audited.
+ */
+export const evidenceDecisions = pgTable(
+  "evidence_decisions",
+  {
+    cutoffId: uuid("cutoff_id")
+      .notNull()
+      .references(() => evidenceCutoffs.id),
+    entity: text("entity").notNull(),
+    recordId: text("record_id").notNull(),
+    decision: text("decision").notNull(), // admitted | excluded
+    reason: text("reason").notNull(),
+    decidedBy: text("decided_by").notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("evidence_decisions_record").on(t.cutoffId, t.entity, t.recordId)],
 );

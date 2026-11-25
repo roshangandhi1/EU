@@ -66,3 +66,13 @@ One history in `packages/db/migrations`. Generate with `npm run db:generate` onl
 - **Reading:** `GET /api/files/<id>` streams the photo to users who hold the entity's **read** permission.
 - **Indicators and exports:** use `uploadedFileIds(db, ids, cutoff?)`. A photo counts only once `uploaded_at` is on or before the cut-off.
 - **Storage:** needs `BLOB_READ_WRITE_TOKEN`, set for Production only. Without it, uploads answer 503 and phones keep the photos.
+
+## Evidence cut-offs and phones (web admin)
+
+- **`/<locale>/admin/evidence`** (`evidence.manage`: system admin, programme manager): create a cut-off, entered in Haut-Lomami time (UTC+2).
+  - Each cut-off page shows, per record type: counted (received by the server by the cut-off), late (captured before, received after), the decisions taken on late records, and wrong-clock counts.
+  - Late records are admitted or excluded with a required reason. Decisions can be changed, and every one is audited.
+  - The CSV download (also audited) lists every record captured by the cut-off with its status, device time, server time, device and author.
+- **Modules:** pass `admittedIds(db, cutoffId, entity)` into their as-at split, so only admitted late records count.
+- **Phones:** after each sync, phones POST `/api/device/status` with their unsynced change and photo counts. The answer gives the next cut-off, and the phone shows "Sync before …" when one is within 7 days.
+- **`/<locale>/admin/phones`** (`devices.manage`): last sync, last reported unsynced work and clock skew (flagged beyond 10 minutes) for each phone. Removing a phone shows its last-reported unsynced counts and requires a confirmation tick.
