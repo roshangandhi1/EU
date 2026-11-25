@@ -83,12 +83,10 @@ describe("forestry records through the platform sync engine", () => {
     expect((await m.store.rejections()).map((r) => r.reason)).toContain("append_only");
   });
 
-  // TODO: un-skip once PR #5 (sync scope checks) is on main.
-  it.skip("a miombo officer cannot file a miombo record against a bamboo plot", async () => {
+  it("a miombo officer cannot file a miombo record against a bamboo plot", async () => {
     const m = device(miomboOfficer, "phone-1");
     await m.client.create("miombo.planting", "plot-KBK-001", { plantedOn: "2026-12-16", lines: [{ species: "x", count: 5 }], isGapFilling: false, photos: [] });
     await m.client.sync();
-    // Enforced by the platform from PR #5 (scope must be a site in the entity's stream).
-    expect((await m.store.rejections()).length).toBe(1);
+    expect((await m.store.rejections())[0]?.reason).toBe("scope_wrong_stream");
   });
 });
