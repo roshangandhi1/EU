@@ -27,10 +27,12 @@ describe("1.1.1 operational", () => {
     const r = indicator111([{ borehole: { ...b, commissionedOn: "2026-11-01" }, visits: [visit("v1", "2026-10-01", 20)] }], "2026-10-16", "captured", s);
     expect(r.rows[0]!.fails).toContain("commissioned");
   });
-  it("unset threshold: counts but flags", () => {
+  it("no minimum set: any measured flow counts, zero flow fails", () => {
     const r = indicator111([{ borehole: b, visits: [visit("v1", "2026-10-01", 5)] }], "2026-10-16", "captured", { ...s, minFlowLpmByPumpKw: {} });
     expect(r.counted).toBe(1);
-    expect(r.rows[0]!.fails).toEqual(["flow_threshold_not_set"]);
+    expect(r.rows[0]!.fails).toEqual([]);
+    const z = indicator111([{ borehole: b, visits: [visit("v1", "2026-10-01", 0)] }], "2026-10-16", "captured", { ...s, minFlowLpmByPumpKw: {} });
+    expect(z.rows[0]!.fails).toEqual(["flow_min"]);
   });
   it("evidence mode excludes late-synced checks", () => {
     const r = indicator111([{ borehole: b, visits: [visit("v1", "2026-10-10", 20, "2026-10-20")] }], "2026-10-16", "evidence", s);

@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 const LIFECYCLE = ["planned", "drilled", "equipped", "commissioned", "handed_over", "operational", "needs_repair", "non_functional"];
 const DUE = ["ok", "due_soon", "due", "overdue"];
-const FAILS = ["commissioned", "pump_delivers", "flow_min", "flow_threshold_not_set", "tank_taps", "water_quality", "caretaker", "sop", "no_recent_check"];
+const FAILS = ["commissioned", "pump_delivers", "flow_min", "tank_taps", "water_quality", "caretaker", "sop", "no_recent_check"];
 
 export default async function BoreholesPage({ params, searchParams }: {
   params: Promise<{ locale: string }>;

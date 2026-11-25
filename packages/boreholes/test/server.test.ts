@@ -49,7 +49,7 @@ describe("borehole admin", () => {
 
     const { rows, counted } = await loadBoreholes(db, "2026-11-25", "captured", "2026-11-25");
     expect(rows[0]!.lastVisitOn).toBe("2026-11-20");
-    expect(rows[0]!.indicator.fails).toEqual(["flow_threshold_not_set"]);
+    expect(rows[0]!.indicator.fails).toEqual([]);
     expect(counted).toBe(1);
     expect(rows[0]!.due.find((x) => x.taskKey === "flow_measure")!.dueOn).toBe("2026-12-01");
   });

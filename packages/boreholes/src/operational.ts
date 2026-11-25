@@ -26,7 +26,7 @@ export interface CheckVisit {
 }
 
 export type Criterion =
-  | "commissioned" | "pump_delivers" | "flow_min" | "flow_threshold_not_set" | "tank_taps"
+  | "commissioned" | "pump_delivers" | "flow_min" | "tank_taps"
   | "water_quality" | "caretaker" | "sop" | "no_recent_check";
 
 export interface OperationalSettings {
@@ -47,16 +47,14 @@ export function evaluateCheck(b: BoreholeForCheck, c: OperationalCheck | null, s
   if (!c.pumpDelivers) fails.push("pump_delivers");
   if (!c.tankFillsTapsOk) fails.push("tank_taps");
   const min = b.pumpRatingKw === null ? null : s.minFlowLpmByPumpKw[String(b.pumpRatingKw)] ?? null;
-  if (min === null) {
-    // Until thresholds are agreed: any measured flow passes, but the result is flagged.
-    if (!c.flowLpm || c.flowLpm <= 0) fails.push("flow_min");
-    else fails.push("flow_threshold_not_set");
-  } else if (c.flowLpm === null || c.flowLpm < min) fails.push("flow_min");
+  // No minimum flow rates are set for the programme (Roshan, 2026-11-25): any measured flow passes.
+  // A per-pump minimum can still be configured in settings if one is agreed later.
+  if (!c.flowLpm || c.flowLpm <= 0 || (min !== null && c.flowLpm < min)) fails.push("flow_min");
   return fails;
 }
 
 /** Flags that do not block counting. */
-const NON_BLOCKING: Criterion[] = ["flow_threshold_not_set"];
+const NON_BLOCKING: Criterion[] = [];
 
 export interface BoreholeIndicatorRow {
   siteId: string;
