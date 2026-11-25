@@ -37,7 +37,7 @@ export function marksContext(d: SchoolData, siteId: string, date: string, classI
   const students = new Map(d.students.map((s) => [s.id, s]));
   const pupilsOf = (id: string) => {
     // Pupils enrolled in the class today, plus any who left but already have marks in it.
-    const now = new Set(activeOn(d.enrolments, date).filter((e) => e.classId === id).map((e) => e.studentId));
+    const now = new Set(activeOn(d.enrolments, date, d.years).filter((e) => e.classId === id).map((e) => e.studentId));
     for (const m of d.marks) if (!m.voidedAt && m.classId === id) now.add(m.studentId);
     return [...now].map((sid) => students.get(sid)).filter((s): s is NonNullable<typeof s> => !!s && !s.voidedAt)
       .sort((a, b) => studentName(a).localeCompare(studentName(b)));

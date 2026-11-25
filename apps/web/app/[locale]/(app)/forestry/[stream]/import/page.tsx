@@ -16,8 +16,9 @@ export const dynamic = "force-dynamic";
 export const generateMetadata = titled((l, p) => `${t(l, "forestry.import.kmz")} · ${t(l, p.stream === "miombo" ? "forestry.miombo" : "forestry.bamboo")}`);
 
 const KEYS = ["choose", "preview", "commit", "found", "found_one", "skipped", "skipped_one", "village", "status", "approve_from", "checked_against", "done", "done_one", "rejected", "include", "problems", "created"] as const;
-const PROBLEMS = ["area_tiny", "area_implausible", "ring_too_short", "outside_drc", "name_missing", "name_too_long", "overlaps", "duplicate_name"] as const;
-const ERRORS = ["file_required", "file_too_large", "unsupported_format", "unreadable_file", "no_kml_in_kmz", "village_required", "invalid_status", "invalid_approve_from", "forbidden", "forbidden_approve", "already_exists", "network", "unknown"] as const;
+const PROBLEMS = ["area_tiny", "area_implausible", "ring_too_short", "outside_drc", "name_missing", "name_too_long", "overlaps", "duplicate_name", "self_overlap", "duplicate_code", "already_exists"] as const;
+const ERRORS = ["file_required", "file_too_large", "unsupported_format", "unreadable_file", "no_kml_in_kmz", "village_required", "invalid_status", "invalid_approve_from", "forbidden", "forbidden_approve", "already_exists", "network", "unknown", "kml_too_large", "too_many_placemarks"] as const;
+const SERVER_ERRORS = new Set(["kml_too_large", "too_many_placemarks"]);
 
 export default async function ImportPage({ params }: { params: Promise<{ locale: string; stream: string }> }) {
   const { locale, stream } = await params;
@@ -43,7 +44,7 @@ export default async function ImportPage({ params }: { params: Promise<{ locale:
           plot: t(locale, "forestry.plot"),
           species: t(locale, "forestry.planting.species"),
           problemNames: Object.fromEntries(PROBLEMS.map((p) => [p, t(locale, `forestry.import.problem.${p}`)])),
-          errors: Object.fromEntries(ERRORS.map((e) => [e, t(locale, `forestry.import.err.${e}`)])),
+          errors: Object.fromEntries(ERRORS.map((e) => [e, t(locale, SERVER_ERRORS.has(e) ? `forestry.import.error.${e}` : `forestry.import.err.${e}`)])),
           mapHint: t(locale, "forestry.import.map_hint"), open: t(locale, "forestry.open"),
           ...Object.fromEntries(["step1", "step2", "step3", "fileHint", "backTo", "selected", "whatFollows", "saving", "optional"].map((k) => [k, t(locale, `ui.form.${k}`)])),
           statuses: Object.fromEntries(["planned", "pegged", "planted", "established"].map((o) => [o, t(locale, `forestry.status.${o}`)])),

@@ -76,7 +76,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
   const exemptions = live(d.exemptions);
   const places = d.school ? placesAsAt(d.school, d.classrooms, date) : null;
   const students = new Map(d.students.map((s) => [s.id, s]));
-  const enrolled = activeOn(d.enrolments, date).map((e) => students.get(e.studentId)).filter((s): s is NonNullable<typeof s> => !!s);
+  const enrolled = activeOn(d.enrolments, date, d.years).map((e) => students.get(e.studentId)).filter((s): s is NonNullable<typeof s> => !!s);
   const needYear = <EmptyRow icon="calendar" title={tr("ux.needYear")} />;
 
   const index = [

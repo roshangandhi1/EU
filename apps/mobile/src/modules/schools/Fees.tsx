@@ -1,4 +1,4 @@
-import { activeOn, checkReceiptNumber, formatCdf, normaliseName, studentBalance, type Student } from "@eu/schools/mobile";
+import { activeOn, checkReceiptNumber, enrolmentBalance, formatCdf, normaliseName, type Student } from "@eu/schools/mobile";
 import { useContext, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { saveErrorKey } from "../../errors";
@@ -29,17 +29,19 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
   const [toast, setToast] = useState<{ msg: string; tone: "good" | "critical" } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const enrolled = activeOn(data.enrolments, date);
+  const enrolled = activeOn(data.enrolments, date, data.years);
   const classes = new Map(data.classes.map((c) => [c.id, c]));
   const shifts = new Set(live(data.classes).map((c) => c.shift)).size;
   const classOf = (id: string) => classes.get(enrolled.find((e) => e.studentId === id)?.classId ?? "");
-  const levelOf = (id: string) => classOf(id)?.level ?? 0;
   const ids = new Set(enrolled.map((e) => e.studentId));
   const n = normaliseName(q);
   const found = n.length >= 2 ? live(data.students).filter((s) => ids.has(s.id) && (normaliseName(studentName(s)).includes(n) || s.studentNumber.toLowerCase().includes(q.trim().toLowerCase()))).slice(0, 20) : [];
 
   const fmt = (v: number) => formatCdf(v, locale);
-  const balOf = (id: string) => studentBalance(id, levelOf(id), data.feeItems, data.exemptions, data.payments, date);
+  const balOf = (id: string) => {
+    const e = enrolled.find((x) => x.studentId === id);
+    return e ? enrolmentBalance(data, e, date) : null;
+  };
   const bal = student ? balOf(student.id) : null;
   const mine = student ? data.payments.filter((p) => p.studentId === student.id).sort((a, b) => (a.paidOn < b.paidOn ? 1 : -1)) : [];
   const next = session.user ? nextReceipt(session.user.id, data.receiptBooks, data.payments) : null;
@@ -120,7 +122,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
                     title={studentName(s)}
                     detail={`${s.studentNumber}${c ? ` · ${classLabel(c, shifts, t)}` : ""}`}
                     leading={<Avatar name={studentName(s)} />}
-                    status={b.balance > 0 ? <StatusChip label={fmt(b.balance)} tone={b.overdue > 0 ? "warning" : "muted"} /> : <StatusChip label={t("ux.paidUp")} tone="good" icon="check" />}
+                    status={!b ? undefined : b.balance > 0 ? <StatusChip label={fmt(b.balance)} tone={b.overdue > 0 ? "warning" : "muted"} /> : <StatusChip label={t("ux.paidUp")} tone="good" icon="check" />}
                     onPress={() => pick(s)}
                     chevron
                   />

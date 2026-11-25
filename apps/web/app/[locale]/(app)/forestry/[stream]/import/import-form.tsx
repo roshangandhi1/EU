@@ -34,7 +34,10 @@ export function ImportForm({ locale, stream, canApprove, species, labels }: {
   const fmt = (n: number) => fmtNum(n, locale, 2);
   // Server codes become sentences; an unknown code is shown inside a generic sentence, never alone.
   const err = (code: string) => labels.errors[code] ?? labels.errors.unknown!.replace("{reason}", code);
-  const problem = (code: string) => labels.problemNames[code] ?? labels.problemNames[code.split(":")[0]!] ?? code;
+  const problem = (code: string) => {
+    const [key, arg = ""] = code.split(":");
+    return (labels.problemNames[code] ?? labels.problemNames[key!] ?? code).replace("{code}", arg);
+  };
   const toggle = (i: number) => setInclude((cur) => { const next = new Set(cur); if (next.has(i)) next.delete(i); else next.add(i); return next; });
   async function post(fd: FormData): Promise<{ ok: boolean; body: Record<string, unknown> }> {
     try {

@@ -1,4 +1,4 @@
-import { activeOn, currentYear, dailyCollections, duplicateReceipts, formatCdf, live, studentBalance } from "@eu/schools";
+import { activeOn, currentYear, dailyCollections, duplicateReceipts, formatCdf, live, enrolmentBalance } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Field, Fields, FormFooter, Notice, RowMenu, Section, SubmitButton, Table } from "@/components/ui";
@@ -24,12 +24,12 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
   const base = `/${locale}/schools/${p.siteId}`;
   const students = new Map(d.students.map((s) => [s.id, s]));
   const classes = new Map(d.classes.map((c) => [c.id, c]));
-  const active = activeOn(d.enrolments, date)
+  const active = activeOn(d.enrolments, date, d.years)
     .map((e) => ({ e, s: students.get(e.studentId), c: classes.get(e.classId) }))
     .filter((r): r is { e: typeof r.e; s: NonNullable<typeof r.s>; c: NonNullable<typeof r.c> } => !!r.s && !!r.c && !r.s.voidedAt)
     .sort((a, b) => studentName(a.s).localeCompare(studentName(b.s)));
   // Each pupil is charged the fees of the year they are enrolled in.
-  const balances = active.map((r) => ({ ...r, b: studentBalance(r.s.id, r.c.level, d.feeItems.filter((i) => i.academicYearId === r.e.academicYearId), d.exemptions, d.payments, date) }));
+  const balances = active.map((r) => ({ ...r, b: enrolmentBalance(d, r.e, date) }));
   const arrears = balances.filter((r) => r.b.overdue > 0).sort((a, b) => b.b.overdue - a.b.overdue);
   const month = /^\d{4}-\d{2}$/.test(param(sp, "month")) && param(sp, "month") <= date.slice(0, 7) ? param(sp, "month") : date.slice(0, 7);
   const daily = dailyCollections(d.payments, `${month}-01`, `${month}-31`).reverse();

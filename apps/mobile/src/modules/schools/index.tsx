@@ -67,7 +67,7 @@ function SchoolMenu({ session, school, onExit }: { session: Session; school: Loc
   const year = data.years.find((y) => !y.voidedAt && y.startsOn <= d && y.endsOn >= d);
   const yearClasses = live(data.classes).filter((c) => c.academicYearId === year?.id);
   const taken = yearClasses.filter((c) => live(data.registers).some((r) => r.classId === c.id && r.date === d)).length;
-  const enrolled = activeOn(data.enrolments, d).length;
+  const enrolled = activeOn(data.enrolments, d, data.years).length;
   const paidToday = live(data.payments).filter((p) => p.paidOn === d).length;
   const pct = yearClasses.length ? taken / yearClasses.length : 0;
 

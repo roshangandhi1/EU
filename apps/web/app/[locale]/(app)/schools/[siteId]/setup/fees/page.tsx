@@ -71,7 +71,7 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
   const cls = param(sp, "class");
   const students = new Map(d.students.map((s) => [s.id, s]));
   const classes = new Map(d.classes.map((c) => [c.id, c]));
-  const pupils = activeOn(d.enrolments, date)
+  const pupils = activeOn(d.enrolments, date, d.years)
     .filter((e) => !cls || e.classId === cls)
     .map((e) => ({ s: students.get(e.studentId), c: classes.get(e.classId) }))
     .filter((r): r is { s: NonNullable<typeof r.s>; c: NonNullable<typeof r.c> } => !!r.s && !!r.c)

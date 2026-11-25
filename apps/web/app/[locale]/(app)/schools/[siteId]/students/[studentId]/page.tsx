@@ -1,4 +1,4 @@
-import { activeOn, formatCdf, live, studentBalance } from "@eu/schools";
+import { activeOn, formatCdf, live, enrolmentBalance } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -46,7 +46,7 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
 
   // Fee statement for the enrolment's year: what is charged, what was paid with which receipt, exemptions.
   const items = e ? d.feeItems.filter((i) => i.academicYearId === e.academicYearId) : [];
-  const bal = cls ? studentBalance(s.id, cls.level, items, d.exemptions, d.payments, date) : null;
+  const bal = cls && e ? enrolmentBalance(d, e, date) : null;
   const payments = d.payments.filter((x) => x.studentId === s.id).sort((a, b) => (a.paidOn < b.paidOn ? 1 : a.paidOn > b.paidOn ? -1 : b.receiptNumber - a.receiptNumber));
   const exemptions = live(d.exemptions).filter((x) => x.studentId === s.id);
 

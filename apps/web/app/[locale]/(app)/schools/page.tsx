@@ -20,7 +20,7 @@ export default async function SchoolsPage({ params, searchParams }: { params: Pr
   const rows = await Promise.all(
     sites.map(async (s) => {
       const d = await loadSchool(db(), s.id);
-      const enrolled = d ? activeOn(d.enrolments, date).length : 0;
+      const enrolled = d ? activeOn(d.enrolments, date, d.years).length : 0;
       const places = d?.school ? placesAsAt(d.school, d.classrooms, date).totalPlaces : 0;
       return { ...s, enrolled, places };
     }),

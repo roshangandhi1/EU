@@ -59,7 +59,7 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
 
   const roster = useMemo(() => {
     const students = new Map(data.students.map((s) => [s.id, s]));
-    return activeOn(data.enrolments, date)
+    return activeOn(data.enrolments, date, data.years)
       .filter((e) => e.classId === classId)
       .map((e) => students.get(e.studentId))
       .filter((s): s is NonNullable<typeof s> => !!s)

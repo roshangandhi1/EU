@@ -15,7 +15,7 @@ export async function saveRegister(fd: FormData) {
   // No registers for days that have not happened yet, or for a class removed in Setup.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today() || !d.classes.some((c) => c.id === classId && !c.voidedAt)) back(path, { error: "invalid:date" });
 
-  const roster = new Set(activeOn(d.enrolments, date).filter((e) => e.classId === classId).map((e) => e.studentId));
+  const roster = new Set(activeOn(d.enrolments, date, d.years).filter((e) => e.classId === classId).map((e) => e.studentId));
   const absent = new Map(
     fd.getAll("absent").map(String).filter((id) => roster.has(id))
       .map((id) => [id, (absenceReason.safeParse(str(fd, `reason-${id}`)).data ?? "unknown")] as const),

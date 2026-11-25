@@ -27,7 +27,7 @@ export default async function Students({ params, searchParams }: { params: Promi
   const q = param(sp, "q");
   const cls = param(sp, "class");
   const status = (STATUSES as readonly string[]).includes(param(sp, "status")) ? (param(sp, "status") as (typeof STATUSES)[number]) : "active";
-  const activeIds = new Set(activeOn(d.enrolments, date).map((e) => e.id));
+  const activeIds = new Set(activeOn(d.enrolments, date, d.years).map((e) => e.id));
 
   // One row per pupil, with their latest enrolment (the one that is active today, if any).
   const latest = new Map<string, (typeof d.enrolments)[number]>();

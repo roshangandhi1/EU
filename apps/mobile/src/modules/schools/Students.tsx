@@ -25,7 +25,7 @@ export function Students({ session, data, onBack }: { session: Session; data: Sc
   const [toast, setToast] = useState<string | null>(null);
   const date = today();
   const classes = new Map(data.classes.map((c) => [c.id, c]));
-  const enrolled = activeOn(data.enrolments, date);
+  const enrolled = activeOn(data.enrolments, date, data.years);
   const byStudent = new Map(enrolled.map((e) => [e.studentId, e]));
   const year = currentYear(data, date);
   const yearClasses = live(data.classes).filter((c) => c.academicYearId === year?.id).sort((a, b) => a.level - b.level || a.section.localeCompare(b.section));

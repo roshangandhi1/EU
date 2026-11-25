@@ -46,7 +46,7 @@ export default async function Attendance({ params, searchParams }: { params: Pro
   const next = schoolDay(date, 1);
 
   const register = selected && (() => {
-    const roster = activeOn(d.enrolments, date)
+    const roster = activeOn(d.enrolments, date, d.years)
       .filter((e) => e.classId === selected.id)
       .map((e) => students.get(e.studentId))
       .filter((x): x is NonNullable<typeof x> => !!x)
