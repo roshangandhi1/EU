@@ -36,6 +36,10 @@ export const schools = {
   reports: { title: "Reports", placesAsAt: "Student places as at", enrolmentAsAt: "Enrolment as at", byLevel: "By level", byShift: "By shift", bySex: "By sex",
     evidence: "Evidence mode (for an assessor)", evidenceHint: "Counts only records the server received by the cut-off.", cutoff: "Cut-off date", counted: "Counted",
     lateSynced: "Captured before the cut-off but synced after it. Review before including.", clock: "Records with a suspect device clock" },
+  mobile: { back: "Back", pickSchool: "Choose a school", noSchools: "No school on this phone yet. Sync, or ask the programme team for access.", menu: "What do you want to do?",
+    prevDay: "Previous day", nextDay: "Next day", tapAbsent: "Tap a pupil to mark them absent. Tap the reason to change it.", savedOffline: "Saved on this phone. It will sync when there is a network.",
+    pickStudent: "Choose a pupil", noClasses: "No classes for this year yet. They are set up on the web.", needYear: "No academic year covers today. It is set up on the web.",
+    newStudent: "Enrol a new pupil", balanceNow: "Balance today: {amount}", pending: "Not yet synced", notTaken: "{count} class(es) without a register today" },
   shift: { morning: "Morning", afternoon: "Afternoon" },
   levelName: "Year {n}",
 } as const;

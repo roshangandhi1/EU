@@ -9,6 +9,7 @@
       "@eu/core/*": ["../../packages/core/src/*"],
       "@eu/sync/client": ["../../packages/sync/src/client.ts"],
       "@eu/sync/sql-store": ["../../packages/sync/src/sql-store.ts"],
+      "@eu/schools/rules": ["../../packages/schools/src/rules.ts"],
       "zod": ["./node_modules/zod"]
     }
   },

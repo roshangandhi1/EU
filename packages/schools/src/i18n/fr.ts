@@ -40,6 +40,10 @@ export const schools: Shape<typeof en> = {
   reports: { title: "Rapports", placesAsAt: "Places élèves au", enrolmentAsAt: "Effectifs au", byLevel: "Par niveau", byShift: "Par vacation", bySex: "Par sexe",
     evidence: "Mode preuve (pour un évaluateur)", evidenceHint: "Ne compte que les données reçues par le serveur avant la date limite.", cutoff: "Date limite", counted: "Comptés",
     lateSynced: "Saisi avant la date limite mais synchronisé après. À vérifier avant de l'inclure.", clock: "Données avec une horloge d'appareil suspecte" },
+  mobile: { back: "Retour", pickSchool: "Choisissez une école", noSchools: "Aucune école sur ce téléphone. Synchronisez, ou demandez l'accès à l'équipe du programme.", menu: "Que voulez-vous faire ?",
+    prevDay: "Jour précédent", nextDay: "Jour suivant", tapAbsent: "Touchez un élève pour le marquer absent. Touchez le motif pour le changer.", savedOffline: "Enregistré sur ce téléphone. La synchronisation se fera dès qu'il y aura du réseau.",
+    pickStudent: "Choisissez un élève", noClasses: "Aucune classe pour cette année. Elles se paramètrent sur le web.", needYear: "Aucune année scolaire ne couvre aujourd'hui. Elle se paramètre sur le web.",
+    newStudent: "Inscrire un nouvel élève", balanceNow: "Solde aujourd'hui : {amount}", pending: "Pas encore synchronisé", notTaken: "{count} classe(s) sans appel aujourd'hui" },
   shift: { morning: "Matin", afternoon: "Après-midi" },
   levelName: "{n}e année",
 };
