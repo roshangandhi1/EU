@@ -1,11 +1,12 @@
 import NetInfo from "@react-native-community/netinfo";
-import { SyncClient, type SyncOutcome } from "@eu/sync/client";
+import { DeviceRevokedError, SyncClient, type SyncOutcome } from "@eu/sync/client";
 import type { SqlStore } from "@eu/sync/sql-store";
 import * as Crypto from "expo-crypto";
 import { AppState } from "react-native";
 import { ApiError, httpTransport, registerDevice } from "./api";
 import { PIN_MAX_FAILURES, SYNC_INTERVAL_MS } from "./config";
 import { openStore } from "./db";
+import { EvidenceFiles } from "./files";
 import * as secure from "./secure";
 
 export type Phase = "loading" | "signIn" | "setPin" | "unlock" | "home" | "revoked";
@@ -13,6 +14,7 @@ export type Phase = "loading" | "signIn" | "setPin" | "unlock" | "home" | "revok
 export interface SyncStatus {
   running: boolean;
   pending: number;
+  photosPending: number;
   rejected: number;
   lastOk: string | null;
   last: SyncOutcome | null;
@@ -29,9 +31,11 @@ export class Session {
   phase: Phase = "loading";
   user: { id: string; name: string } | null = null;
   notice: string | null = null; // an i18n key to show on the next screen
-  status: SyncStatus = { running: false, pending: 0, rejected: 0, lastOk: null, last: null, offline: false };
+  status: SyncStatus = { running: false, pending: 0, photosPending: 0, rejected: 0, lastOk: null, last: null, offline: false };
   store!: SqlStore;
   client!: SyncClient;
+  /** Photo evidence: files.capture({ entity, scopeId }) → { fileId } to store in a record. */
+  files!: EvidenceFiles;
   private listeners = new Set<Listener>();
   private stopLoop: (() => void) | null = null;
 
@@ -49,8 +53,9 @@ export class Session {
   }
 
   async boot(): Promise<void> {
-    const { store } = await openStore(await secure.dbKey());
+    const { store, driver } = await openStore(await secure.dbKey());
     this.store = store;
+    this.files = await EvidenceFiles.open(driver, secure.token.get);
     this.client = new SyncClient(store, httpTransport(secure.token.get), { newId: () => Crypto.randomUUID() });
     this.user = await secure.savedUser();
     const [tok, hasPin] = await Promise.all([secure.token.get(), secure.pin.isSet()]);
@@ -67,6 +72,7 @@ export class Session {
         // Never mix two people's work: the previous user must sync first, then the phone is cleared.
         if ((await this.store.outboxSize()) > 0) return "auth.otherUserPending";
         await this.store.wipe();
+        await this.files.wipe();
       }
       await secure.token.set(res.token);
       this.user = { id: res.user.id, name: res.user.name };
@@ -142,8 +148,18 @@ export class Session {
     this.status = { ...this.status, running: true };
     this.emit();
     const out = await this.client.sync();
-    if (out.revoked) {
+    let revoked = out.revoked ?? false;
+    if (out.ok && !revoked) {
+      try {
+        await this.files.upload();
+      } catch (e) {
+        if (e instanceof DeviceRevokedError) revoked = true;
+      }
+    }
+    if (revoked) {
       this.stopLoop?.();
+      await this.store.wipe();
+      await this.files.wipe();
       await secure.forgetAll();
       this.user = null;
       this.go("revoked");
@@ -154,8 +170,12 @@ export class Session {
   }
 
   async refreshCounts(): Promise<void> {
-    const [pending, rejected] = await Promise.all([this.store.outboxSize(), this.store.rejections().then((r) => r.length)]);
-    this.status = { ...this.status, pending, rejected };
+    const [pending, rejected, photosPending] = await Promise.all([
+      this.store.outboxSize(),
+      this.store.rejections().then((r) => r.length),
+      this.files.pendingCount(),
+    ]);
+    this.status = { ...this.status, pending, rejected, photosPending };
     this.emit();
   }
 }

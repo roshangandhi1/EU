@@ -57,3 +57,12 @@ One history in `packages/db/migrations`. Generate with `npm run db:generate` onl
 - Sync runs on unlock, when the app returns to the foreground, every 5 minutes, and when the network comes back. The home screen shows pending, rejected and clock warnings.
 - Module screens go in `apps/mobile/src/modules/<stream>/`. They read and write only through `session.client`. A module's Home tile appears only when the phone holds a record for that stream, so multi-stream users see only what they need.
 - Build: `eas build -p android --profile preview` produces a signed APK for private distribution. This needs an Expo account, which is not set up yet.
+
+## Evidence photos
+
+- **Phone:** `session.files.capture({ entity, scopeId })` opens the camera. It compresses the photo to a 1600 px JPEG, adds GPS (a 10 s fix, otherwise the last known position) and device time, stores it in app-private storage (protected by Android device encryption; not SQLCipher), and returns `{ fileId }` straight away, offline. Store `fileId` in the record, e.g. `photoIds: z.array(z.string().uuid())`.
+- **Upload:** photos upload after each successful record sync (`POST /api/files`, multipart `meta` plus `file`), 10 per pass, and they are retried until accepted. A record never waits for its photo. `session.files.status(id)` returns `local`, `uploaded`, `rejected` or `missing`.
+- **Server:** `acceptUpload` checks the sha256, the entity's **write** permission at the scope, and the same scope rules as records. It stores the file privately in Vercel Blob (`evidence/<stream>/<id>.jpg`) and writes a `files` row. A retry with the same id and bytes is answered `duplicate`.
+- **Reading:** `GET /api/files/<id>` streams the photo to users who hold the entity's **read** permission.
+- **Indicators and exports:** use `uploadedFileIds(db, ids, cutoff?)`. A photo counts only once `uploaded_at` is on or before the cut-off.
+- **Storage:** needs `BLOB_READ_WRITE_TOKEN`, set for Production only. Without it, uploads answer 503 and phones keep the photos.

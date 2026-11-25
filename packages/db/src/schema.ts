@@ -170,3 +170,31 @@ export const loginAttempts = pgTable("login_attempts", {
   ok: boolean("ok").notNull(),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Photos and other evidence files. The phone picks the id when the photo is taken, so records can
+ * reference it offline; the row appears when the upload arrives. A file counts as evidence only
+ * once uploaded_at is set (and, for an export, on or before the cut-off).
+ */
+export const files = pgTable(
+  "files",
+  {
+    id: uuid("id").primaryKey(),
+    /** The entity whose write permission governs this file, e.g. "forestry.visit". */
+    entity: text("entity").notNull(),
+    scopeId: text("scope_id").notNull(),
+    mime: text("mime").notNull(),
+    bytes: integer("bytes").notNull(),
+    sha256: text("sha256").notNull(),
+    blobPath: text("blob_path").notNull(),
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    accuracyM: doublePrecision("accuracy_m"),
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull(),
+    clockSuspect: boolean("clock_suspect").notNull().default(false),
+    createdBy: text("created_by").notNull(),
+    deviceId: text("device_id"),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("files_scope").on(t.scopeId)],
+);

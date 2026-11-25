@@ -8,10 +8,7 @@
     "android": {
       "package": "cd.gocongo.eu",
       "versionCode": 1,
-      "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
-      ]
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "plugins": [
       [
@@ -22,10 +19,11 @@
       ],
       "expo-secure-store",
       "expo-localization",
+      ["expo-image-picker", { "cameraPermission": "GoCongo uses the camera to take evidence photos." }],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "GoCongo uses your location to find the plot or borehole you are at and to stamp records with GPS."
+          "locationWhenInUsePermission": "GoCongo uses your location to find the plot or borehole you are at and to stamp records and photos with GPS."
         }
       ]
     ],
