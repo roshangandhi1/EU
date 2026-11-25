@@ -13,7 +13,7 @@ export const boreholeEntities = [
   defineEntity({ name: "boreholes.population", stream: "boreholes", table: t.populationEstimates, schema: v.populationEstimateSchema, policy: "append_only",
     actions: { read: "boreholes.read", write: "boreholes.population.write", void: "boreholes.record.void" }, label: { en: "Population served", fr: "Population desservie" } }),
   defineEntity({ name: "boreholes.template", stream: "boreholes", table: t.maintenanceTemplates, schema: v.templateSchema, policy: "server_authoritative",
-    actions: { read: "boreholes.read", write: "boreholes.template.write" }, label: { en: "Maintenance template", fr: "Modèle d'entretien" } }),
-  defineEntity({ name: "boreholes.settings", stream: "boreholes", table: t.boreholeSettings, schema: z.object({}).passthrough(), policy: "server_authoritative",
-    actions: { read: "boreholes.read", write: "boreholes.settings.write" }, label: { en: "Borehole settings", fr: "Paramètres forages" } }),
+    actions: { read: "boreholes.read", write: "boreholes.template.write", configure: "boreholes.template.write" }, label: { en: "Maintenance template", fr: "Modèle d'entretien" } }),
+  defineEntity({ name: "boreholes.settings", stream: "boreholes", table: t.boreholeSettings, schema: z.object({ minFlowLpmByPumpKw: z.record(z.string(), z.number().positive().nullable()), maxCheckAgeDays: z.number().int().positive(), dueSoonDays: z.number().int().min(0), overdueGraceDays: z.number().int().min(0) }), policy: "server_authoritative",
+    actions: { read: "boreholes.read", write: "boreholes.settings.write", configure: "boreholes.settings.write" }, label: { en: "Borehole settings", fr: "Paramètres forages" } }),
 ];

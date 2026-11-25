@@ -14,6 +14,9 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@eu/core": "*",
+    "@eu/db": "*",
+    "@eu/sync": "*",
     "@tmcw/togeojson": "^7.1.2",
     "@turf/area": "^7.3.0",
     "@turf/bbox": "^7.3.0",
@@ -22,14 +25,13 @@
     "@xmldom/xmldom": "^0.9.8",
     "drizzle-orm": "0.45.4",
     "jszip": "^3.10.1",
-    "zod": "4.6.7",
-    "@eu/core": "*",
-    "@eu/db": "*",
-    "@eu/sync": "*"
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.6.0",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^22.20.6",
+    "drizzle-kit": "^0.31.11",
     "typescript": "5.9.3",
     "vitest": "5.1.1"
   }

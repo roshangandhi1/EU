@@ -1,11 +1,13 @@
 /**
  * Forestry module tables: bamboo (indicator 2.2.1) and miombo (2.1.1), plus the shared nursery.
  *
- * Plots are platform `sites` rows (kind 'plot'); everything here is keyed by site_id.
- * scope_id (from syncColumns) is the site id for per-site records, which drives what each phone pulls.
+ * Plots are platform `sites` rows (kind 'plot'). Every per-plot record uses scope_id (from
+ * syncColumns) as its plot's site id, which also drives what each phone pulls. Nursery records are
+ * scoped to the nursery site, validation visits to the village site, settings and imagery to the
+ * stream (scope_id = 'bamboo' | 'miombo').
  */
 import {
-  boolean, date, doublePrecision, index, integer, jsonb, numeric, pgEnum, pgTable, text, uuid,
+  boolean, date, uniqueIndex, doublePrecision, index, integer, jsonb, numeric, pgEnum, pgTable, text, uuid,
 } from "drizzle-orm/pg-core";
 import { syncColumns } from "../platform";
 import { multiPolygon, point } from "./geometry";
@@ -29,7 +31,6 @@ const gps = () => ({
 /** Attributes of a plot. Policy: field_merge (edited mostly on web; field edits become proposals). */
 export const plots = pgTable("forestry_plots", {
   ...syncColumns(),
-  siteId: uuid("site_id").notNull().unique(),
   stream: forestryStream("stream").notNull(),
   code: text("code").notNull(), // e.g. KBK-B-007
   localName: text("local_name"),
@@ -43,7 +44,7 @@ export const plots = pgTable("forestry_plots", {
   communityContacts: jsonb("community_contacts").$type<{ name: string; role: string; phone?: string }[]>(),
   publicVisible: boolean("public_visible").notNull().default(false),
   notes: text("notes"),
-}, (t) => [index("forestry_plots_stream_idx").on(t.stream)]);
+}, (t) => [uniqueIndex("forestry_plots_site_unique").on(t.scopeId), index("forestry_plots_stream_idx").on(t.stream)]);
 
 /**
  * Versioned plot boundaries. Append-only; exactly one per plot may be authoritative at a time
@@ -52,16 +53,17 @@ export const plots = pgTable("forestry_plots", {
  */
 export const plotBoundaries = pgTable("forestry_plot_boundaries", {
   ...syncColumns(),
-  siteId: uuid("site_id").notNull(),
   geom: multiPolygon("geom").notNull(),
+  /** [minLng, minLat, maxLng, maxLat], for map fitting and cheap overlap pre-checks. */
+  bbox: jsonb("bbox").$type<[number, number, number, number]>().notNull(),
   source: boundarySource("source").notNull(),
   sourceRef: text("source_ref"), // file name / KML placemark id / imagery layer id
   gpsAccuracyM: doublePrecision("gps_accuracy_m"), // phone walks only
   areaHa: numeric("area_ha", { precision: 12, scale: 4 }), // server-computed
   authoritative: boolean("authoritative").notNull().default(false),
   authoritativeFrom: date("authoritative_from"), // as-at reports use the boundary in force on the date
-  approvedBy: uuid("approved_by"),
-}, (t) => [index("forestry_boundaries_site_idx").on(t.siteId)]);
+  approvedBy: text("approved_by"),
+}, (t) => [index("forestry_boundaries_site_idx").on(t.scopeId)]);
 
 export type PlantingLine = { species: string; count: number; batchId?: string; natural?: false };
 
@@ -69,7 +71,6 @@ export type PlantingLine = { species: string; count: number; batchId?: string; n
 export const plantingEvents = pgTable("forestry_planting_events", {
   ...syncColumns(),
   ...gps(),
-  siteId: uuid("site_id").notNull(),
   plantedOn: date("planted_on").notNull(),
   lines: jsonb("lines").$type<PlantingLine[]>().notNull(),
   isGapFilling: boolean("is_gap_filling").notNull().default(false),
@@ -77,7 +78,7 @@ export const plantingEvents = pgTable("forestry_planting_events", {
   team: text("team"),
   photos: jsonb("photos").$type<string[]>().notNull().default([]), // platform file ids
   notes: text("notes"),
-}, (t) => [index("forestry_planting_site_idx").on(t.siteId, t.plantedOn)]);
+}, (t) => [index("forestry_planting_site_idx").on(t.scopeId, t.plantedOn)]);
 
 export type SampleCount = {
   species: string;
@@ -103,7 +104,6 @@ export type SamplePlot = {
 export const monitoringVisits = pgTable("forestry_monitoring_visits", {
   ...syncColumns(),
   ...gps(),
-  siteId: uuid("site_id").notNull(),
   visitedOn: date("visited_on").notNull(),
   sampleSeed: integer("sample_seed"), // seed used to place sample points
   samples: jsonb("samples").$type<SamplePlot[]>().notNull().default([]),
@@ -117,12 +117,11 @@ export const monitoringVisits = pgTable("forestry_monitoring_visits", {
   droneSurveyOn: date("drone_survey_on"),
   orthomosaicLayerId: uuid("orthomosaic_layer_id"),
   notes: text("notes"),
-}, (t) => [index("forestry_visits_site_idx").on(t.siteId, t.visitedOn)]);
+}, (t) => [index("forestry_visits_site_idx").on(t.scopeId, t.visitedOn)]);
 
 /** Fixed photo points per plot, so the same view can be compared year on year. Field-merge. */
 export const photoPoints = pgTable("forestry_photo_points", {
   ...syncColumns(),
-  siteId: uuid("site_id").notNull(),
   label: text("label").notNull(),
   location: point("location").notNull(),
   bearingDeg: integer("bearing_deg"),
@@ -144,7 +143,6 @@ export const validationVisits = pgTable("forestry_validation_visits", {
 /** Nursery batches (shared by bamboo and miombo). Field-merge; scope = the nursery site. */
 export const nurseryBatches = pgTable("forestry_nursery_batches", {
   ...syncColumns(),
-  nurserySiteId: uuid("nursery_site_id").notNull(),
   code: text("code").notNull(),
   stream: forestryStream("stream").notNull(),
   species: text("species").notNull(),
@@ -161,7 +159,7 @@ export const nurseryEvents = pgTable("forestry_nursery_events", {
   occurredOn: date("occurred_on").notNull(),
   kind: text("kind").$type<"germination_count" | "loss" | "dispatch">().notNull(),
   quantity: integer("quantity").notNull(),
-  toPlotSiteId: uuid("to_plot_site_id"), // dispatch only
+  toPlotSiteId: text("to_plot_site_id"), // dispatch only
   notes: text("notes"),
 });
 

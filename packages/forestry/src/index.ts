@@ -7,5 +7,5 @@ export * from "./import/kml";
 export { forestryActions } from "./actions";
 export { forestryEntities } from "./entities";
 export { defaultSettings } from "./defaults";
-export { en as forestryEn } from "./i18n/en";
-export { fr as forestryFr } from "./i18n/fr";
+export { strings as forestryStrings, registerForestryStrings } from "./i18n";
+export { fa, FORESTRY_STREAMS, type ForestryStream } from "./actions";

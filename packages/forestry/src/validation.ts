@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const uuid = z.uuid();
+const siteId = z.string().min(1).max(64);
 const count = z.number().int().min(0).max(1_000_000);
 const gps = {
   gpsLat: z.number().min(-90).max(90).nullable().optional(),
@@ -13,7 +14,6 @@ const gps = {
 export const stream = z.enum(["bamboo", "miombo"]);
 
 export const plotSchema = z.object({
-  siteId: uuid,
   stream,
   code: z.string().min(1).max(40),
   localName: z.string().max(120).nullable().optional(),
@@ -36,7 +36,6 @@ export const multiPolygonSchema = z.object({
 });
 
 export const boundarySchema = z.object({
-  siteId: uuid,
   geom: multiPolygonSchema,
   source: z.enum(["phone_walk", "imagery_drawn", "kmz_import", "geojson_import", "shapefile_import", "survey"]),
   sourceRef: z.string().nullable().optional(),
@@ -44,7 +43,6 @@ export const boundarySchema = z.object({
 });
 
 export const plantingEventSchema = z.object({
-  siteId: uuid,
   plantedOn: isoDate,
   lines: z.array(z.object({ species: z.string().min(1), count: count.min(1), batchId: uuid.optional() })).min(1),
   isGapFilling: z.boolean().default(false),
@@ -74,7 +72,6 @@ export const samplePlotSchema = z.object({
 });
 
 export const monitoringVisitSchema = z.object({
-  siteId: uuid,
   visitedOn: isoDate,
   sampleSeed: z.number().int().nullable().optional(),
   samples: z.array(samplePlotSchema).default([]),
@@ -96,14 +93,13 @@ export const validationVisitSchema = z.object({
   heldOn: isoDate,
   village: z.string().min(1),
   attendees: z.array(z.object({ name: z.string().min(1), role: z.string().min(1) })).min(1),
-  plotSiteIds: z.array(uuid).min(1),
+  plotSiteIds: z.array(siteId).min(1),
   attendanceSheetFileId: z.string().nullable().optional(),
   notes: z.string().max(4000).nullable().optional(),
   ...gps,
 });
 
 export const nurseryBatchSchema = z.object({
-  nurserySiteId: uuid,
   code: z.string().min(1).max(40),
   stream,
   species: z.string().min(1),
@@ -118,7 +114,7 @@ export const nurseryEventSchema = z.object({
   occurredOn: isoDate,
   kind: z.enum(["germination_count", "loss", "dispatch"]),
   quantity: count.min(1),
-  toPlotSiteId: uuid.nullable().optional(),
+  toPlotSiteId: siteId.nullable().optional(),
   notes: z.string().max(4000).nullable().optional(),
 }).refine((e) => e.kind !== "dispatch" || !!e.toPlotSiteId, { message: "dispatch_needs_plot", path: ["toPlotSiteId"] });
 

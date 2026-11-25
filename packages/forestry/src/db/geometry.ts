@@ -1,19 +1,11 @@
-import { customType } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { jsonb } from "drizzle-orm/pg-core";
 import type { MultiPolygon, Point } from "geojson";
-import { parseWkbHex } from "../geo/wkb";
 
-/** PostGIS MultiPolygon in WGS84. Written from GeoJSON, read back from WKB hex. */
-export const multiPolygon = customType<{ data: MultiPolygon; driverData: string }>({
-  dataType: () => "geometry(MultiPolygon,4326)",
-  toDriver: (v) =>
-    sql`ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(v)}), 4326))` as unknown as string,
-  fromDriver: (v) => parseWkbHex(v) as MultiPolygon,
-});
-
-/** PostGIS Point in WGS84. */
-export const point = customType<{ data: Point; driverData: string }>({
-  dataType: () => "geometry(Point,4326)",
-  toDriver: (v) => sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(v)}), 4326)` as unknown as string,
-  fromDriver: (v) => parseWkbHex(v) as Point,
-});
+/**
+ * Geometry is stored as GeoJSON (WGS84) in jsonb for now, because the PGlite test database has
+ * no PostGIS. Areas are computed on the server with a geodesic formula (see geo/area.ts).
+ * A later migration adds PostGIS geometry columns generated from these, for spatial queries
+ * and tile serving, without changing the module's API.
+ */
+export const multiPolygon = (name: string) => jsonb(name).$type<MultiPolygon>();
+export const point = (name: string) => jsonb(name).$type<Point>();

@@ -49,7 +49,7 @@ export const fr: Record<ForestryKey, string> = {
   "forestry.import.problem.area_implausible": "Superficie supérieure à 200 ha",
   "forestry.import.problem.ring_too_short": "Limite avec trop peu de points",
   "forestry.import.problem.outside_drc": "Hors de la RDC",
-  "forestry.nursery": "Pépinière",
+  "forestry.nursery.title": "Pépinière",
   "forestry.nursery.germination_pct": "Taux de germination %",
   "forestry.validation": "Validation communautaire",
 };

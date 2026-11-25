@@ -1,23 +1,36 @@
-import type { ActionMap } from "./platform";
+import type { ActionMap, Role } from "./platform";
 
-const both = ["bamboo", "miombo"] as const;
-const field = ["system_admin", "programme_manager", "stream_lead", "field_officer"] as const;
-const lead = ["system_admin", "programme_manager", "stream_lead"] as const;
-const all = [...field, "viewer"] as const;
+export type ForestryStream = "bamboo" | "miombo";
+export const FORESTRY_STREAMS: ForestryStream[] = ["bamboo", "miombo"];
 
-export const forestryActions = {
-  "forestry.plot.read": { stream: [...both], roles: [...all] },
-  "forestry.plot.write": { stream: [...both], roles: [...lead] },
-  "forestry.plot.propose": { stream: [...both], roles: [...field] },
-  "forestry.boundary.write": { stream: [...both], roles: [...field] },
-  "forestry.boundary.approve": { stream: [...both], roles: [...lead] },
-  "forestry.planting.write": { stream: [...both], roles: [...field] },
-  "forestry.visit.write": { stream: [...both], roles: [...field] },
-  "forestry.record.void": { stream: [...both], roles: [...lead] },
-  "forestry.validation.write": { stream: [...both], roles: [...field] },
-  "forestry.nursery.write": { stream: [...both], roles: [...field] },
-  "forestry.import.run": { stream: [...both], roles: [...lead] },
-  "forestry.imagery.manage": { stream: [...both], roles: [...lead] },
-  "forestry.settings.write": { stream: [...both], roles: ["system_admin", "programme_manager"] },
-  "forestry.publish": { stream: [...both], roles: ["system_admin", "programme_manager"] },
-} satisfies ActionMap;
+const field: Role[] = ["system_admin", "programme_manager", "stream_lead", "field_officer"];
+const lead: Role[] = ["system_admin", "programme_manager", "stream_lead"];
+const manager: Role[] = ["system_admin", "programme_manager"];
+
+/**
+ * Bamboo and miombo share tables but are separate streams, so a user can be given one without
+ * the other. Every action exists once per stream: "bamboo.visit.write", "miombo.visit.write", ...
+ */
+const verbs = {
+  "plot.read": [...field, "viewer"],
+  "plot.write": lead,
+  "plot.propose": field,
+  "boundary.write": field,
+  "boundary.approve": lead,
+  "planting.write": field,
+  "visit.write": field,
+  "record.void": lead,
+  "validation.write": field,
+  "nursery.write": field,
+  "import.run": lead,
+  "imagery.manage": lead,
+  "settings.write": manager,
+  "publish": manager,
+} satisfies Record<string, Role[]>;
+export type ForestryVerb = keyof typeof verbs;
+
+export const fa = (stream: ForestryStream, verb: ForestryVerb) => `${stream}.${verb}`;
+
+export const forestryActions: ActionMap = Object.fromEntries(
+  FORESTRY_STREAMS.flatMap((s) => Object.entries(verbs).map(([v, roles]) => [fa(s, v as ForestryVerb), { stream: s, roles }])),
+);

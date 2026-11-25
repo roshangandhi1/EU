@@ -1,9 +1,10 @@
 /**
  * Boreholes module tables (indicator 1.1.1). Boreholes are platform `sites` rows (kind 'borehole').
+ * Per-borehole records use scope_id = the borehole's site id; templates and settings use scope_id = 'boreholes'.
  * Only GoCongo technicians use the field app for this module (no caretaker view).
  */
 import {
-  boolean, date, doublePrecision, index, integer, jsonb, pgEnum, pgTable, text, uuid,
+  boolean, date, uniqueIndex, doublePrecision, index, integer, jsonb, pgEnum, pgTable, text, uuid,
 } from "drizzle-orm/pg-core";
 import { syncColumns } from "../platform";
 import type { Frequency, ProofSpec, AppliesTo, TaskResult, OperationalCheck } from "../types";
@@ -15,7 +16,6 @@ export const lifecycle = pgEnum("borehole_lifecycle", [
 /** Borehole attributes. Policy: field_merge (master data edited on web; field edits are proposals). */
 export const boreholes = pgTable("borehole_attributes", {
   ...syncColumns(),
-  siteId: uuid("site_id").notNull().unique(),
   code: text("code").notNull(), // e.g. BH-017
   village: text("village").notNull(),
   gpsLat: doublePrecision("gps_lat"),
@@ -50,12 +50,11 @@ export const boreholes = pgTable("borehole_attributes", {
   attachments: jsonb("attachments").$type<Record<string, string[]>>().notNull().default({}),
   publicVisible: boolean("public_visible").notNull().default(false),
   notes: text("notes"),
-}, (t) => [index("borehole_village_idx").on(t.village)]);
+}, (t) => [uniqueIndex("borehole_site_unique").on(t.scopeId), index("borehole_village_idx").on(t.village)]);
 
 /** Population served estimates. Append-only, always with the method used. */
 export const populationEstimates = pgTable("borehole_population_estimates", {
   ...syncColumns(),
-  siteId: uuid("site_id").notNull(),
   estimatedOn: date("estimated_on").notNull(),
   method: text("method").$type<"household_count" | "collection_headcount" | "village_census">().notNull(),
   households: integer("households"),
@@ -97,7 +96,6 @@ export const visits = pgTable("borehole_visits", {
   gpsLat: doublePrecision("gps_lat"),
   gpsLng: doublePrecision("gps_lng"),
   gpsAccuracyM: doublePrecision("gps_accuracy_m"),
-  siteId: uuid("site_id").notNull(),
   visitedOn: date("visited_on").notNull(),
   kind: text("kind").$type<"routine" | "repair" | "inspection" | "commissioning">().notNull(),
   templateKey: text("template_key"),
@@ -113,12 +111,11 @@ export const visits = pgTable("borehole_visits", {
   faultsClosed: jsonb("faults_closed").$type<string[]>().notNull().default([]),
   photos: jsonb("photos").$type<string[]>().notNull().default([]),
   notes: text("notes"),
-}, (t) => [index("borehole_visits_site_idx").on(t.siteId, t.visitedOn)]);
+}, (t) => [index("borehole_visits_site_idx").on(t.scopeId, t.visitedOn)]);
 
 /** Faults: opened by a failed check, closed by a repair visit. Later edit wins, history kept. */
 export const faults = pgTable("borehole_faults", {
   ...syncColumns(),
-  siteId: uuid("site_id").notNull(),
   openedOn: date("opened_on").notNull(),
   openedByVisitId: uuid("opened_by_visit_id"),
   taskKey: text("task_key"),

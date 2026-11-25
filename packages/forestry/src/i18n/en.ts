@@ -47,7 +47,7 @@ export const en = {
   "forestry.import.problem.area_implausible": "Area over 200 ha",
   "forestry.import.problem.ring_too_short": "Boundary has too few points",
   "forestry.import.problem.outside_drc": "Outside the DRC",
-  "forestry.nursery": "Nursery",
+  "forestry.nursery.title": "Nursery",
   "forestry.nursery.germination_pct": "Germination %",
   "forestry.validation": "Community validation",
 } as const;

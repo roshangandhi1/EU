@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const uuid = z.uuid();
+const siteId = z.string().min(1).max(64);
 const bi = z.object({ en: z.string().min(1), fr: z.string().min(1) });
 
 export const frequencySchema = z.discriminatedUnion("kind", [
@@ -19,7 +20,7 @@ export const proofSchema = z.discriminatedUnion("kind", [
 
 export const appliesToSchema = z.union([
   z.object({ all: z.literal(true) }),
-  z.object({ pumpRatingsKw: z.array(z.number()).optional(), villages: z.array(z.string()).optional(), siteIds: z.array(uuid).optional() }),
+  z.object({ pumpRatingsKw: z.array(z.number()).optional(), villages: z.array(z.string()).optional(), siteIds: z.array(siteId).optional() }),
 ]);
 
 export const taskDefSchema = z.object({
@@ -39,7 +40,6 @@ export const templateSchema = z.object({
 });
 
 export const boreholeSchema = z.object({
-  siteId: uuid,
   code: z.string().min(1).max(40),
   village: z.string().min(1),
   gpsLat: z.number().min(-90).max(90).nullable().optional(),
@@ -73,7 +73,6 @@ export const taskResultSchema = z.object({
 });
 
 export const visitSchema = z.object({
-  siteId: uuid,
   visitedOn: isoDate,
   kind: z.enum(["routine", "repair", "inspection", "commissioning"]),
   templateKey: z.string().nullable().optional(),
@@ -95,7 +94,6 @@ export const visitSchema = z.object({
 });
 
 export const populationEstimateSchema = z.object({
-  siteId: uuid,
   estimatedOn: isoDate,
   method: z.enum(["household_count", "collection_headcount", "village_census"]),
   households: z.number().int().min(0).nullable().optional(),
@@ -109,7 +107,6 @@ export const populationEstimateSchema = z.object({
 });
 
 export const faultSchema = z.object({
-  siteId: uuid,
   openedOn: isoDate,
   openedByVisitId: uuid.nullable().optional(),
   taskKey: z.string().nullable().optional(),
