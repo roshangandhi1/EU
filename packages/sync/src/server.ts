@@ -405,7 +405,9 @@ export async function handlePull(ctx: SyncContext, req: PullRequest): Promise<Pu
     const entity = ctx.entities.get(name)!;
     const cols = getTableColumns(entity.table) as Record<string, AnyDb>;
     const rows = (await db.select().from(entity.table).where(and(inArray(cols.id, [...ids])))) as Row[];
-    for (const row of rows) changes.push({ entity: name, record: toWire(row) });
+    let records = rows.map(toWire) as Row[];
+    if (entity.decorate) records = await entity.decorate(db, records);
+    for (const record of records) changes.push({ entity: name, record: record as WireRecord });
   }
 
   const last = batch.at(-1);

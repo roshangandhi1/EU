@@ -1,7 +1,18 @@
+import { sites } from "@eu/db";
 import { defineEntity } from "@eu/sync";
+import { inArray } from "drizzle-orm";
 import * as m from "./model";
 import * as t from "./db/schema";
 import { validatePayment } from "./queries";
+
+/** Phones show the school's name, which lives on the sites table: add it to pulled school records. */
+async function withSiteName(tx: any, records: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  const ids = [...new Set(records.map((r) => r.siteId as string))];
+  if (ids.length === 0) return records;
+  const rows = (await tx.select({ id: sites.id, name: sites.name }).from(sites).where(inArray(sites.id, ids))) as { id: string; name: string }[];
+  const names = new Map(rows.map((r) => [r.id, r.name]));
+  return records.map((r) => ({ ...r, name: names.get(r.siteId as string) ?? null }));
+}
 
 const config = { read: "school.read", write: "school.configure", configure: "school.configure" } as const;
 
@@ -10,7 +21,7 @@ const config = { read: "school.read", write: "school.configure", configure: "sch
  * handling"). Register with: entities.register(...schoolsEntities).
  */
 export const schoolsEntities = [
-  defineEntity({ name: "school.school", stream: "schools", table: t.schoolSchools, schema: m.school, policy: "server_authoritative", actions: config, label: { en: "School", fr: "École" } }),
+  defineEntity({ name: "school.school", stream: "schools", table: t.schoolSchools, schema: m.school, policy: "server_authoritative", actions: config, label: { en: "School", fr: "École" }, decorate: withSiteName }),
   defineEntity({ name: "school.academic_year", stream: "schools", table: t.schoolAcademicYears, schema: m.academicYear, policy: "server_authoritative", actions: config, label: { en: "Academic year", fr: "Année scolaire" } }),
   defineEntity({ name: "school.term", stream: "schools", table: t.schoolTerms, schema: m.term, policy: "server_authoritative", actions: config, label: { en: "Term", fr: "Trimestre" } }),
   defineEntity({ name: "school.classroom", stream: "schools", table: t.schoolClassrooms, schema: m.classroom, policy: "server_authoritative", actions: config, label: { en: "Classroom", fr: "Salle de classe" } }),

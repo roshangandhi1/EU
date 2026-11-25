@@ -35,6 +35,11 @@ export interface EntityDef {
    * it translated), or undefined to accept. Runs on the server only; never on the phone.
    */
   validate?: (ctx: EntityValidateContext, change: EntityChange) => Promise<string | undefined>;
+  /**
+   * Optional: add read-only fields to records sent to phones on pull (for example a name kept on
+   * another table). The extra fields are for display; phones never send them back. Server only.
+   */
+  decorate?: (tx: any, records: Record<string, unknown>[]) => Promise<Record<string, unknown>[]>;
 }
 
 /** What `validate` receives. `tx` is the Drizzle transaction (typed loosely to keep this file phone-safe). */

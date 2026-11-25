@@ -224,3 +224,14 @@ describe("schools entities on the sync engine", () => {
     expect((await a.store.rejections())).toHaveLength(6);
   });
 });
+
+describe("school records on the phone carry the site name", () => {
+  it("adds the name from the sites table on pull", async () => {
+    const m = device("web-manager", manager);
+    const id = await m.client.create("school.school", SITE, { siteId: SITE, code: "LUN", locale: "fr", shiftsRunning: ["morning"] });
+    expect((await m.client.sync()).ok).toBe(true);
+    const h = device("phone-head", head);
+    await h.client.sync();
+    expect((await h.store.getServerRecord("school.school", id))?.name).toBe("École Luniemu");
+  });
+});
