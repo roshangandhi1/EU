@@ -1,0 +1,23 @@
+:root {
+  /* Provisional tokens sampled from the GoCongo logo; replace when the brand kit arrives. */
+  --gc-green: #1c6b33;
+  --gc-lime: #afc437;
+  --gc-yellow: #e8d72c;
+  --gc-orange: #e8a827;
+  --eu-blue: #003399;
+  --eu-yellow: #ffcc00;
+  --bg: #ffffff;
+  --text: #1a1a1a;
+  --muted: #5a5a5a;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1a12; --text: #f1f1f1; --muted: #b5b5b5; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
