@@ -1,0 +1,45 @@
+import type { schools as en } from "./en";
+
+type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
+
+export const schools: Shape<typeof en> = {
+  nav: { schools: "Écoles", overview: "Aperçu", students: "Élèves", attendance: "Présences", fees: "Frais scolaires", reports: "Rapports", setup: "Paramètres" },
+  common: {
+    save: "Enregistrer", add: "Ajouter", cancel: "Annuler", none: "Aucun pour l'instant", date: "Date", name: "Nom", status: "Statut", total: "Total",
+    actions: "Actions", saved: "Enregistré.", forbidden: "Vous n'avez pas l'autorisation de faire ceci.", invalid: "Certaines valeurs manquent ou sont invalides.",
+    noAccess: "Vous n'avez encore accès à aucune école. Demandez à l'équipe du programme de vous ajouter.", downloadCsv: "Télécharger CSV", optional: "facultatif",
+    rejected: "Non enregistré : {reason}", yes: "Oui", no: "Non", from: "Du", to: "Au", level: "Niveau", class: "Classe", shift: "Vacation",
+  },
+  list: { title: "Écoles", subtitle: "Écoles primaires du programme", pupils: "Élèves inscrits", places: "Places élèves", open: "Ouvrir", addSchool: "Ajouter une école",
+    siteId: "Identifiant court", siteIdHint: "En minuscules, ex. luniemu", code: "Code", codeHint: "2 à 12 lettres, utilisé dans les matricules, ex. LUN" },
+  overview: { enrolled: "Élèves inscrits", girls: "Filles", places: "Places élèves", placesHint: "{baseline} existantes + {new} nouvelles, {shifts} vacation(s)",
+    registersToday: "Appels faits aujourd'hui", collectedMonth: "Frais perçus ce mois-ci", arrears: "Frais en retard", notSetUp: "Cette école n'est pas encore paramétrée. Commencez par Paramètres." },
+  student: {
+    title: "Élèves", add: "Inscrire un élève", firstName: "Prénom", lastName: "Nom", postName: "Post-nom", sex: "Sexe", female: "Fille", male: "Garçon",
+    dateOfBirth: "Date de naissance", birthYearEstimate: "Année de naissance estimée", birthHint: "Indiquez une date de naissance ou une année estimée",
+    guardianName: "Parent ou tuteur", guardianPhone: "Téléphone du tuteur", village: "Village", studentNumber: "Matricule",
+    duplicateWarning: "Cet enfant est peut-être déjà inscrit : {matches}. S'il s'agit d'un autre enfant, cochez la case et enregistrez à nouveau.",
+    confirmDifferent: "C'est un autre enfant", enrolledIn: "Classe", enrolledOn: "Date d'inscription", leave: "Enregistrer un départ", leftOn: "Date de départ",
+    statuses: { active: "Actif", transferred: "Transféré", dropped_out: "Abandon", completed: "Terminé" }, search: "Rechercher par nom ou matricule",
+  },
+  attendance: { title: "Présences", takeRegister: "Faire l'appel", chooseClass: "Choisissez une classe et une date", markAbsent: "Cochez les élèves absents. Tous les autres sont marqués présents.",
+    saveRegister: "Enregistrer l'appel", notTaken: "Appel non fait", taken: "Appel fait", present: "Présents", absent: "Absents", rate: "Taux de présence",
+    chronic: "Absents 5 jours ou plus ce mois-ci", reason: "Motif",
+    reasons: { sick: "Malade", fees: "Frais", work: "Travail", family: "Famille", unknown: "Inconnu" } },
+  fees: { title: "Frais scolaires", payment: "Enregistrer un paiement", amount: "Montant (FC)", receiptNumber: "Numéro de reçu", paidOn: "Date du paiement", balance: "Solde", charged: "Dû", paid: "Payé",
+    overdue: "En retard", void: "Annuler", voidReason: "Motif de l'annulation", voided: "Annulé", notInBook: "Ce numéro de reçu n'est pas dans un carnet qui vous est attribué.",
+    alreadyUsed: "Ce numéro de reçu est déjà utilisé.", duplicates: "Numéros de reçu utilisés deux fois (à vérifier après synchronisation) : {numbers}", daily: "Encaissements par jour",
+    receipts: "Reçus", arrears: "Élèves avec des frais en retard", recent: "Paiements récents", student: "Élève" },
+  capacity: { title: "Registre des salles", places: "Places élèves", baseline: "Existantes", new: "Nouvelles", seatsPerShift: "Places par vacation", shifts: "Vacations en cours",
+    asAt: "Au", commissionedOn: "En service depuis", decommissionedOn: "Hors service depuis", evidenceUrl: "Lien de preuve (rapport d'ingénieur)", basis: "Base", room: "Salle" },
+  setup: { title: "Paramètres", school: "Informations de l'école", shiftsRunning: "Vacations de l'école", year: "Années scolaires", yearLabel: "Libellé", startsOn: "Début", endsOn: "Fin",
+    term: "Trimestres", termNumber: "Trimestre", classrooms: "Salles de classe", classes: "Classes", section: "Section", classroom: "Salle",
+    feeItems: "Frais", feeName: "Frais", levels: "Niveaux", levelsHint: "ex. 1-6 ou 1,2,3", dueOn: "Échéance",
+    receiptBooks: "Carnets de reçus", firstNumber: "Premier numéro", lastNumber: "Dernier numéro", assignedTo: "Attribué à", exemptions: "Exonérations",
+    kind: "Type", kinds: { full: "Totale", percent: "Pourcentage", fixed: "Montant fixe (FC)" }, value: "Valeur", reason: "Motif", configureOnly: "Seule l'équipe du programme peut modifier les paramètres." },
+  reports: { title: "Rapports", placesAsAt: "Places élèves au", enrolmentAsAt: "Effectifs au", byLevel: "Par niveau", byShift: "Par vacation", bySex: "Par sexe",
+    evidence: "Mode preuve (pour un évaluateur)", evidenceHint: "Ne compte que les données reçues par le serveur avant la date limite.", cutoff: "Date limite", counted: "Comptés",
+    lateSynced: "Saisi avant la date limite mais synchronisé après. À vérifier avant de l'inclure.", clock: "Données avec une horloge d'appareil suspecte" },
+  shift: { morning: "Matin", afternoon: "Après-midi" },
+  levelName: "{n}e année",
+};

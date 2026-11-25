@@ -1,0 +1,161 @@
+import NetInfo from "@react-native-community/netinfo";
+import { SyncClient, type SyncOutcome } from "@eu/sync/client";
+import type { SqlStore } from "@eu/sync/sql-store";
+import * as Crypto from "expo-crypto";
+import { AppState } from "react-native";
+import { ApiError, httpTransport, registerDevice } from "./api";
+import { PIN_MAX_FAILURES, SYNC_INTERVAL_MS } from "./config";
+import { openStore } from "./db";
+import * as secure from "./secure";
+
+export type Phase = "loading" | "signIn" | "setPin" | "unlock" | "home" | "revoked";
+
+export interface SyncStatus {
+  running: boolean;
+  pending: number;
+  rejected: number;
+  lastOk: string | null;
+  last: SyncOutcome | null;
+  offline: boolean;
+}
+
+type Listener = () => void;
+
+/**
+ * Everything the app knows that is not a screen: the encrypted store, the sync client,
+ * who is signed in, and when to sync. Screens read `phase`/`status` and call the methods.
+ */
+export class Session {
+  phase: Phase = "loading";
+  user: { id: string; name: string } | null = null;
+  notice: string | null = null; // an i18n key to show on the next screen
+  status: SyncStatus = { running: false, pending: 0, rejected: 0, lastOk: null, last: null, offline: false };
+  store!: SqlStore;
+  client!: SyncClient;
+  private listeners = new Set<Listener>();
+  private stopLoop: (() => void) | null = null;
+
+  subscribe(l: Listener): () => void {
+    this.listeners.add(l);
+    return () => this.listeners.delete(l);
+  }
+  private emit() {
+    for (const l of this.listeners) l();
+  }
+  private go(phase: Phase, notice: string | null = null) {
+    this.phase = phase;
+    this.notice = notice;
+    this.emit();
+  }
+
+  async boot(): Promise<void> {
+    const { store } = await openStore(await secure.dbKey());
+    this.store = store;
+    this.client = new SyncClient(store, httpTransport(secure.token.get), { newId: () => Crypto.randomUUID() });
+    this.user = await secure.savedUser();
+    const [tok, hasPin] = await Promise.all([secure.token.get(), secure.pin.isSet()]);
+    await this.refreshCounts();
+    this.go(!tok ? "signIn" : hasPin ? "unlock" : "setPin");
+  }
+
+  async signIn(email: string, password: string): Promise<string | null> {
+    const id = await secure.deviceId();
+    try {
+      const res = await registerDevice(email.trim(), password, id, "Android");
+      const previous = await secure.savedUser();
+      if (previous && previous.id !== res.user.id) {
+        // Never mix two people's work: the previous user must sync first, then the phone is cleared.
+        if ((await this.store.outboxSize()) > 0) return "auth.otherUserPending";
+        await this.store.wipe();
+      }
+      await secure.token.set(res.token);
+      this.user = { id: res.user.id, name: res.user.name };
+      await secure.saveUser(this.user);
+      this.go("setPin");
+      return null;
+    } catch (e) {
+      if (e instanceof ApiError) {
+        if (e.code === "offline") return "auth.offline";
+        if (e.code === "locked") return "auth.locked";
+        if (e.status === 401) return "auth.invalid";
+      }
+      return "sync.failed";
+    }
+  }
+
+  async setPin(value: string): Promise<void> {
+    await secure.pin.set(value);
+    this.enterHome();
+  }
+
+  async unlock(value: string): Promise<{ ok: true } | { ok: false; remaining: number }> {
+    const r = await secure.pin.check(value, PIN_MAX_FAILURES);
+    if (r === "ok") {
+      this.enterHome();
+      return { ok: true };
+    }
+    if (r <= 0) {
+      await secure.pin.lockOut();
+      this.go("signIn", "auth.pinLockedOut");
+    }
+    return { ok: false, remaining: r };
+  }
+
+  lock(): void {
+    this.stopLoop?.();
+    this.stopLoop = null;
+    this.go("unlock");
+  }
+
+  private enterHome() {
+    this.go("home");
+    this.startLoop();
+  }
+
+  /** Sync now, when the app comes to the foreground, every few minutes, and when the network returns. */
+  private startLoop() {
+    this.stopLoop?.();
+    void this.syncNow();
+    const timer = setInterval(() => void this.syncNow(), SYNC_INTERVAL_MS);
+    const appSub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void this.syncNow();
+    });
+    let wasOffline = false;
+    const netUnsub = NetInfo.addEventListener((n) => {
+      const offline = n.isConnected === false;
+      if (wasOffline && !offline) void this.syncNow();
+      wasOffline = offline;
+      if (this.status.offline !== offline) {
+        this.status = { ...this.status, offline };
+        this.emit();
+      }
+    });
+    this.stopLoop = () => {
+      clearInterval(timer);
+      appSub.remove();
+      netUnsub();
+    };
+  }
+
+  async syncNow(): Promise<void> {
+    if (this.status.running || this.phase !== "home") return;
+    this.status = { ...this.status, running: true };
+    this.emit();
+    const out = await this.client.sync();
+    if (out.revoked) {
+      this.stopLoop?.();
+      await secure.forgetAll();
+      this.user = null;
+      this.go("revoked");
+      return;
+    }
+    this.status = { ...this.status, running: false, last: out, lastOk: out.ok ? new Date().toISOString() : this.status.lastOk };
+    await this.refreshCounts();
+  }
+
+  async refreshCounts(): Promise<void> {
+    const [pending, rejected] = await Promise.all([this.store.outboxSize(), this.store.rejections().then((r) => r.length)]);
+    this.status = { ...this.status, pending, rejected };
+    this.emit();
+  }
+}

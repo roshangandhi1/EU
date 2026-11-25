@@ -12,8 +12,15 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1795602356340,
-      "tag": "0001_field_modules",
+      "when": 1795602019135,
+      "tag": "0001_schools_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795603701828,
+      "tag": "0002_field_modules",
       "breakpoints": true
     }
   ]
