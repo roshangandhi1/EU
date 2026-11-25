@@ -1,4 +1,4 @@
-import type { MaintenanceTaskDef } from "./db/schema";
+import type { MaintenanceTaskDef } from "./types";
 
 /** Starting template from the scope doc. Stream leads edit it on the web; nothing here is hard-coded behaviour. */
 export const defaultTemplate: { templateKey: string; name: { en: string; fr: string }; tasks: MaintenanceTaskDef[] } = {

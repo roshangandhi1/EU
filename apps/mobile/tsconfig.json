@@ -5,13 +5,35 @@
     "noUncheckedIndexedAccess": true,
     "types": [],
     "paths": {
-      "@eu/core": ["../../packages/core/src/index.ts"],
-      "@eu/core/*": ["../../packages/core/src/*"],
-      "@eu/sync/client": ["../../packages/sync/src/client.ts"],
-      "@eu/sync/sql-store": ["../../packages/sync/src/sql-store.ts"],
-      "@eu/schools/mobile": ["../../packages/schools/src/rules.ts"],
-      "zod": ["./node_modules/zod"]
+      "@eu/core": [
+        "../../packages/core/src/index.ts"
+      ],
+      "@eu/core/*": [
+        "../../packages/core/src/*"
+      ],
+      "@eu/sync/client": [
+        "../../packages/sync/src/client.ts"
+      ],
+      "@eu/sync/sql-store": [
+        "../../packages/sync/src/sql-store.ts"
+      ],
+      "@eu/schools/mobile": [
+        "../../packages/schools/src/rules.ts"
+      ],
+      "zod": [
+        "./node_modules/zod"
+      ],
+      "@eu/forestry/mobile": [
+        "../../packages/forestry/src/mobile.ts"
+      ],
+      "@eu/boreholes/mobile": [
+        "../../packages/boreholes/src/mobile.ts"
+      ]
     }
   },
-  "include": ["index.ts", "src/**/*.ts", "src/**/*.tsx"]
+  "include": [
+    "index.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ]
 }

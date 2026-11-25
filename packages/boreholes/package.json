@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./db/schema": "./src/db/schema.ts",
     "./server": "./src/server/index.ts",
-    "./types": "./src/db/types-only.ts"
+    "./types": "./src/db/types-only.ts",
+    "./mobile": "./src/mobile.ts"
   },
   "scripts": {
     "test": "vitest run",

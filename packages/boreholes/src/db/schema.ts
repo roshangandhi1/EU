@@ -7,7 +7,7 @@ import {
   boolean, date, uniqueIndex, doublePrecision, index, integer, jsonb, pgEnum, pgTable, text, uuid,
 } from "drizzle-orm/pg-core";
 import { syncColumns } from "../platform";
-import type { Frequency, ProofSpec, AppliesTo, TaskResult, OperationalCheck } from "../types";
+import type { Frequency, ProofSpec, AppliesTo, TaskResult, OperationalCheck, MaintenanceTaskDef } from "../types";
 
 export const lifecycle = pgEnum("borehole_lifecycle", [
   "planned", "drilled", "equipped", "commissioned", "handed_over", "operational", "needs_repair", "non_functional",
@@ -79,16 +79,7 @@ export const maintenanceTemplates = pgTable("borehole_maintenance_templates", {
   tasks: jsonb("tasks").$type<MaintenanceTaskDef[]>().notNull(),
 }, (t) => [index("borehole_tmpl_key_idx").on(t.templateKey, t.templateVersion)]);
 
-export interface MaintenanceTaskDef {
-  key: string; // stable across versions so history lines up
-  label: { en: string; fr: string };
-  frequency: Frequency;
-  assignee?: string; // team or technician user id
-  appliesTo: AppliesTo;
-  proof: ProofSpec;
-  /** A failed result opens a fault. */
-  failOpensFault: boolean;
-}
+export type { MaintenanceTaskDef } from "../types";
 
 /** Technician visits. Append-only. */
 export const visits = pgTable("borehole_visits", {

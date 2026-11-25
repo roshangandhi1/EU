@@ -2,7 +2,7 @@
  * Maintenance schedule engine: templates (configured on the web) -> due list per borehole.
  * Runs on the phone offline (from the synced template and visit history) and on the server.
  */
-import type { MaintenanceTaskDef } from "./db/schema";
+import type { MaintenanceTaskDef } from "./types";
 import type { AppliesTo, Frequency, TaskResult } from "./types";
 import { addDays, addMonths, daysBetween, toDate, ymd } from "./dates";
 
