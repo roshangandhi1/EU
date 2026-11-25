@@ -4,7 +4,7 @@ import { Image, StyleSheet, Text, View } from "react-native";
 import type { FileStatus } from "../files";
 import { useT } from "../i18n";
 import type { Session } from "../session";
-import { Button } from "../ui";
+import { Button, Txt } from "../ui";
 
 function Thumb({ session, id }: { session: Session; id: string }) {
   const [uri, setUri] = useState<string | null>(null);
@@ -25,8 +25,8 @@ function Thumb({ session, id }: { session: Session; id: string }) {
  * Photo evidence for a record: take photos (stored offline, uploaded on sync) and show them with
  * an upload badge. `entity` is the record type whose write permission governs the upload.
  */
-export function PhotoStrip({ session, entity, scopeId, ids, onChange, label }: {
-  session: Session; entity: string; scopeId: string; ids: string[]; onChange: (ids: string[]) => void; label?: string;
+export function PhotoStrip({ session, entity, scopeId, ids, onChange, label, hint }: {
+  session: Session; entity: string; scopeId: string; ids: string[]; onChange: (ids: string[]) => void; label?: string; hint?: string;
 }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
@@ -40,7 +40,8 @@ export function PhotoStrip({ session, entity, scopeId, ids, onChange, label }: {
     }
   };
   return (
-    <View style={{ gap: space.xs }}>
+    <View style={{ gap: space.sm }}>
+      {hint ? <Txt variant="small" tone="muted">{hint}</Txt> : null}
       {ids.length > 0 && (
         <View style={s.row}>
           {ids.map((id) => (
@@ -48,16 +49,16 @@ export function PhotoStrip({ session, entity, scopeId, ids, onChange, label }: {
           ))}
         </View>
       )}
-      <Button kind="secondary" label={label ?? t("forestry.m.take_photo")} onPress={() => void take()} disabled={busy} />
+      <Button kind="secondary" icon="camera" label={ids.length ? t("ux.anotherPhoto") : (label ?? t("forestry.m.take_photo"))} onPress={() => void take()} disabled={busy} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
-  thumb: { width: 72, height: 72 },
-  img: { width: 72, height: 72, borderRadius: radius.sm },
-  badge: { position: "absolute", right: 2, bottom: 2, backgroundColor: colors.surface, borderRadius: radius.sm, paddingHorizontal: 4, fontSize: 12, color: colors.textMuted },
+  thumb: { width: 76, height: 76 },
+  img: { width: 76, height: 76, borderRadius: radius.md },
+  badge: { position: "absolute", right: 4, bottom: 4, backgroundColor: colors.surface, borderRadius: radius.sm, paddingHorizontal: 5, fontSize: 13, fontWeight: "700", color: colors.textMuted, overflow: "hidden" },
   up: { color: colors.statusGood },
   bad: { color: colors.statusCritical },
 });

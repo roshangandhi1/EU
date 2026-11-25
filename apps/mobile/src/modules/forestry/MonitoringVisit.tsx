@@ -1,13 +1,14 @@
-import { colors, radius, space, touch } from "@eu/core/tokens";
+import { colors, streamAccent } from "@eu/core/tokens";
 import {
   bearingDeg, compass, defaultSettings, distanceM, estimateStocking, monitoringVisitSchema, placeSamplePoints,
   type ForestryStream, type SamplePlot,
 } from "@eu/forestry/mobile";
 import { useContext, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
-import { BackBar, Body, Button, Field, Title } from "../../ui";
+import { Button, Card, Chips, DateField, Field, Header, Notice, NumberField, Page, Section, Segmented, Stat, Txt } from "../../ui";
+import { Icon } from "../../icons";
 import { getFix, localToday, type Fix } from "../location";
 import { loadSpecies, type PlotLite, type SpeciesOption } from "./data";
 import { PhotoStrip } from "../photos";
@@ -22,18 +23,6 @@ const n = (v: string | undefined) => {
   const x = Number((v ?? "").replace(/\s/g, ""));
   return Number.isFinite(x) && x >= 0 ? Math.floor(x) : 0;
 };
-
-function Pills<T extends string>({ value, options, onToggle }: { value: T[]; options: { v: T; label: string }[]; onToggle: (v: T) => void }) {
-  return (
-    <View style={s.pills}>
-      {options.map((o) => (
-        <Pressable key={o.v} accessibilityRole="button" onPress={() => onToggle(o.v)} style={[s.pill, value.includes(o.v) && s.pillOn]}>
-          <Text style={[s.pillText, value.includes(o.v) && s.pillTextOn]}>{o.label}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
 
 /**
  * Monitoring visit: the phone draws random sample circles inside the plot from a stored seed,
@@ -144,101 +133,130 @@ export function MonitoringVisit({ session, stream, plot, onDone }: { session: Se
 
   const fmt = (x: number) => (Number.isFinite(x) ? String(Math.round(x)) : "–");
 
+  const accent = streamAccent[stream];
+  const header = (sub: string) => <Header title={t("forestry.visit.new")} subtitle={sub} onBack={() => onDone(false)} backLabel={t("forestry.m.back")} accent={accent} />;
+  const leave = () => { if (!points[idx]) setPoints({ ...points, [idx]: { counts: {}, fix: fix ?? undefined } }); };
+
   if (phase === "points" && drawn.length > 0) {
     const p = drawn[idx]!;
     const st = points[idx];
     const d = fix ? distanceM(fix.lat, fix.lng, p.lat, p.lng) : null;
     const near = d !== null && d <= Math.max(settings.sampleRadiusM, fix?.accuracyM ?? 0);
+    const last = idx + 1 >= drawn.length;
     return (
-      <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
-        <BackBar label={t("forestry.m.back")} onBack={() => onDone(false)} />
-        <Title>{t("forestry.visit.new")}</Title>
-        <Body tone="muted">
-          {t("forestry.plot")} {plot.code} · {t("forestry.visit.sample_n", { n: idx + 1, total: drawn.length })}
-        </Body>
-        {idx === 0 && !st && <Body tone="muted">{t("forestry.m.samples_intro", { n: drawn.length, r: settings.sampleRadiusM })}</Body>}
-        {gpsNote ? (
-          <Body tone="muted">{gpsNote}</Body>
-        ) : d !== null && fix ? (
-          <Body tone={near ? "good" : "warning"}>
-            {near ? t("forestry.m.at_point", { m: Math.round(Math.max(settings.sampleRadiusM, fix.accuracyM ?? 0)) }) : t("forestry.m.heading", { m: Math.round(d), dir: t(`forestry.m.dir.${compass(bearingDeg(fix.lat, fix.lng, p.lat, p.lng))}`) })}
-          </Body>
-        ) : null}
-        <Button kind="secondary" label={t("forestry.m.where_am_i")} onPress={() => void locate()} />
+      <Page
+        header={header(`${t("forestry.plot")} ${plot.code}`)}
+        footer={
+          <>
+            {idx > 0 && <Button kind="secondary" icon="chevronLeft" label={t("ux.previous")} onPress={() => setIdx(idx - 1)} flex={1} />}
+            <Button
+              icon={last ? "check" : undefined}
+              iconAfter={last ? undefined : "chevronRight"}
+              label={last ? t("forestry.m.finish_points") : t("forestry.m.next_point")}
+              onPress={() => { leave(); if (last) setPhase("summary"); else setIdx(idx + 1); }}
+              flex={2}
+            />
+          </>
+        }
+      >
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
+            <Txt variant="title" style={{ flex: 1 }}>{t("forestry.visit.sample_n", { n: idx + 1, total: drawn.length })}</Txt>
+          </View>
+          <View style={s.dots}>
+            {drawn.map((x, i) => {
+              const done = !!points[i];
+              return <View key={x.pointIndex} style={[s.dot, done && { backgroundColor: accent }, i === idx && s.dotOn]} />;
+            })}
+          </View>
+        </View>
+        {idx === 0 && !st && <Txt variant="small" tone="muted">{t("forestry.m.samples_intro", { n: drawn.length, r: settings.sampleRadiusM })}</Txt>}
+
+        <Card style={near ? { backgroundColor: colors.gcGreenTint, borderColor: colors.gcGreen } : undefined}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={[s.guide, { backgroundColor: near ? colors.gcGreen : colors.gcGreenDeep }]}>
+              <Icon name={near ? "check" : "compass"} size={26} color={colors.surface} strokeWidth={2.2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              {gpsNote ? (
+                <Txt tone="muted">{gpsNote}</Txt>
+              ) : d !== null && fix ? (
+                <Txt variant="heading" color={near ? colors.gcGreen : colors.text}>
+                  {near ? t("forestry.m.at_point", { m: Math.round(Math.max(settings.sampleRadiusM, fix.accuracyM ?? 0)) }) : t("forestry.m.heading", { m: Math.round(d), dir: t(`forestry.m.dir.${compass(bearingDeg(fix.lat, fix.lng, p.lat, p.lng))}`) })}
+                </Txt>
+              ) : (
+                <Txt tone="muted">{t("forestry.m.gps_none")}</Txt>
+              )}
+            </View>
+          </View>
+          <Button kind="secondary" icon="locate" label={t("forestry.m.where_am_i")} onPress={() => void locate()} />
+        </Card>
 
         {st?.skipped ? (
-          <Body tone="warning">
-            {t("forestry.m.skipped")}: {t(`forestry.m.skip_reason.${st.skipped}`)}
-          </Body>
+          <Notice tone="warning" title={t("forestry.m.skipped")}>{t(`forestry.m.skip_reason.${st.skipped}`)}</Notice>
         ) : (
           plotSpecies.map((o) => {
             const c = st?.counts[o.key];
             return (
-              <View key={o.key} style={s.box}>
-                <Text style={s.boxTitle}>{label(o)}</Text>
-                <Field label={t("forestry.visit.alive")} value={c?.alive ?? ""} onChangeText={(v) => setCount(o.key, "alive", v)} keyboardType="number-pad" />
-                <Field label={t("forestry.visit.dead")} value={c?.dead ?? ""} onChangeText={(v) => setCount(o.key, "dead", v)} keyboardType="number-pad" />
-                {stream === "miombo" && (
-                  <Field label={t("forestry.visit.natural")} value={c?.natural ?? ""} onChangeText={(v) => setCount(o.key, "natural", v)} keyboardType="number-pad" />
-                )}
-              </View>
+              <Section key={o.key} title={label(o)}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <NumberField compact label={t("forestry.visit.alive")} value={c?.alive ?? ""} onChange={(v) => setCount(o.key, "alive", v)} />
+                  <NumberField compact label={t("forestry.visit.dead")} value={c?.dead ?? ""} onChange={(v) => setCount(o.key, "dead", v)} />
+                </View>
+                {stream === "miombo" && <NumberField label={t("forestry.visit.natural")} value={c?.natural ?? ""} onChange={(v) => setCount(o.key, "natural", v)} />}
+              </Section>
             );
           })
         )}
 
-        <Text style={s.label}>{t("forestry.visit.skip")}</Text>
-        <Pills<Skip> value={st?.skipped ? [st.skipped] : []} onToggle={skip} options={(["inaccessible", "flooded", "other"] as const).map((v) => ({ v, label: t(`forestry.m.skip_reason.${v}`) }))} />
-
-        {idx + 1 < drawn.length ? (
-          <Button label={t("forestry.m.next_point")} onPress={() => { if (!points[idx]) setPoints({ ...points, [idx]: { counts: {}, fix: fix ?? undefined } }); setIdx(idx + 1); }} />
-        ) : (
-          <Button label={t("forestry.m.finish_points")} onPress={() => { if (!points[idx]) setPoints({ ...points, [idx]: { counts: {}, fix: fix ?? undefined } }); setPhase("summary"); }} />
-        )}
-        {idx > 0 && <Button kind="secondary" label={t("forestry.m.prev_point")} onPress={() => setIdx(idx - 1)} />}
-        <Button kind="secondary" label={t("forestry.m.back")} onPress={() => onDone(false)} />
-      </ScrollView>
+        <View style={{ gap: 6 }}>
+          <Txt variant="label" tone="muted">{t("forestry.visit.skip")}</Txt>
+          <Chips<Skip> selected={st?.skipped ? [st.skipped] : []} onToggle={(r) => (st?.skipped === r ? setPoints({ ...points, [idx]: { counts: {} } }) : skip(r))} options={(["inaccessible", "flooded", "other"] as const).map((v) => ({ value: v, label: t(`forestry.m.skip_reason.${v}`) }))} />
+        </View>
+      </Page>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
-      <BackBar label={t("forestry.m.back")} onBack={() => onDone(false)} />
-      <Title>{t("forestry.visit.new")}</Title>
-      <Body tone="muted">
-        {t("forestry.plot")} {plot.code} · {plot.village}
-      </Body>
-      {!plot.geom && <Body tone="warning">{t("forestry.m.no_boundary_visit")}</Body>}
+    <Page
+      header={header(`${t("forestry.plot")} ${plot.code} · ${plot.village}`)}
+      footer={
+        <>
+          {drawn.length > 0 && <Button kind="secondary" icon="chevronLeft" label={t("ux.points")} onPress={() => setPhase("points")} flex={1} />}
+          <Button icon="check" label={t("ux.saveVisit")} onPress={() => void save()} disabled={saving} flex={2} />
+        </>
+      }
+    >
+      {!plot.geom && <Notice tone="warning">{t("forestry.m.no_boundary_visit")}</Notice>}
       {est && (
-        <View style={s.box}>
-          <Body>{t("forestry.m.estimate", { perHa: fmt(est.livingPerHa.value), low: fmt(est.livingPerHa.low), high: fmt(est.livingPerHa.high) })}</Body>
-          {est.survivalPct && <Body>{t("forestry.m.survival", { pct: fmt(est.survivalPct.value), low: fmt(est.survivalPct.low), high: fmt(est.survivalPct.high) })}</Body>}
-        </View>
+        <Card>
+          <Txt variant="label" tone="muted">{t("ux.estimate")}</Txt>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <Stat value={fmt(est.livingPerHa.value)} label={t("ux.perHa", { low: fmt(est.livingPerHa.low), high: fmt(est.livingPerHa.high) })} />
+            {est.survivalPct && <Stat value={`${fmt(est.survivalPct.value)} %`} label={t("ux.survival", { low: fmt(est.survivalPct.low), high: fmt(est.survivalPct.high) })} tone={est.survivalPct.value >= 80 ? "good" : est.survivalPct.value >= 60 ? "warning" : "critical"} />}
+          </View>
+        </Card>
       )}
-      <Field label={t("forestry.m.visit_date")} value={visitedOn} onChangeText={setVisitedOn} placeholder={t("forestry.m.date_hint")} keyboardType="numbers-and-punctuation" />
-      <Text style={s.label}>{t("forestry.m.threats")}</Text>
-      <Pills<Threat> value={threats} onToggle={(v) => setThreats(threats.includes(v) ? threats.filter((x) => x !== v) : [...threats, v])} options={THREATS.map((v) => ({ v, label: t(`forestry.threat.${v}`) }))} />
-      <Text style={s.label}>{t("forestry.m.weeding")}</Text>
-      <Pills value={weeding} onToggle={(v) => setWeeding(weeding[0] === v ? [] : [v])} options={(["done", "partial", "needed"] as const).map((v) => ({ v, label: t(`forestry.m.weed.${v}`) }))} />
-      <Field label={t("forestry.m.mean_height")} value={height} onChangeText={setHeight} keyboardType="number-pad" />
-      <Field label={t("forestry.m.notes")} value={notes} onChangeText={setNotes} multiline />
-      <Body tone="muted">{t("forestry.m.photo_hint")}</Body>
-      <PhotoStrip session={session} entity={`${stream}.visit`} scopeId={plot.scopeId} ids={photos} onChange={setPhotos} />
-      {error && <Body tone="critical">{error}</Body>}
-      <Button label={t("forestry.m.save")} onPress={() => void save()} disabled={saving} />
-      {drawn.length > 0 && <Button kind="secondary" label={t("forestry.m.prev_point")} onPress={() => setPhase("points")} />}
-      <Button kind="secondary" label={t("forestry.m.back")} onPress={() => onDone(false)} />
-    </ScrollView>
+      <DateField label={t("forestry.m.visit_date")} value={visitedOn} onChange={setVisitedOn} max={localToday()} todayLabel={t("app.today")} yesterdayLabel={t("app.yesterday")} />
+      <Section title={t("forestry.m.threats")} hint={t("ux.tickAll")}>
+        <Chips<Threat> selected={threats} onToggle={(v) => setThreats(threats.includes(v) ? threats.filter((x) => x !== v) : [...threats, v])} options={THREATS.map((v) => ({ value: v, label: t(`forestry.threat.${v}`) }))} />
+      </Section>
+      <Section title={t("forestry.m.weeding")}>
+        <Segmented value={weeding[0] ?? null} onChange={(v) => setWeeding(weeding[0] === v ? [] : [v])} options={(["done", "partial", "needed"] as const).map((v) => ({ value: v, label: t(`forestry.m.weed.${v}`) }))} />
+      </Section>
+      <Section title={t("ux.notesPhotos")}>
+        <NumberField label={`${t("forestry.m.mean_height")} (${t("ux.optional")})`} value={height} onChange={setHeight} step={5} suffix="cm" />
+        <Field label={`${t("forestry.m.notes")} (${t("ux.optional")})`} value={notes} onChangeText={setNotes} multiline />
+        <PhotoStrip session={session} entity={`${stream}.visit`} scopeId={plot.scopeId} ids={photos} onChange={setPhotos} hint={t("forestry.m.photo_hint")} />
+      </Section>
+      {error && <Notice tone="critical">{error}</Notice>}
+    </Page>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { padding: space.md, paddingTop: space.xl, gap: space.sm, backgroundColor: colors.surface },
-  label: { fontSize: 14, color: colors.textMuted },
-  box: { gap: space.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.sm },
-  boxTitle: { fontSize: touch.bodyText, fontWeight: "600", color: colors.text },
-  pills: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
-  pill: { minHeight: touch.minTarget, justifyContent: "center", paddingHorizontal: space.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gcGreen },
-  pillOn: { backgroundColor: colors.gcGreen },
-  pillText: { fontSize: touch.bodyText, color: colors.gcGreen },
-  pillTextOn: { color: colors.surface },
+  dots: { flexDirection: "row", gap: 6 },
+  dot: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "#DDE3D9" },
+  dotOn: { backgroundColor: colors.gcGreenDeep },
+  guide: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
 });

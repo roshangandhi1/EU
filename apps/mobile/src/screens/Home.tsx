@@ -2,15 +2,17 @@ import type { Locale } from "@eu/core/i18n";
 import { colors, space, streamAccent } from "@eu/core/tokens";
 import { useContext, useState, type ReactNode } from "react";
 import { StatusBar } from "expo-status-bar";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { canLoadDemo, mainRoleKey, MODULES, modulesFor, type ModuleKey } from "../access";
 import { API_BASE } from "../config";
 import { LocaleContext, useT } from "../i18n";
 import { openModule, useModuleCounts, type ModuleCounts } from "../modules/field";
 import type { Session } from "../session";
-import { BackBar, Body, BrandBar, Button, Card, EmptyState, EuBand, LanguageSwitch, Pill, Screen, Subtitle, TOP, Title, ui } from "../ui";
+import type { IconName } from "../icons";
+import { Body, BrandBar, Button, Card, EmptyState, EuBand, Header, IconBadge, IconButton, LanguageSwitch, Notice, Page, Screen, StatusChip, Title, Txt, ui, type Tone } from "../ui";
 
-const ICON: Record<ModuleKey, string> = { schools: "🏫", boreholes: "💧", bamboo: "🎋", miombo: "🌳" };
+export const MODULE_ICON: Record<ModuleKey, IconName> = { schools: "school", boreholes: "drop", bamboo: "bamboo", miombo: "tree" };
 const WEB_PATH: Record<ModuleKey, string> = { schools: "schools", boreholes: "boreholes", bamboo: "forestry/bamboo", miombo: "forestry/miombo" };
 const COUNT_KEY: Record<ModuleKey, string> = { schools: "app.countSchools", boreholes: "app.countBoreholes", bamboo: "app.countPlots", miombo: "app.countPlots" };
 const EMPTY_KEY: Record<ModuleKey, string> = { schools: "app.emptySchools", boreholes: "app.emptyBoreholes", bamboo: "app.emptyPlots", miombo: "app.emptyPlots" };
@@ -26,14 +28,14 @@ export function Home({ session }: { session: Session }) {
   if (open)
     return (
       <View style={s.moduleFrame}>
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
         {openModule(open, session, () => setOpen(null))}
       </View>
     );
   if (empty)
     return (
       <>
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
         <EmptyModule session={session} module={empty} counts={counts} onBack={() => setEmpty(null)} />
       </>
     );
@@ -43,6 +45,7 @@ export function Home({ session }: { session: Session }) {
   const shown = MODULES.filter((m) => allowed.has(m) || (counts?.[m] ?? 0) > 0);
   const total = counts ? MODULES.reduce((n, m) => n + counts[m], 0) : null;
   const role = mainRoleKey(session.roles);
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={{ flex: 1, backgroundColor: ui.page }}>
@@ -50,27 +53,24 @@ export function Home({ session }: { session: Session }) {
         right={
           <>
             <LanguageSwitch locale={locale} onChange={(l) => setLocale(l as Locale)} onDark />
-            <Pressable accessibilityRole="button" onPress={() => session.lock()} style={s.lock}>
-              <Text style={s.lockText} accessibilityLabel={t("app.lock")}>🔒</Text>
-            </Pressable>
+            <IconButton icon="lock" label={t("app.lock")} onPress={() => session.lock()} onDark />
           </>
         }
       />
-      <ScrollView contentContainerStyle={s.body}>
-        <View>
-          <Title>{session.user ? t("app.hello", { name: session.user.name }) : t("common.appName")}</Title>
-          {role && <Body tone="muted">{t(role)}</Body>}
+      <ScrollView contentContainerStyle={[s.body, { paddingBottom: space.md + insets.bottom }]}>
+        <View style={{ gap: 2 }}>
+          <Txt variant="display">{session.user ? t("app.hello", { name: session.user.name }) : t("common.appName")}</Txt>
+          {role && <Txt tone="muted">{t(role)}</Txt>}
         </View>
 
         <SyncCard session={session} />
 
-        {counts?.demo && <Pill label={t("app.demoBadge")} tone="warning" />}
-
-        <Subtitle>{t("app.modules")}</Subtitle>
+        <View style={s.sectionHead}>
+          <Txt variant="heading">{t("app.modules")}</Txt>
+          {counts?.demo && <StatusChip label={t("app.demoBadge")} tone="warning" />}
+        </View>
         {shown.length === 0 ? (
-          <Card>
-            <Body>{t("app.noModules")}</Body>
-          </Card>
+          <Notice tone="info">{t("app.noModules")}</Notice>
         ) : (
           <View style={s.grid}>
             {shown.map((m) => (
@@ -78,6 +78,7 @@ export function Home({ session }: { session: Session }) {
                 key={m}
                 module={m}
                 label={t(`app.${m}`)}
+                count={counts?.[m] ?? null}
                 detail={counts == null ? "…" : counts[m] === 1 ? t(`${COUNT_KEY[m]}1`) : counts[m] > 1 ? t(COUNT_KEY[m], { count: counts[m] }) : t("app.emptyTile")}
                 onPress={() => ((counts?.[m] ?? 0) > 0 ? setOpen(m) : setEmpty(m))}
               />
@@ -93,16 +94,17 @@ export function Home({ session }: { session: Session }) {
   );
 }
 
-function Tile({ module, label, detail, onPress }: { module: ModuleKey; label: string; detail: string; onPress: () => void }) {
+function Tile({ module, label, detail, count, onPress }: { module: ModuleKey; label: string; detail: string; count: number | null; onPress: () => void }) {
   const accent = streamAccent[module];
+  const empty = count === 0;
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${label}, ${detail}`} onPress={onPress} android_ripple={{ color: colors.border }} style={({ pressed }) => [s.tile, pressed && { backgroundColor: "#EEF3EA" }]}>
       <View style={[s.tileBar, { backgroundColor: accent }]} />
-      <View style={[s.tileIcon, { backgroundColor: `${accent}33` }]}>
-        <Text style={s.tileEmoji}>{ICON[module]}</Text>
+      <IconBadge icon={MODULE_ICON[module]} color={accent} size={48} />
+      <View style={{ gap: 2 }}>
+        <Txt variant="heading">{label}</Txt>
+        <Txt variant="small" tone={empty ? "warning" : "muted"}>{detail}</Txt>
       </View>
-      <Text style={s.tileLabel}>{label}</Text>
-      <Text style={s.tileDetail}>{detail}</Text>
     </Pressable>
   );
 }
@@ -111,40 +113,42 @@ function SyncCard({ session }: { session: Session }) {
   const t = useT();
   const { locale } = useContext(LocaleContext);
   const st = session.status;
-  const when = st.lastOk ? new Date(st.lastOk).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : null;
-  const pill = st.running ? (
-    <Pill label={t("sync.syncing")} tone="muted" />
-  ) : st.offline ? (
-    <Pill label={t("sync.offline").split(".")[0]!} tone="warning" />
-  ) : st.last && !st.last.ok ? (
-    <Pill label={t("sync.failed")} tone="critical" />
-  ) : st.pending > 0 ? (
-    <Pill label={t("sync.waiting", { count: st.pending })} tone="warning" />
-  ) : st.lastOk ? (
-    <Pill label={t("app.allSynced")} tone="good" />
-  ) : (
-    <Pill label={t("sync.never")} tone="muted" />
-  );
+  const when = st.lastOk ? new Date(st.lastOk).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
+  const [icon, tone, label]: [IconName, Tone, string] = st.running
+    ? ["sync", "info", t("app.syncing")]
+    : st.offline
+      ? ["cloudOff", "warning", t("app.syncOffline")]
+      : st.last && !st.last.ok
+        ? ["alert", "critical", t("app.syncFailedShort")]
+        : st.pending > 0
+          ? ["sync", "warning", t("app.syncWaiting", { count: st.pending })]
+          : st.lastOk
+            ? ["cloudOk", "good", t("app.allSynced")]
+            : ["sync", "muted", t("app.syncNever")];
   const notes: ReactNode[] = [];
   if (st.nextCutoff && Date.parse(st.nextCutoff.at) - Date.now() < 7 * 86_400_000)
-    notes.push(<Body key="cut" tone="warning">{t("sync.cutoffSoon", { time: new Date(st.nextCutoff.at).toLocaleString(locale), label: st.nextCutoff.label })}</Body>);
-  if (st.photosPending > 0) notes.push(<Body key="ph" tone="warning">{t("sync.photosWaiting", { count: st.photosPending })}</Body>);
-  if (st.offline) notes.push(<Body key="off" tone="muted">{t("sync.offline")}</Body>);
-  if (st.last?.clockSuspect) notes.push(<Body key="clk" tone="critical">{t("sync.clockSuspect")}</Body>);
+    notes.push(<Notice key="cut" tone="warning">{t("sync.cutoffSoon", { time: new Date(st.nextCutoff.at).toLocaleString(locale), label: st.nextCutoff.label })}</Notice>);
+  if (st.photosPending > 0) notes.push(<Notice key="ph" tone="warning" icon="camera">{t("sync.photosWaiting", { count: st.photosPending })}</Notice>);
+  if (st.offline) notes.push(<Txt key="off" variant="small" tone="muted">{t("sync.offline")}</Txt>);
+  if (st.last?.clockSuspect) notes.push(<Notice key="clk" tone="critical">{t("sync.clockSuspect")}</Notice>);
   if (st.rejected > 0)
     notes.push(
-      <View key="rej">
-        <Body tone="critical">{t("sync.rejected", { count: st.rejected })}</Body>
-        <Body tone="muted">{t("sync.rejectedHint")}</Body>
-      </View>,
+      <Notice key="rej" tone="critical" title={t("sync.rejected", { count: st.rejected })}>
+        <Txt>{t("sync.rejectedHint")}</Txt>
+      </Notice>,
     );
+  const colour = { good: colors.statusGood, warning: colors.statusWarningText, critical: colors.statusCritical, muted: colors.textMuted, info: colors.statusInfo }[tone];
   return (
-    <Card accent={colors.gcGreen}>
-      <Subtitle>{t("app.syncCard")}</Subtitle>
-      {pill}
-      <Body tone="muted">{when ? t("sync.lastSync", { time: when }) : t("sync.never")}</Body>
+    <Card>
+      <View style={s.syncRow}>
+        <IconBadge icon={icon} color={colour} size={44} />
+        <View style={{ flex: 1, gap: 1 }}>
+          <Txt weight={700} color={tone === "muted" ? colors.text : colour}>{label}</Txt>
+          {when ? <Txt variant="small" tone="muted">{t("app.lastSyncShort", { time: when })}</Txt> : null}
+        </View>
+      </View>
       {notes}
-      <Button kind="secondary" label={st.running ? t("sync.syncing") : t("sync.syncNow")} onPress={() => void session.syncNow()} disabled={st.running} />
+      <Button kind="secondary" icon="sync" label={st.running ? t("sync.syncing") : t("sync.syncNow")} onPress={() => void session.syncNow()} disabled={st.running} />
     </Card>
   );
 }
@@ -155,8 +159,8 @@ function DemoCard({ session }: { session: Session }) {
   const [msg, setMsg] = useState<string | null>(null);
   return (
     <Card accent={colors.gcOrange}>
-      <Subtitle>{t("app.demoTitle")}</Subtitle>
-      <Body>{t("app.demoIntro")}</Body>
+      <Txt variant="heading">{t("app.demoTitle")}</Txt>
+      <Txt>{t("app.demoIntro")}</Txt>
       {msg && <Body tone={msg === "app.demoLoaded" ? "good" : "critical"}>{t(msg)}</Body>}
       <Button
         label={busy ? t("app.demoLoading") : t("app.demoLoad")}
@@ -178,19 +182,17 @@ function EmptyModule({ session, module, counts, onBack }: { session: Session; mo
   const { locale } = useContext(LocaleContext);
   const total = counts ? MODULES.reduce((n, m) => n + counts[m], 0) : null;
   return (
-    <Screen scroll>
-      <BackBar label={t("app.back")} onBack={onBack} />
-      <Title>{t(`app.${module}`)}</Title>
-      <Card accent={streamAccent[module]}>
-        <EmptyState icon={ICON[module]} title={t("app.emptyTitle")}>
-          <Body>{t(EMPTY_KEY[module])}</Body>
-          <Body tone="muted">{t("app.emptyAskAdmin")}</Body>
+    <Page header={<Header title={t(`app.${module}`)} onBack={onBack} backLabel={t("app.back")} accent={streamAccent[module]} />}>
+      <Card>
+        <EmptyState icon={MODULE_ICON[module]} color={streamAccent[module]} title={t("app.emptyTitle")}>
+          <Txt center>{t(EMPTY_KEY[module])}</Txt>
+          <Txt center variant="small" tone="muted">{t("app.emptyAskAdmin")}</Txt>
         </EmptyState>
         {canLoadDemo(session.roles) && <Button label={t("app.openWeb")} onPress={() => void Linking.openURL(`${API_BASE}/${locale}/${WEB_PATH[module]}`)} />}
-        <Button kind="secondary" label={session.status.running ? t("sync.syncing") : t("app.syncAgain")} disabled={session.status.running} onPress={() => void session.syncNow()} />
+        <Button kind="secondary" icon="sync" label={session.status.running ? t("sync.syncing") : t("app.syncAgain")} disabled={session.status.running} onPress={() => void session.syncNow()} />
       </Card>
       {total === 0 && canLoadDemo(session.roles) && <DemoCard session={session} />}
-    </Screen>
+    </Page>
   );
 }
 
@@ -205,15 +207,11 @@ export function Revoked() {
 }
 
 const s = StyleSheet.create({
-  moduleFrame: { flex: 1, backgroundColor: colors.surface, paddingTop: Math.max(0, TOP - space.xl) },
+  moduleFrame: { flex: 1, backgroundColor: ui.page },
   body: { padding: space.md, gap: space.md, flexGrow: 1 },
-  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: space.md },
-  tile: { width: "48%", minHeight: 150, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: "#E4E8E1", padding: space.md, paddingTop: space.md + 6, gap: 6, overflow: "hidden" },
-  tileBar: { position: "absolute", top: 0, left: 0, right: 0, height: 6 },
-  tileIcon: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  tileEmoji: { fontSize: 28 },
-  tileLabel: { fontSize: 18, fontWeight: "800", color: colors.text },
-  tileDetail: { fontSize: 14, color: colors.textMuted },
-  lock: { minHeight: 36, minWidth: 40, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, borderRadius: 999, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.6)" },
-  lockText: { color: colors.surface, fontWeight: "700", fontSize: 14 },
+  sectionHead: { gap: 6, marginTop: space.xs },
+  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 12 },
+  tile: { width: "48.3%", minHeight: 148, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: ui.line, padding: space.md, paddingTop: space.md + 4, gap: 12, overflow: "hidden", justifyContent: "space-between" },
+  tileBar: { position: "absolute", top: 0, left: 0, right: 0, height: 5 },
+  syncRow: { flexDirection: "row", alignItems: "center", gap: 12 },
 });

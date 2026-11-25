@@ -1,10 +1,11 @@
-import { colors, radius, space, touch } from "@eu/core/tokens";
+import { streamAccent } from "@eu/core/tokens";
 import { defaultSettings, plantingEventSchema, type ForestryStream } from "@eu/forestry/mobile";
 import { useContext, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
-import { BackBar, Body, Button, Field, Title } from "../../ui";
+import { Button, Chips, DateField, Field, Header, IconButton, NumberField, Notice, Page, Section, Segmented, Txt } from "../../ui";
+import { GpsLine } from "../boreholes/VisitForm";
 import { getFix, localToday, type Fix } from "../location";
 import { PhotoStrip } from "../photos";
 import { loadSpecies, type PlotLite, type SpeciesOption } from "./data";
@@ -78,63 +79,48 @@ export function PlantingForm({ session, stream, plot, onDone }: { session: Sessi
     }
   };
 
+  const total = lines.reduce((n, l) => n + (Number(l.count) || 0), 0);
+
   return (
-    <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
-      <BackBar label={t("forestry.m.back")} onBack={() => onDone(false)} />
-      <Title>{t("forestry.planting.new")}</Title>
-      <Body tone="muted">
-        {t("forestry.plot")} {plot.code} · {plot.village}
-      </Body>
+    <Page
+      header={<Header title={t("forestry.planting.new")} subtitle={`${t("forestry.plot")} ${plot.code} · ${plot.village}`} onBack={() => onDone(false)} backLabel={t("forestry.m.back")} accent={streamAccent[stream]} />}
+      footer={<Button icon="check" label={total > 0 ? t("ux.savePlanting", { n: total.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB") }) : t("forestry.m.save")} onPress={() => void save()} disabled={saving} flex={1} />}
+    >
+      <DateField label={t("forestry.planting.date")} value={plantedOn} onChange={setPlantedOn} max={localToday()} todayLabel={t("app.today")} yesterdayLabel={t("app.yesterday")} />
 
-      <Field label={t("forestry.planting.date")} value={plantedOn} onChangeText={setPlantedOn} placeholder={t("forestry.m.date_hint")} keyboardType="numbers-and-punctuation" />
-
-      {lines.map((line, i) => (
-        <View key={i} style={s.line}>
-          <Text style={s.label}>{t("forestry.planting.species")}</Text>
-          <View style={s.pills}>
-            {species.map((o) => (
-              <Pressable key={o.key} accessibilityRole="button" onPress={() => setLine(i, { species: o.key })} style={[s.pill, line.species === o.key && s.pillOn]}>
-                <Text style={[s.pillText, line.species === o.key && s.pillTextOn]}>{label(o)}</Text>
-              </Pressable>
-            ))}
+      <Section title={t("ux.whatPlanted")}>
+        {lines.map((line, i) => (
+          <View key={i} style={[s.line, i > 0 && s.lineNext]}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Txt variant="label" style={{ flex: 1 }}>{t("forestry.planting.species")}{lines.length > 1 ? ` ${i + 1}` : ""}</Txt>
+              {lines.length > 1 && <IconButton icon="x" label={t("forestry.m.remove")} onPress={() => setLines(lines.filter((_, j) => j !== i))} />}
+            </View>
+            <Chips options={species.map((o) => ({ value: o.key, label: label(o) }))} selected={[line.species]} onToggle={(v) => setLine(i, { species: v })} />
+            <NumberField label={t("forestry.planting.count")} value={line.count} onChange={(v) => setLine(i, { count: v })} step={10} />
           </View>
-          <Field label={t("forestry.planting.count")} value={line.count} onChangeText={(v) => setLine(i, { count: v })} keyboardType="number-pad" />
-          {lines.length > 1 && <Button kind="secondary" label={t("forestry.m.remove")} onPress={() => setLines(lines.filter((_, j) => j !== i))} />}
-        </View>
-      ))}
-      <Button kind="secondary" label={t("forestry.m.add_species")} onPress={() => setLines([...lines, { species: "", count: "" }])} />
-
-      <Text style={s.label}>{t("forestry.planting.gap_filling")}</Text>
-      <View style={s.pills}>
-        {[false, true].map((v) => (
-          <Pressable key={String(v)} accessibilityRole="button" onPress={() => setGapFilling(v)} style={[s.pill, gapFilling === v && s.pillOn]}>
-            <Text style={[s.pillText, gapFilling === v && s.pillTextOn]}>{t(v ? "forestry.m.yes" : "forestry.m.no")}</Text>
-          </Pressable>
         ))}
-      </View>
+        <Button kind="ghost" icon="plus" label={t("forestry.m.add_species")} onPress={() => setLines([...lines, { species: "", count: "" }])} />
+      </Section>
 
-      <Field label={t("forestry.m.team")} value={team} onChangeText={setTeam} />
-      <Field label={t("forestry.m.notes")} value={notes} onChangeText={setNotes} multiline />
+      <Section title={t("forestry.planting.gap_filling")} hint={t("ux.gapHint")}>
+        <Segmented value={gapFilling} onChange={setGapFilling} options={[{ value: false, label: t("forestry.m.no") }, { value: true, label: t("forestry.m.yes") }]} />
+      </Section>
 
-      <Body tone={fix ? "good" : "muted"}>{gpsNote ?? (fix ? t("forestry.m.gps_ok", { m: Math.round(fix.accuracyM ?? 0) }) : t("forestry.m.gps_none"))}</Body>
-      <Button kind="secondary" label={t("forestry.m.record_gps")} onPress={() => void recordGps()} />
-      <Body tone="muted">{t("forestry.m.photo_hint")}</Body>
-      <PhotoStrip session={session} entity={`${stream}.planting`} scopeId={plot.scopeId} ids={photos} onChange={setPhotos} />
-
-      {error && <Body tone="critical">{error}</Body>}
-      <Button label={t("forestry.m.save")} onPress={() => void save()} disabled={saving} />
-      <Button kind="secondary" label={t("forestry.m.back")} onPress={() => onDone(false)} />
-    </ScrollView>
+      <Section title={t("ux.notesPhotos")}>
+        <Field label={`${t("forestry.m.team")} (${t("ux.optional")})`} value={team} onChangeText={setTeam} />
+        <Field label={`${t("forestry.m.notes")} (${t("ux.optional")})`} value={notes} onChangeText={setNotes} multiline />
+        <PhotoStrip session={session} entity={`${stream}.planting`} scopeId={plot.scopeId} ids={photos} onChange={setPhotos} hint={t("forestry.m.photo_hint")} />
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <GpsLine fix={fix} note={gpsNote} />
+          <IconButton icon="locate" label={t("forestry.m.record_gps")} onPress={() => void recordGps()} />
+        </View>
+      </Section>
+      {error && <Notice tone="critical">{error}</Notice>}
+    </Page>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { padding: space.md, paddingTop: space.xl, gap: space.sm, backgroundColor: colors.surface },
-  line: { gap: space.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.sm },
-  label: { fontSize: 14, color: colors.textMuted },
-  pills: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
-  pill: { minHeight: touch.minTarget, justifyContent: "center", paddingHorizontal: space.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gcGreen },
-  pillOn: { backgroundColor: colors.gcGreen },
-  pillText: { fontSize: touch.bodyText, color: colors.gcGreen },
-  pillTextOn: { color: colors.surface },
+  line: { gap: 12 },
+  lineNext: { borderTopWidth: 1, borderTopColor: "#E4E8E1", paddingTop: 12 },
 });

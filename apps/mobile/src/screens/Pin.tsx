@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Body, Button, Field } from "../ui";
+import { Button, Field, Notice, Txt } from "../ui";
 import { useT } from "../i18n";
 import type { Session } from "../session";
 import { AuthLayout } from "./AuthLayout";
 
 const valid = (p: string) => /^\d{4,6}$/.test(p);
+const digits = (v: string) => v.replace(/\D/g, "");
 
 export function SetPin({ session }: { session: Session }) {
   const t = useT();
@@ -17,10 +18,10 @@ export function SetPin({ session }: { session: Session }) {
   };
   return (
     <AuthLayout title={t("auth.setPin")} intro={t("app.pinIntro")}>
-      {session.user && <Body tone="muted">{t("auth.signedInAs", { name: session.user.name })}</Body>}
-      {error && <Body tone="critical">{t(error)}</Body>}
-      <Field label={t("auth.setPin")} value={first} onChangeText={setFirst} keyboardType="number-pad" secureTextEntry maxLength={6} />
-      <Field label={t("auth.confirmPin")} value={second} onChangeText={setSecond} keyboardType="number-pad" secureTextEntry maxLength={6} />
+      {session.user && <Txt variant="small" tone="muted">{t("auth.signedInAs", { name: session.user.name })}</Txt>}
+      {error && <Notice tone="critical">{t(error)}</Notice>}
+      <Field big label={t("auth.setPin")} value={first} onChangeText={(v) => { setFirst(digits(v)); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={6} autoFocus />
+      <Field big label={t("auth.confirmPin")} value={second} onChangeText={(v) => { setSecond(digits(v)); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={6} onSubmitEditing={() => valid(first) && valid(second) && void submit()} />
       <Button label={t("common.save")} onPress={submit} disabled={!valid(first) || !valid(second)} />
     </AuthLayout>
   );
@@ -37,8 +38,8 @@ export function Unlock({ session }: { session: Session }) {
   };
   return (
     <AuthLayout title={session.user ? t("app.hello", { name: session.user.name }) : t("auth.enterPin")} intro={t("app.pinIntro")}>
-      {error && <Body tone="critical">{error}</Body>}
-      <Field label={t("auth.enterPin")} value={value} onChangeText={setValue} keyboardType="number-pad" secureTextEntry maxLength={6} autoFocus onSubmitEditing={() => valid(value) && void submit()} />
+      {error && <Notice tone="critical">{error}</Notice>}
+      <Field big label={t("app.pinTitleUnlock")} value={value} onChangeText={(v) => { setValue(digits(v)); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={6} autoFocus onSubmitEditing={() => valid(value) && void submit()} />
       <Button label={t("common.signIn")} onPress={submit} disabled={!valid(value)} />
     </AuthLayout>
   );

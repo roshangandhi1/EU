@@ -1,55 +1,29 @@
-import { colors, radius, space, touch } from "@eu/core/tokens";
-import type { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { Payment, ReceiptBook, SchoolClass } from "@eu/schools/mobile";
+import { streamAccent } from "@eu/core/tokens";
+import type { Local } from "./data";
 
-/** Schools-only pieces on top of src/ui.tsx. */
-export function Scroll({ children }: { children: ReactNode }) {
-  return <ScrollView contentContainerStyle={{ gap: space.sm, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">{children}</ScrollView>;
+/** The schools stream colour, for the header stripe and icons. */
+export const ACCENT = streamAccent.schools;
+
+/** "1A", or "1A · Morning" when the school runs more than one shift. */
+export function classLabel(c: Pick<SchoolClass, "level" | "section" | "shift">, shifts: number, t: (k: string) => string): string {
+  return shifts > 1 ? `${c.level}${c.section} · ${t(`schools.shift.${c.shift}`)}` : `${c.level}${c.section}`;
 }
 
-export function Row({ title, detail, onPress, selected, right, onRightPress }: {
-  title: string; detail?: string; onPress?: () => void; selected?: boolean; right?: string; onRightPress?: () => void;
-}) {
-  return (
-    <View style={[s.row, selected && s.rowSelected]}>
-      <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected }} onPress={onPress} style={s.rowMain} disabled={!onPress}>
-        <Text style={[s.rowTitle, selected && s.rowTitleSelected]}>{title}</Text>
-        {detail ? <Text style={s.rowDetail}>{detail}</Text> : null}
-      </Pressable>
-      {right ? (
-        <Pressable accessibilityRole="button" onPress={onRightPress} style={s.chip} disabled={!onRightPress}>
-          <Text style={s.chipText}>{right}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
+/** The first receipt number in this person's books that no payment has used: what they will write next. */
+export function nextReceipt(userId: string, books: readonly Local<ReceiptBook>[], payments: readonly Local<Payment>[]): number | null {
+  const used = new Set(payments.filter((p) => !p.voidedAt).map((p) => p.receiptNumber));
+  for (const b of books.filter((x) => !x.voidedAt && x.assignedTo === userId).sort((x, y) => x.firstNumber - y.firstNumber))
+    for (let n = b.firstNumber; n <= b.lastNumber; n++) if (!used.has(n)) return n;
+  return null;
 }
 
-export function Choice<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
-  return (
-    <View style={s.choices}>
-      {options.map((o) => (
-        <Pressable key={o.value} accessibilityRole="radio" accessibilityState={{ checked: o.value === value }} onPress={() => onChange(o.value)}
-          style={[s.choice, o.value === value && s.choiceOn]}>
-          <Text style={[s.choiceText, o.value === value && s.choiceTextOn]}>{o.label}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
+/** Digits typed as DDMMYYYY shown as DD/MM/YYYY, and the ISO date once complete and real. */
+export function maskDate(raw: string): { text: string; iso: string | null } {
+  const d = raw.replace(/\D/g, "").slice(0, 8);
+  const text = [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join("/");
+  if (d.length < 8) return { text, iso: null };
+  const iso = `${d.slice(4, 8)}-${d.slice(2, 4)}-${d.slice(0, 2)}`;
+  const t = new Date(`${iso}T12:00:00Z`);
+  return { text, iso: !Number.isNaN(t.getTime()) && t.toISOString().slice(0, 10) === iso ? iso : null };
 }
-
-const s = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", minHeight: touch.minTarget, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
-  rowSelected: { backgroundColor: "#FBEAEA", borderColor: colors.statusCritical },
-  rowMain: { flex: 1, paddingVertical: space.sm, paddingHorizontal: space.sm },
-  rowTitle: { fontSize: touch.bodyText, color: colors.text },
-  rowTitleSelected: { color: colors.statusCritical, fontWeight: "600" },
-  rowDetail: { fontSize: 13, color: colors.textMuted },
-  chip: { minHeight: touch.minTarget, justifyContent: "center", paddingHorizontal: space.sm, borderLeftWidth: 1, borderLeftColor: colors.border },
-  chipText: { fontSize: 14, color: colors.statusCritical },
-  choices: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
-  choice: { minHeight: touch.minTarget, justifyContent: "center", paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gcGreen },
-  choiceOn: { backgroundColor: colors.gcGreen },
-  choiceText: { fontSize: touch.bodyText, color: colors.gcGreen },
-  choiceTextOn: { color: colors.surface },
-});

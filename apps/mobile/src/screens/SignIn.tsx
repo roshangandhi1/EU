@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Body, Button, Field } from "../ui";
+import { Button, Field, Notice } from "../ui";
 import { useT } from "../i18n";
 import type { Session } from "../session";
 import { AuthLayout } from "./AuthLayout";
@@ -19,7 +19,7 @@ export function SignIn({ session }: { session: Session }) {
 
   return (
     <AuthLayout title={t("app.welcome")} intro={t("app.signInIntro")}>
-      {error && <Body tone="critical">{t(error)}</Body>}
+      {error && <Notice tone="critical">{t(error)}</Notice>}
       <Field label={t("common.email")} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" textContentType="emailAddress" returnKeyType="next" />
       <Field label={t("common.password")} value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" returnKeyType="go" onSubmitEditing={() => email && password && !busy && void submit()} />
       <Button label={busy ? t("common.loading") : t("common.signIn")} onPress={submit} disabled={busy || !email || !password} />

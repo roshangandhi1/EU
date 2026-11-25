@@ -1,10 +1,10 @@
 import { failedResults, visitSchema, type TaskResult } from "@eu/boreholes/mobile";
-import { colors, radius, space, touch } from "@eu/core/tokens";
+import { colors, streamAccent } from "@eu/core/tokens";
 import { useContext, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
-import { BackBar, Body, Button, Field, Title } from "../../ui";
+import { Button, DateField, Field, Header, Notice, Page, Section, Segmented, StatusChip, Txt, type Tone } from "../../ui";
 import { getFix, localToday, type Fix } from "../location";
 import type { BoreholeRow, Schedule } from "./data";
 import { PhotoStrip } from "../photos";
@@ -12,18 +12,6 @@ import { PhotoStrip } from "../photos";
 type Mark = "ok" | "problem" | "not_done";
 type Kind = "routine" | "repair" | "inspection" | "commissioning";
 type Severity = "no_water" | "reduced" | "minor";
-
-function Choice<T extends string | boolean>({ value, options, onChange }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void }) {
-  return (
-    <View style={s.pills}>
-      {options.map((o) => (
-        <Pressable key={String(o.v)} accessibilityRole="button" onPress={() => onChange(o.v)} style={[s.pill, value === o.v && s.pillOn]}>
-          <Text style={[s.pillText, value === o.v && s.pillTextOn]}>{o.label}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
 
 /**
  * A technician's visit: the configured checklist (from the web template), the operational check
@@ -116,96 +104,104 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
   };
 
   const yesNo = [
-    { v: true, label: t("forestry.m.yes") },
-    { v: false, label: t("forestry.m.no") },
+    { value: true, label: t("forestry.m.yes") },
+    { value: false, label: t("forestry.m.no") },
   ];
+  const dueTone = (st: string): Tone => (st === "overdue" ? "critical" : st === "due" ? "warning" : st === "due_soon" ? "info" : "muted");
+  const answered = tasks.filter((x) => resultFor(x.key) !== null).length;
 
   return (
-    <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
-      <BackBar label={t("forestry.m.back")} onBack={() => onDone(false)} />
-      <Title>{t("boreholes.visit.new")}</Title>
-      <Body tone="muted">
-        {borehole.code} · {borehole.village}
-      </Body>
-      <Field label={t("boreholes.m.visit_date")} value={visitedOn} onChangeText={setVisitedOn} placeholder={t("forestry.m.date_hint")} keyboardType="numbers-and-punctuation" />
-      <Choice<Kind> value={kind} onChange={setKind} options={(["routine", "repair", "inspection", "commissioning"] as const).map((k) => ({ v: k, label: t(`boreholes.m.kind.${k}`) }))} />
+    <Page
+      header={<Header title={t("ux.maintenanceVisit")} subtitle={`${borehole.code} · ${borehole.village}`} onBack={() => onDone(false)} backLabel={t("forestry.m.back")} accent={streamAccent.boreholes} />}
+      footer={<Button icon="check" label={t("ux.saveVisit")} onPress={() => void save()} disabled={saving} flex={1} />}
+    >
+      <Section title={t("ux.theVisit")}>
+        <DateField label={t("boreholes.m.visit_date")} value={visitedOn} onChange={setVisitedOn} max={localToday()} todayLabel={t("app.today")} yesterdayLabel={t("app.yesterday")} />
+        <Segmented<Kind> columns={2} value={kind} onChange={setKind} options={(["routine", "repair", "inspection", "commissioning"] as const).map((k) => ({ value: k, label: t(`boreholes.m.kind.${k}`) }))} />
+      </Section>
 
-      <Text style={s.h}>{t("boreholes.m.operational")}</Text>
-      <Text style={s.label}>{t("boreholes.op.pump_delivers")}</Text>
-      <Choice value={pumpDelivers} onChange={setPumpDelivers} options={yesNo} />
-      <Field label={t("boreholes.m.bucket_seconds")} value={bucketSec} onChangeText={setBucketSec} keyboardType="decimal-pad" />
-      <Body tone="muted">{lpm !== null ? t("boreholes.m.flow_result", { lpm }) : t("boreholes.visit.flow_help")}</Body>
-      <Text style={s.label}>{t("boreholes.op.tank_taps")}</Text>
-      <Choice value={tankTaps} onChange={setTankTaps} options={yesNo} />
+      <Section title={t("boreholes.m.operational")}>
+        <View style={{ gap: 6 }}>
+          <Txt variant="label">{t("boreholes.op.pump_delivers")}</Txt>
+          <Segmented value={pumpDelivers} onChange={setPumpDelivers} options={yesNo} tones={{ false: "critical" }} />
+        </View>
+        <Field label={t("boreholes.m.bucket_seconds")} value={bucketSec} onChangeText={setBucketSec} keyboardType="decimal-pad" suffix="s" hint={lpm === null ? t("boreholes.visit.flow_help") : undefined} />
+        {lpm !== null && <Notice tone="good" icon="drop" title={t("boreholes.m.flow_result", { lpm })} />}
+        <View style={{ gap: 6 }}>
+          <Txt variant="label">{t("boreholes.op.tank_taps")}</Txt>
+          <Segmented value={tankTaps} onChange={setTankTaps} options={yesNo} tones={{ false: "critical" }} />
+        </View>
+      </Section>
 
-      <Text style={s.h}>{t("boreholes.m.tasks")}</Text>
-      {tasks.map((task) => {
-        const r = resultFor(task.key);
-        return (
-          <View key={task.key} style={[s.task, dueKeys.has(task.key) && s.taskDue]}>
-            <Text style={s.taskTitle}>{task.label[locale]}</Text>
-            {(() => {
-              const d = borehole.due.find((x) => x.taskKey === task.key);
-              return d ? <Text style={s.label}>{t(`boreholes.due.${d.status}`)}{d.dueOn ? ` · ${d.dueOn}` : ""}</Text> : null;
-            })()}
-            {task.proof.kind === "reading" ? (
-              <Field
-                label={t("boreholes.m.reading", { unit: task.proof.unit })}
-                value={readings[task.key] ?? (task.proof.unit === "L/min" && lpm !== null ? String(lpm) : "")}
-                onChangeText={(v) => setReadings({ ...readings, [task.key]: v })}
-                keyboardType="decimal-pad"
-              />
-            ) : (
-              <Choice<Mark>
-                value={marks[task.key] ?? ("" as Mark)}
-                onChange={(m) => setMarks({ ...marks, [task.key]: m })}
-                options={[
-                  { v: "ok", label: t("boreholes.m.done_ok") },
-                  { v: "problem", label: t("boreholes.m.problem") },
-                  { v: "not_done", label: t("boreholes.m.not_done") },
-                ]}
-              />
-            )}
-            {task.proof.kind === "photo" && <Body tone="muted">{t("boreholes.m.photo_task")}</Body>}
-            {task.proof.kind === "photo" && (
-              <PhotoStrip session={session} entity="boreholes.visit" scopeId={borehole.siteId} ids={taskPhotos[task.key] ?? []} onChange={(ids) => setTaskPhotos({ ...taskPhotos, [task.key]: ids })} />
-            )}
-            {r && r.pass === false && task.failOpensFault && <Body tone="critical">{t("boreholes.m.out_of_range")}</Body>}
-            {r && r.pass === false && (
-              <Field label={t("boreholes.m.note")} value={taskNotes[task.key] ?? ""} onChangeText={(v) => setTaskNotes({ ...taskNotes, [task.key]: v })} />
-            )}
-          </View>
-        );
-      })}
+      <Section title={t("boreholes.m.tasks")} right={<StatusChip label={`${answered}/${tasks.length}`} tone={answered === tasks.length ? "good" : "muted"} />}>
+        {tasks.map((task) => {
+          const r = resultFor(task.key);
+          const d = borehole.due.find((x) => x.taskKey === task.key);
+          return (
+            <View key={task.key} style={[s.task, dueKeys.has(task.key) && d?.status !== "each_visit" && s.taskDue]}>
+              <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                <Txt weight={700} style={{ flex: 1 }}>{task.label[locale]}</Txt>
+                {d && d.status !== "each_visit" ? <StatusChip label={t(`boreholes.due.${d.status}`)} tone={dueTone(d.status)} /> : null}
+              </View>
+              {task.proof.kind === "reading" ? (
+                <Field
+                  label={t("boreholes.m.reading", { unit: task.proof.unit })}
+                  value={readings[task.key] ?? (task.proof.unit === "L/min" && lpm !== null ? String(lpm) : "")}
+                  onChangeText={(v) => setReadings({ ...readings, [task.key]: v })}
+                  keyboardType="decimal-pad"
+                  suffix={task.proof.unit}
+                />
+              ) : (
+                <Segmented<Mark>
+                  value={marks[task.key]}
+                  onChange={(m) => setMarks({ ...marks, [task.key]: m })}
+                  tones={{ problem: "critical", not_done: "muted" }}
+                  options={[
+                    { value: "ok", label: t("ux.taskOk") },
+                    { value: "problem", label: t("boreholes.m.problem") },
+                    { value: "not_done", label: t("boreholes.m.not_done") },
+                  ]}
+                />
+              )}
+              {task.proof.kind === "photo" && (
+                <PhotoStrip session={session} entity="boreholes.visit" scopeId={borehole.siteId} ids={taskPhotos[task.key] ?? []} onChange={(ids) => setTaskPhotos({ ...taskPhotos, [task.key]: ids })} hint={t("boreholes.m.photo_task")} />
+              )}
+              {r && r.pass === false && task.failOpensFault && <Notice tone="critical">{t("boreholes.m.out_of_range")}</Notice>}
+              {r && r.pass === false && (
+                <Field label={t("boreholes.m.note")} value={taskNotes[task.key] ?? ""} onChangeText={(v) => setTaskNotes({ ...taskNotes, [task.key]: v })} />
+              )}
+            </View>
+          );
+        })}
+      </Section>
 
       {faults.length > 0 && (
-        <>
-          <Body tone="warning">{t("boreholes.m.faults_will_open", { n: faults.length })}</Body>
-          <Text style={s.label}>{t("boreholes.m.fault_severity")}</Text>
-          <Choice<Severity> value={severity} onChange={setSeverity} options={(["no_water", "reduced", "minor"] as const).map((v) => ({ v, label: t(`boreholes.m.sev.${v}`) }))} />
-        </>
+        <Section title={t("boreholes.m.faults_will_open", { n: faults.length })} hint={t("boreholes.m.fault_severity")}>
+          <Segmented<Severity> value={severity} onChange={setSeverity} options={(["no_water", "reduced", "minor"] as const).map((v) => ({ value: v, label: t(`boreholes.m.sev.${v}`) }))} />
+        </Section>
       )}
 
-      <Field label={t("forestry.m.notes")} value={notes} onChangeText={setNotes} multiline />
-      <PhotoStrip session={session} entity="boreholes.visit" scopeId={borehole.siteId} ids={photos} onChange={setPhotos} />
-      <Body tone={fix ? "good" : "muted"}>{fix ? t("forestry.m.gps_ok", { m: Math.round(fix.accuracyM ?? 0) }) : t("forestry.m.gps_none")}</Body>
-      {error && <Body tone="critical">{error}</Body>}
-      <Button label={t("forestry.m.save")} onPress={() => void save()} disabled={saving} />
-      <Button kind="secondary" label={t("forestry.m.back")} onPress={() => onDone(false)} />
-    </ScrollView>
+      <Section title={t("ux.notesPhotos")}>
+        <Field label={t("forestry.m.notes")} value={notes} onChangeText={setNotes} multiline />
+        <PhotoStrip session={session} entity="boreholes.visit" scopeId={borehole.siteId} ids={photos} onChange={setPhotos} />
+        <GpsLine fix={fix} />
+      </Section>
+      {error && <Notice tone="critical">{error}</Notice>}
+    </Page>
+  );
+}
+
+/** Whether the visit will carry a GPS position. */
+export function GpsLine({ fix, note }: { fix: Fix | null; note?: string | null }) {
+  const t = useT();
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <StatusChip icon="pin" label={note ?? (fix ? t("forestry.m.gps_ok", { m: Math.round(fix.accuracyM ?? 0) }) : t("forestry.m.gps_none"))} tone={fix && !note ? "good" : "muted"} />
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { padding: space.md, paddingTop: space.xl, gap: space.sm, backgroundColor: colors.surface },
-  h: { fontSize: 18, fontWeight: "700", color: colors.gcGreen, marginTop: space.sm },
-  label: { fontSize: 14, color: colors.textMuted },
-  task: { gap: space.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.sm },
-  taskDue: { borderColor: colors.statusWarning, borderWidth: 2 },
-  taskTitle: { fontSize: touch.bodyText, fontWeight: "600", color: colors.text },
-  pills: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
-  pill: { minHeight: touch.minTarget, justifyContent: "center", paddingHorizontal: space.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gcGreen },
-  pillOn: { backgroundColor: colors.gcGreen },
-  pillText: { fontSize: touch.bodyText, color: colors.gcGreen },
-  pillTextOn: { color: colors.surface },
+  task: { gap: 10, borderWidth: 1, borderColor: "#E4E8E1", borderRadius: 12, padding: 12, backgroundColor: "#FAFBF9" },
+  taskDue: { borderColor: colors.statusWarning, borderLeftWidth: 4 },
 });

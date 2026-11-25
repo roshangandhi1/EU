@@ -1,10 +1,10 @@
 import { distanceToGeomM, pointInMultiPolygon, type ForestryStream } from "@eu/forestry/mobile";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { colors, radius, space, touch } from "@eu/core/tokens";
+import { View } from "react-native";
+import { colors, streamAccent } from "@eu/core/tokens";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
-import { BackBar, Body, Button, Title } from "../../ui";
+import { Button, Card, EmptyState, Header, IconBadge, ListGroup, ListRow, Notice, Page, Stat, StatusChip, Toast, Txt, type Tone } from "../../ui";
 import { getFix } from "../location";
 import { loadPlots, type PlotLite } from "./data";
 import { MonitoringVisit } from "./MonitoringVisit";
@@ -53,49 +53,56 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
   };
   if (open && mode === "planting") return <PlantingForm session={session} stream={stream} plot={open} onDone={(ok) => done(ok, t("forestry.m.saved"))} />;
   if (open && mode === "visit") return <MonitoringVisit session={session} stream={stream} plot={open} onDone={(ok) => done(ok, t("forestry.m.visit_saved"))} />;
+  const accent = streamAccent[stream];
+  const statusTone = (st: string): Tone => (st === "planted" || st === "established" ? "good" : st === "pegged" || st === "prepared" ? "info" : st === "failed" || st === "abandoned" ? "critical" : "muted");
   if (open) {
     return (
-      <ScrollView contentContainerStyle={s.wrap}>
-        <BackBar label={t("forestry.m.back")} onBack={() => setOpen(null)} />
-        <Title>
-          {t("forestry.plot")} {open.code}
-        </Title>
-        <Body tone="muted">{open.village}</Body>
-        <Body>{t("forestry.m.what_now")}</Body>
-        <Button label={t("forestry.planting.new")} onPress={() => setMode("planting")} />
-        <Button label={t("forestry.visit.new")} onPress={() => setMode("visit")} />
-      </ScrollView>
+      <Page header={<Header title={`${t("forestry.plot")} ${open.code}`} subtitle={`${t(`forestry.${stream}`)} · ${open.village}`} onBack={() => setOpen(null)} backLabel={t("forestry.m.back")} accent={accent} />}>
+        <Card>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <StatusChip label={t(`forestry.status.${open.status}`)} tone={statusTone(open.status)} />
+            {!open.geom && <StatusChip label={t("ux.noBoundary")} tone="warning" />}
+          </View>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <Stat value={open.planted.toLocaleString("fr-FR")} label={t("ux.plantsPlanted")} />
+            <Stat value={open.plantings} label={t("ux.plantingsRecorded")} />
+          </View>
+        </Card>
+        <Txt variant="heading">{t("forestry.m.what_now")}</Txt>
+        <ListGroup>
+          <ListRow title={t("forestry.planting.new")} detail={t("ux.plantingHint")} leading={<IconBadge icon="sprout" color={accent} size={48} />} onPress={() => setMode("planting")} chevron />
+          <ListRow title={t("forestry.visit.new")} detail={t("ux.visitHint")} leading={<IconBadge icon="compass" color={accent} size={48} />} onPress={() => setMode("visit")} chevron />
+        </ListGroup>
+      </Page>
     );
   }
 
   const sorted = plots && highlight ? [...plots.filter((p) => p.id === highlight), ...plots.filter((p) => p.id !== highlight)] : plots;
 
   return (
-    <ScrollView contentContainerStyle={s.wrap}>
-      <BackBar label={t("forestry.m.back")} onBack={onBack} />
-      <Title>{t(`forestry.${stream}`)}</Title>
-      {flash && <Body tone="good">{flash}</Body>}
-      <Button label={t("forestry.m.find_plot")} onPress={() => void findPlot()} disabled={!plots || plots.length === 0} />
-      {gpsNote && <Body tone="muted">{gpsNote}</Body>}
-      <Body tone="muted">{t("forestry.m.choose_plot")}</Body>
-      {plots && plots.length === 0 && <Body tone="warning">{t("forestry.m.no_plots")}</Body>}
-      {sorted?.map((p) => (
-        <Pressable key={p.id} accessibilityRole="button" onPress={() => setOpen(p)} style={[s.row, p.id === highlight && s.rowHot]}>
-          <Text style={s.code}>{p.code}</Text>
-          <Text style={s.meta}>
-            {p.village} · {t(`forestry.status.${p.status}`)}
-          </Text>
-          {p.plantings > 0 && <Text style={s.meta}>{t("forestry.m.plantings_here", { n: p.plantings, total: p.planted })}</Text>}
-        </Pressable>
-      ))}
-    </ScrollView>
+    <Page
+      header={<Header title={t(`forestry.${stream}`)} subtitle={plots ? t("ux.plotsSummary", { n: plots.length }) : undefined} onBack={onBack} backLabel={t("forestry.m.back")} accent={accent} />}
+      toast={<Toast message={flash} onHide={() => setFlash(null)} />}
+    >
+      <Button kind="secondary" icon="locate" label={t("forestry.m.find_plot")} onPress={() => void findPlot()} disabled={!plots || plots.length === 0} />
+      {gpsNote && <Notice tone={highlight ? "good" : "info"} icon={highlight ? "pin" : "locate"}>{gpsNote}</Notice>}
+      {plots && plots.length === 0 && <EmptyState icon={stream === "bamboo" ? "bamboo" : "tree"} color={accent} title={t("app.emptyTitle")}><Txt center>{t("forestry.m.no_plots")}</Txt></EmptyState>}
+      {sorted && sorted.length > 0 && (
+        <ListGroup>
+          {sorted.map((p) => (
+            <ListRow
+              key={p.id}
+              title={p.code}
+              detail={p.plantings > 0 ? `${p.village} · ${t("ux.plantsShort", { n: p.planted.toLocaleString("fr-FR") })}` : p.village}
+              leading={<IconBadge icon={stream === "bamboo" ? "bamboo" : "tree"} color={accent} />}
+              status={<StatusChip label={t(`forestry.status.${p.status}`)} tone={statusTone(p.status)} />}
+              onPress={() => setOpen(p)}
+              highlight={p.id === highlight}
+              chevron
+            />
+          ))}
+        </ListGroup>
+      )}
+    </Page>
   );
 }
-
-const s = StyleSheet.create({
-  wrap: { padding: space.md, paddingTop: space.xl, gap: space.sm, backgroundColor: colors.surface },
-  row: { minHeight: touch.minTarget, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.sm, gap: 2 },
-  rowHot: { borderColor: colors.gcGreen, borderWidth: 2 },
-  code: { fontSize: touch.bodyText, fontWeight: "700", color: colors.text },
-  meta: { fontSize: 14, color: colors.textMuted },
-});

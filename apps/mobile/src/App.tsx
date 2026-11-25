@@ -3,6 +3,7 @@ import { isLocale } from "@eu/core/i18n";
 import { StatusBar } from "expo-status-bar";
 import "./strings";
 import { useEffect, useMemo, useReducer, useState } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Body, Screen } from "./ui";
 import { deviceLocale, LocaleContext } from "./i18n";
 import { savedLocale } from "./secure";
@@ -41,9 +42,11 @@ export default function App() {
   else screen = <Screen><Body tone="muted">…</Body></Screen>;
 
   return (
-    <LocaleContext.Provider value={{ locale, setLocale }}>
-      <StatusBar style={session.phase === "home" || session.phase === "signIn" || session.phase === "setPin" || session.phase === "unlock" ? "light" : "dark"} />
-      {screen}
-    </LocaleContext.Provider>
+    <SafeAreaProvider>
+      <LocaleContext.Provider value={{ locale, setLocale }}>
+        <StatusBar style={session.phase === "home" || session.phase === "signIn" || session.phase === "setPin" || session.phase === "unlock" ? "light" : "dark"} />
+        {screen}
+      </LocaleContext.Provider>
+    </SafeAreaProvider>
   );
 }

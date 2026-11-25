@@ -1,17 +1,19 @@
 import { absenceReason, activeOn, planRegister, type Absence } from "@eu/schools/mobile";
+import { colors } from "@eu/core/tokens";
 import { useEffect, useMemo, useState } from "react";
-import { View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useT } from "../../i18n";
+import { Icon } from "../../icons";
 import type { Session } from "../../session";
-import { BackBar, Body, Button, Title } from "../../ui";
-import { addDays, currentYear, live, studentName, today, type SchoolData } from "./data";
-import { Choice, Row, Scroll } from "./parts";
+import { Button, Card, DateField, Header, ListGroup, Notice, Page, Segmented, Stat, StatusChip, Toast, Txt, ui } from "../../ui";
+import { currentYear, live, studentName, today, type SchoolData } from "./data";
+import { ACCENT, classLabel } from "./parts";
 
 type Reason = Absence["reason"];
 const REASONS = absenceReason.options;
 
 /**
- * Typing up a paper register: pick a class and a day, tap the pupils who were absent.
+ * Typing up a paper register: pick a day and a class, tap the pupils who were absent.
  * Saving writes a register-taken marker, so "all present" differs from "not entered".
  */
 export function Attendance({ session, data, onBack }: { session: Session; data: SchoolData; onBack: () => void }) {
@@ -22,22 +24,29 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
     () => live(data.classes).filter((c) => c.academicYearId === year?.id).sort((a, b) => a.level - b.level || a.section.localeCompare(b.section) || a.shift.localeCompare(b.shift)),
     [data.classes, year?.id],
   );
+  const registers = live(data.registers);
+  const takenFor = (cid: string) => registers.some((r) => r.classId === cid && r.date === date);
+  // Open on the first class still missing a register for the day: usually the next one to type up.
   const [classId, setClassId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!classId || !classes.some((c) => c.id === classId)) setClassId((classes.find((c) => !takenFor(c.id)) ?? classes[0])?.id ?? null);
+  }, [classes, date]); // eslint-disable-line react-hooks/exhaustive-deps
   const cls = classes.find((c) => c.id === classId) ?? null;
 
   const existing = useMemo(
     () => live(data.absences).filter((a) => a.classId === classId && a.date === date),
     [data.absences, classId, date],
   );
-  const taken = live(data.registers).some((r) => r.classId === classId && r.date === date);
+  const taken = !!classId && takenFor(classId);
   const [absent, setAbsent] = useState<Map<string, Reason>>(new Map());
-  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Start from what is already recorded for this class and day.
   useEffect(() => {
     setAbsent(new Map(existing.map((a) => [a.studentId, a.reason])));
-    setSaved(false);
+    setDirty(false);
   }, [classId, date, existing.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const students = new Map(data.students.map((s) => [s.id, s]));
@@ -52,14 +61,14 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
     if (next.has(id)) next.delete(id);
     else next.set(id, "unknown");
     setAbsent(next);
-    setSaved(false);
+    setDirty(true);
   };
   const cycleReason = (id: string) => {
     const r = absent.get(id) ?? "unknown";
     const next = new Map(absent);
     next.set(id, REASONS[(REASONS.indexOf(r) + 1) % REASONS.length] ?? "unknown");
     setAbsent(next);
-    setSaved(false);
+    setDirty(true);
   };
 
   const save = async () => {
@@ -76,40 +85,89 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
     await session.refreshCounts();
     void session.syncNow();
     setBusy(false);
-    setSaved(true);
+    setDirty(false);
+    setToast(t("app.savedOnPhone"));
   };
 
-  if (!year) return <><BackBar label={t("schools.mobile.back")} onBack={onBack} /><Title>{t("schools.attendance.title")}</Title><Body tone="warning">{t("schools.mobile.needYear")}</Body></>;
+  const shifts = new Set(classes.map((c) => c.shift)).size;
+  const header = <Header title={t("schools.attendance.title")} subtitle={data.school.code} onBack={onBack} backLabel={t("schools.mobile.back")} accent={ACCENT} />;
+  if (!year)
+    return (
+      <Page header={header}>
+        <Notice tone="warning">{t("schools.mobile.needYear")}</Notice>
+      </Page>
+    );
 
   return (
-    <Scroll>
-      <BackBar label={t("schools.mobile.back")} onBack={onBack} />
-      <Title>{t("schools.attendance.title")}</Title>
-      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <View style={{ flex: 1 }}><Button kind="secondary" label="‹" onPress={() => setDate(addDays(date, -1))} /></View>
-        <View style={{ flex: 3 }}><Body>{date}</Body></View>
-        <View style={{ flex: 1 }}><Button kind="secondary" label="›" onPress={() => setDate(addDays(date, 1))} disabled={date >= today()} /></View>
-      </View>
-      {classes.length === 0 ? <Body tone="warning">{t("schools.mobile.noClasses")}</Body> : (
-        <Choice
-          value={classId ?? ""}
-          onChange={(v) => setClassId(v)}
-          options={classes.map((c) => ({ value: c.id, label: `${c.level}${c.section} · ${t(`schools.shift.${c.shift}`)}` }))}
-        />
+    <Page
+      header={header}
+      toast={<Toast message={toast} onHide={() => setToast(null)} />}
+      footer={cls && <Button icon="check" kind={taken && !dirty ? "secondary" : "primary"} label={taken && !dirty ? t("ux.registerSaved") : t("schools.attendance.saveRegister")} onPress={() => void save()} disabled={busy || roster.length === 0} flex={1} />}
+    >
+      <DateField value={date} onChange={setDate} max={today()} todayLabel={t("app.today")} yesterdayLabel={t("app.yesterday")} />
+      {classes.length === 0 ? (
+        <Notice tone="warning">{t("schools.mobile.noClasses")}</Notice>
+      ) : (
+        <View style={{ gap: 6 }}>
+          <Txt variant="label">{t("schools.student.enrolledIn")}</Txt>
+          <Segmented
+            columns={Math.min(classes.length, shifts > 1 ? 2 : 3)}
+            value={classId}
+            onChange={(v) => setClassId(v)}
+            options={classes.map((c) => ({ value: c.id, label: `${classLabel(c, shifts, t)}${takenFor(c.id) ? " ✓" : ""}` }))}
+          />
+        </View>
       )}
       {cls && (
         <>
-          <Body tone={taken ? "good" : "muted"}>{taken ? t("schools.attendance.taken") : t("schools.attendance.notTaken")}</Body>
-          <Body tone="muted">{t("schools.mobile.tapAbsent")}</Body>
-          {roster.map((s) => (
-            <Row key={s.id} title={studentName(s)} detail={s.studentNumber} selected={absent.has(s.id)} onPress={() => toggle(s.id)}
-              right={absent.has(s.id) ? t(`schools.attendance.reasons.${absent.get(s.id)}`) : undefined} onRightPress={() => cycleReason(s.id)} />
-          ))}
-          <Body>{t("schools.attendance.present")}: {roster.length - absent.size} · {t("schools.attendance.absent")}: {absent.size}</Body>
-          {saved && <Body tone="good">{t("schools.mobile.savedOffline")}</Body>}
-          <Button label={t("schools.attendance.saveRegister")} onPress={() => void save()} disabled={busy || roster.length === 0} />
+          <Card>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Stat value={roster.length - absent.size} label={t("schools.attendance.present")} tone="good" />
+              <Stat value={absent.size} label={t("schools.attendance.absent")} tone={absent.size ? "critical" : undefined} />
+              {taken ? <StatusChip label={t("schools.attendance.taken")} tone="good" icon="check" /> : <StatusChip label={t("schools.attendance.notTaken")} tone="warning" />}
+            </View>
+          </Card>
+          <Txt variant="small" tone="muted">{t("schools.mobile.tapAbsent")}</Txt>
+          <ListGroup>
+            {roster.map((s) => {
+              const out = absent.has(s.id);
+              return (
+                <Pressable
+                  key={s.id}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: !out }}
+                  accessibilityLabel={`${studentName(s)}, ${out ? t("schools.attendance.absent") : t("schools.attendance.present")}`}
+                  onPress={() => toggle(s.id)}
+                  android_ripple={{ color: colors.border }}
+                  style={[st.row, out && { backgroundColor: ui.dangerTint }]}
+                >
+                  <View style={[st.mark, out ? st.markOut : st.markIn]}>
+                    <Icon name={out ? "x" : "check"} size={20} color={colors.surface} strokeWidth={2.8} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Txt weight={600} lines={1} color={out ? colors.statusCritical : colors.text}>{studentName(s)}</Txt>
+                    <Txt variant="small" tone="muted">{s.studentNumber}</Txt>
+                  </View>
+                  {out && (
+                    <Pressable accessibilityRole="button" accessibilityLabel={t("ux.changeReason")} onPress={() => cycleReason(s.id)} style={st.reason} hitSlop={4}>
+                      <Txt variant="label" color={colors.statusCritical}>{t(`schools.attendance.reasons.${absent.get(s.id)}`)}</Txt>
+                      <Icon name="sync" size={14} color={colors.statusCritical} />
+                    </Pressable>
+                  )}
+                </Pressable>
+              );
+            })}
+          </ListGroup>
         </>
       )}
-    </Scroll>
+    </Page>
   );
 }
+
+const st = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 60, paddingHorizontal: 16, paddingVertical: 8 },
+  mark: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  markIn: { backgroundColor: colors.statusGood },
+  markOut: { backgroundColor: colors.statusCritical },
+  reason: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 40, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1.5, borderColor: colors.statusCritical, backgroundColor: colors.surface },
+});

@@ -19,4 +19,19 @@ config.resolver.extraNodeModules = {
 config.resolver.disableHierarchicalLookup = true;
 config.resolver.unstable_enablePackageExports = true;
 
+// Browser preview for design review (EU_PREVIEW=1, see preview/README.md): the real screens on an
+// in-memory demo session, with the native-only modules stubbed. Never used for the Android build.
+if (process.env.EU_PREVIEW) {
+  const stubs = {
+    "expo-secure-store": path.join(projectRoot, "preview/stubs/secure-store.js"),
+    "expo-location": path.join(projectRoot, "preview/stubs/location.js"),
+  };
+  config.resolver.resolveRequest = (context, moduleName, platform) => {
+    if (stubs[moduleName]) return { type: "sourceFile", filePath: stubs[moduleName] };
+    if (moduleName === "./src/App" && context.originModulePath === path.join(projectRoot, "index.ts"))
+      return { type: "sourceFile", filePath: path.join(projectRoot, "preview/PreviewApp.tsx") };
+    return context.resolveRequest(context, moduleName, platform);
+  };
+}
+
 module.exports = config;
