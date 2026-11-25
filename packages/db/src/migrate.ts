@@ -4,9 +4,19 @@ import { migrate } from "drizzle-orm/neon-serverless/migrator";
 import { fileURLToPath } from "node:url";
 import ws from "ws";
 
-// Applies pending migrations. Run during the Vercel build when DATABASE_URL is set.
+/**
+ * Applies pending migrations. Runs during the Vercel build.
+ * On Vercel it runs only for production builds: a preview build of an unmerged branch must never
+ * apply that branch's migrations to a shared database. Off Vercel (CI, local) it runs whenever
+ * DATABASE_URL is set.
+ */
 async function main() {
   const url = process.env.DATABASE_URL;
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (vercelEnv && vercelEnv !== "production") {
+    console.log(`VERCEL_ENV=${vercelEnv}; migrations run only on production builds. Skipping.`);
+    return;
+  }
   if (!url) {
     console.log("DATABASE_URL not set; skipping migrations.");
     return;
