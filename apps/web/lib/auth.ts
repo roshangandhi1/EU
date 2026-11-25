@@ -1,6 +1,6 @@
 import { ROLES, type Role, type RoleAssignment, type Stream, type UserContext } from "@eu/core";
-import { devices, loginAttempts, roleAssignments, sessions, users, type Db } from "@eu/db";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { devices, loginAttempts, roleAssignments, sessions, sites, users, type Db } from "@eu/db";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
@@ -144,13 +144,22 @@ export async function loadAssignments(db: Db, userId: string): Promise<RoleAssig
     scopeType: string;
     scopeValue: string | null;
   }[];
+  const siteIds = rows.filter((r) => r.scopeType === "site" && r.scopeValue).map((r) => r.scopeValue!);
+  const siteStreams = new Map<string, string>();
+  if (siteIds.length) {
+    const found = (await (db as AnyDb).select({ id: sites.id, stream: sites.stream }).from(sites).where(inArray(sites.id, siteIds))) as { id: string; stream: string }[];
+    for (const s of found) siteStreams.set(s.id, s.stream);
+  }
   const out: RoleAssignment[] = [];
   for (const r of rows) {
     if (!(ROLES as readonly string[]).includes(r.role)) continue;
     const role = r.role as Role;
     if (r.scopeType === "global") out.push({ role, scope: { type: "global" } });
     else if (r.scopeType === "stream" && r.scopeValue) out.push({ role, scope: { type: "stream", stream: r.scopeValue as Stream } });
-    else if (r.scopeType === "site" && r.scopeValue) out.push({ role, scope: { type: "site", siteId: r.scopeValue } });
+    else if (r.scopeType === "site" && r.scopeValue) {
+      const stream = siteStreams.get(r.scopeValue);
+      out.push({ role, scope: { type: "site", siteId: r.scopeValue, ...(stream ? { stream: stream as Stream } : {}) } });
+    }
   }
   return out;
 }
