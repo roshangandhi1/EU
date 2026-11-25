@@ -38,7 +38,7 @@ export const locale = z.enum(["en", "fr"]);
 
 /** School attributes, keyed by the platform sites row (kind 'school'). */
 export const school = z.object({
-  siteId: id,
+  siteId: z.string().min(1),
   code: z.string().min(2).max(12),
   locale,
   /** Shifts this school actually runs. Places are only counted for shifts listed here. */

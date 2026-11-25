@@ -1,4 +1,6 @@
 import { PermissionRegistry, platformActions } from "@eu/core";
+import { registerNamespace } from "@eu/core/i18n";
+import { schoolsActions, schoolsEn, schoolsEntities, schoolsFr } from "@eu/schools";
 import { EntityRegistry } from "@eu/sync";
 
 /**
@@ -6,5 +8,7 @@ import { EntityRegistry } from "@eu/sync";
  * add them here, e.g.
  *   permissions.register(schoolsActions); entities.register(...schoolsEntities);
  */
-export const permissions = new PermissionRegistry().register(platformActions);
-export const entities = new EntityRegistry();
+export const permissions = new PermissionRegistry().register(platformActions).register(schoolsActions);
+export const entities = new EntityRegistry().register(...schoolsEntities);
+
+registerNamespace("schools", { en: schoolsEn, fr: schoolsFr });
