@@ -10,9 +10,20 @@ const WEB_TAG = "W";
 export interface EnrolState {
   error?: string;
   matches?: string;
+  /** What was typed, so a refused form comes back filled in (React resets forms after an action). */
+  values?: Record<string, string>;
+  /** Changes on every refusal so the form remounts with the values above. */
+  n?: number;
 }
 
-export async function enrolStudent(_prev: EnrolState, fd: FormData): Promise<EnrolState> {
+const keep = (fd: FormData) => Object.fromEntries([...fd.entries()].filter(([, v]) => typeof v === "string") as [string, string][]);
+
+export async function enrolStudent(prev: EnrolState, fd: FormData): Promise<EnrolState> {
+  const r = await enrol(fd);
+  return r ? { ...r, values: keep(fd), n: (prev.n ?? 0) + 1 } : {};
+}
+
+async function enrol(fd: FormData): Promise<EnrolState | void> {
   const { me, locale } = await signedIn(str(fd, "locale"));
   const siteId = str(fd, "siteId");
   const path = `/${locale}/schools/${siteId}/students`;
@@ -61,7 +72,7 @@ export async function enrolStudent(_prev: EnrolState, fd: FormData): Promise<Enr
   revalidatePath(path);
   const bad = firstRejection(res);
   if (bad) return { error: bad };
-  back(path, { ok: "1" });
+  back(path, { ok: "enrolled", num: fields.studentNumber });
 }
 
 export async function recordLeaving(fd: FormData) {
@@ -79,5 +90,5 @@ export async function recordLeaving(fd: FormData) {
   ]);
   revalidatePath(path);
   const bad = firstRejection(res);
-  back(path, bad ? { error: bad } : { ok: "1" });
+  back(path, bad ? { error: bad } : { ok: "left" });
 }

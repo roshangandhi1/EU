@@ -1,37 +1,42 @@
 "use server";
 import { insertMutation, updateMutation, voidMutation, schoolsEntities } from "@eu/schools";
 import { revalidatePath } from "next/cache";
-import { back, can, firstRejection, int, newId, orNull, parseLevels, push, schoolFor, signedIn, str } from "@/lib/schools";
+import { redirect } from "next/navigation";
+import { can, firstRejection, int, newId, orNull, parseLevels, push, schoolFor, signedIn, str } from "@/lib/schools";
 
 const CONFIG = new Set(["school.academic_year", "school.term", "school.classroom", "school.class", "school.fee_item", "school.receipt_book", "school.exemption", "school.device_tag"]);
 
 async function ctx(fd: FormData) {
   const { me, locale } = await signedIn(str(fd, "locale"));
   const siteId = str(fd, "siteId");
+  const section = str(fd, "section").replace(/[^a-z-]/g, "");
   const path = `/${locale}/schools/${siteId}/setup`;
-  if (!can(me, "school.configure", siteId)) back(path, { error: "forbidden" });
-  return { me, locale, siteId, path };
+  // Results come back to the section that sent them (?s=) and the page scrolls to it (#).
+  const go = (q: Record<string, string>): never =>
+    redirect(`${path}?${new URLSearchParams({ ...q, ...(section ? { s: section } : {}), ...(q.ok ? { n: Date.now().toString(36) } : {}) })}${section ? `#${section}` : ""}`);
+  if (!can(me, "school.configure", siteId)) go({ error: "forbidden" });
+  return { me, locale, siteId, path, go };
 }
 
 async function insert(fd: FormData, entity: string, fields: Record<string, unknown>) {
-  const { me, locale, siteId, path } = await ctx(fd);
+  const { me, locale, siteId, go } = await ctx(fd);
   const def = schoolsEntities.find((e) => e.name === entity)!;
-  if (!def.schema.safeParse(fields).success) back(path, { error: "invalid" });
+  if (!def.schema.safeParse(fields).success) go({ error: "invalid" });
   const res = await push(me, [insertMutation(entity, siteId, fields, { mutationId: newId(), recordId: newId() })]);
   revalidatePath(`/${locale}/schools/${siteId}`, "layout");
   const bad = firstRejection(res);
-  back(path, bad ? { error: bad } : { ok: "1" });
+  go(bad ? { error: bad } : { ok: "added" });
 }
 
 export async function saveSchool(fd: FormData) {
-  const { me, locale, siteId, path } = await ctx(fd);
+  const { me, locale, siteId, go } = await ctx(fd);
   const d = await schoolFor(me, siteId);
   const shiftsRunning = fd.getAll("shiftsRunning").map(String).filter((s) => s === "morning" || s === "afternoon");
-  if (!d.school || shiftsRunning.length === 0) back(path, { error: "invalid" });
+  if (!d.school || shiftsRunning.length === 0) go({ error: "invalid" });
   const res = await push(me, [updateMutation("school.school", siteId, d.school!.id, { shiftsRunning }, newId())]);
   revalidatePath(`/${locale}/schools/${siteId}`, "layout");
   const bad = firstRejection(res);
-  back(path, bad ? { error: bad } : { ok: "1" });
+  go(bad ? { error: bad } : { ok: "saved" });
 }
 
 export const addYear = async (fd: FormData) =>
@@ -82,21 +87,21 @@ export const addExemption = async (fd: FormData) =>
   });
 
 export async function voidConfig(fd: FormData) {
-  const { me, locale, siteId, path } = await ctx(fd);
+  const { me, locale, siteId, go } = await ctx(fd);
   const entity = str(fd, "entity");
-  if (!CONFIG.has(entity)) back(path, { error: "invalid" });
+  if (!CONFIG.has(entity)) go({ error: "invalid" });
   const res = await push(me, [voidMutation(entity, siteId, str(fd, "id"), str(fd, "reason") || "Removed in setup", newId())]);
   revalidatePath(`/${locale}/schools/${siteId}`, "layout");
   const bad = firstRejection(res);
-  back(path, bad ? { error: bad } : { ok: "1" });
+  go(bad ? { error: bad } : { ok: "removed" });
 }
 
 /** One letter per phone per school, never W (the web's), never reused while assigned. */
 export async function addDeviceTag(fd: FormData) {
-  const { me, siteId, path } = await ctx(fd);
+  const { me, siteId, go } = await ctx(fd);
   const d = await schoolFor(me, siteId);
   const deviceId = str(fd, "deviceId");
   const tag = str(fd, "tag").toUpperCase();
-  if (d.deviceTags.some((x) => !x.voidedAt && (x.tag === tag || x.phoneId === deviceId))) back(path, { error: "letter_taken" });
+  if (d.deviceTags.some((x) => !x.voidedAt && (x.tag === tag || x.phoneId === deviceId))) go({ error: "letter_taken" });
   return insert(fd, "school.device_tag", { phoneId: deviceId, tag });
 }

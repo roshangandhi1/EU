@@ -1,7 +1,8 @@
 import { activeOn, placesAsAt } from "@eu/schools";
 import { Icon } from "@/components/icons";
 import Link from "next/link";
-import { Button, Field, Form, Notice, PageHeader, Table } from "@/components/ui";
+import { Field, Fields, FormFooter, Notice, PageHeader, Section, SubmitButton, Table } from "@/components/ui";
+import { t } from "@eu/core/i18n";
 import { db } from "@/lib/http";
 import { can, mySchools, signedIn, today, tr as trFor } from "@/lib/schools";
 import { loadSchool } from "@eu/schools";
@@ -32,6 +33,7 @@ export default async function SchoolsPage({ params, searchParams }: { params: Pr
         rows={rows}
         rowKey={(r) => r.id}
         empty={tr("common.none")}
+        emptyIcon="school"
         columns={[
           { key: "name", header: tr("common.name"), render: (r) => <Link href={`/${locale}/schools/${r.id}`}>{r.name}</Link> },
           { key: "enrolled", header: tr("list.pupils"), numeric: true, render: (r) => r.enrolled },
@@ -39,22 +41,25 @@ export default async function SchoolsPage({ params, searchParams }: { params: Pr
         ]}
       />
       {canCreate && (
-        <>
-          <h2>{tr("list.addSchool")}</h2>
-          <Form action={createSchool}>
+        <Section id="add-school" icon="plus" title={tr("list.addSchool")} description={tr("ux.addSchoolIntro")}>
+          <form action={createSchool}>
             <input type="hidden" name="locale" value={locale} />
-            <Field label={tr("common.name")}>
-              <input name="name" required />
-            </Field>
-            <Field label={tr("list.siteId")} hint={tr("list.siteIdHint")}>
-              <input name="siteId" required pattern="[a-z0-9-]{2,40}" />
-            </Field>
-            <Field label={tr("list.code")} hint={tr("list.codeHint")}>
-              <input name="code" required pattern="[A-Za-z]{2,12}" />
-            </Field>
-            <Button type="submit">{tr("common.add")}</Button>
-          </Form>
-        </>
+            <Fields>
+              <Field span={6} label={tr("common.name")}>
+                <input name="name" required placeholder="École primaire Luniemu" />
+              </Field>
+              <Field span={3} label={tr("list.siteId")} hint={tr("list.siteIdHint")} error={tr("ux.siteIdError")}>
+                <input name="siteId" required pattern="[a-z0-9-]{2,40}" autoCapitalize="none" spellCheck={false} />
+              </Field>
+              <Field span={3} label={tr("list.code")} hint={tr("list.codeHint")} error={tr("ux.codeError")}>
+                <input name="code" required pattern="[A-Za-z]{2,12}" style={{ textTransform: "uppercase" }} />
+              </Field>
+            </Fields>
+            <FormFooter>
+              <SubmitButton icon="plus" pending={t(locale, "ui.form.saving")}>{tr("list.addSchool")}</SubmitButton>
+            </FormFooter>
+          </form>
+        </Section>
       )}
     </section>
   );

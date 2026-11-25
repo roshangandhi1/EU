@@ -36,6 +36,8 @@ export default async function TemplatesPage({ params }: { params: Promise<{ loca
             unit: t(locale, "boreholes.unit"), min: t(locale, "boreholes.min"), max: t(locale, "boreholes.max"),
             n: t(locale, "boreholes.n"), day: t(locale, "boreholes.day"), month: t(locale, "boreholes.month"), key: t(locale, "boreholes.key"),
             error: t(locale, "boreholes.error"),
+            nDays: t(locale, "ui.form.nDays"), nMonths: t(locale, "ui.form.nMonths"), taskN: t(locale, "ui.form.taskN"), tasks: t(locale, "ui.form.tasks"),
+            unsaved: t(locale, "ui.form.unsaved"), savedAll: t(locale, "ui.form.savedAll"), saving: t(locale, "ui.form.saving"), keyHint: t(locale, "ui.form.keyHint"), optional: t(locale, "ui.form.optional"),
           } as never}
         />
       ))}

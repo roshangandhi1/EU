@@ -53,15 +53,15 @@ export default async function ForestryStreamPage({ params, searchParams }: {
         </>}
       />
 
-      <form className="asat" method="get">
-        <label>{t(locale, "forestry.as_at")}<input type="date" name="asAt" defaultValue={asAt} /></label>
-        <label>
-          <select name="mode" defaultValue={mode}>
+      <form className="filterbar" method="get">
+        <label className="tb-field">{t(locale, "forestry.as_at")}<input className="ctl" type="date" name="asAt" defaultValue={asAt} /></label>
+        <label className="tb-field">{t(locale, "ui.form.mode")}
+          <select className="ctl" name="mode" defaultValue={mode}>
             <option value="captured">{t(locale, "forestry.mode.captured")}</option>
             <option value="evidence">{t(locale, "forestry.mode.evidence")}</option>
           </select>
         </label>
-        <button className="btn" type="submit">{t(locale, "forestry.update")}</button>
+        <button className="btn secondary" type="submit">{t(locale, "forestry.update")}</button>
       </form>
 
       <div className="indicator" aria-live="polite">

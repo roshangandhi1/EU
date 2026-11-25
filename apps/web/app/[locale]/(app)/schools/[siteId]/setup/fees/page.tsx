@@ -1,7 +1,8 @@
 import { activeOn, colKey, feeGrid, feeNames, formatCdf, LEVELS, live } from "@eu/schools";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
-import { Notice } from "@/components/ui";
+import { t } from "@eu/core/i18n";
+import { EmptyRow, Field, Fields, FormFooter, Notice, Section, SubmitButton } from "@/components/ui";
 import { can, mySchools, schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
 import { Flash, param, type SP } from "../../../flash";
 import { classLabel, studentName } from "../../labels";
@@ -94,18 +95,14 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
       {param(sp, "fee_terms") && <Notice>{tr("feeGrid.copyTerms", { count: param(sp, "fee_terms") })}</Notice>}
       {param(sp, "fee_exempted") && <Notice tone="success">{tr("feeGrid.exempted", { count: param(sp, "fee_exempted") })}</Notice>}
 
-      <section className="card">
-        <div className="card-head">
-          <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon name="coins" size={20} />{tr("feeGrid.title")}</h2>
-          <Link className="btn ghost sm" href={base}>{tr("nav.setup")}</Link>
-        </div>
-        <p className="muted">{tr("feeGrid.intro")}</p>
-        <form method="get" className="row">
-          <label>{tr("feeGrid.year")}
-            <select name="year" defaultValue={year.id}>{years.map((y) => <option key={y.id} value={y.id}>{y.label}</option>)}</select>
+      <Section id="grid" icon="coins" title={tr("feeGrid.title")} description={tr("feeGrid.intro")}
+        actions={<Link className="btn ghost sm" href={base}>{tr("nav.setup")}</Link>}>
+        <form method="get" className="filterbar inset">
+          <label className="tb-field">{tr("feeGrid.year")}
+            <select className="ctl" name="year" defaultValue={year.id}>{years.map((y) => <option key={y.id} value={y.id}>{y.label}</option>)}</select>
           </label>
-          <label>{tr("feeGrid.fee")}
-            <select name="fee" defaultValue={fee || "__new"}>
+          <label className="tb-field">{tr("feeGrid.fee")}
+            <select className="ctl" name="fee" defaultValue={fee || "__new"}>
               {names.map((n) => <option key={n} value={n}>{n}</option>)}
               <option value="__new">+ {tr("feeGrid.newFee")}</option>
             </select>
@@ -113,13 +110,13 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
           <button className="btn secondary" type="submit">{tr("feeGrid.show")}</button>
         </form>
 
-        <form action={saveFeeSchedule} style={{ marginTop: 16 }}>
+        <form action={saveFeeSchedule}>
           {hidden}
           <input type="hidden" name="fee" value={fee} />
           {!fee && (
-            <div className="row" style={{ marginBottom: 12 }}>
-              <label>{tr("feeGrid.newFee")}<input name="newFee" required placeholder={tr("feeGrid.newFeeHint")} /></label>
-            </div>
+            <Fields>
+              <Field span={6} label={tr("feeGrid.newFee")} hint={tr("feeGrid.newFeeHint")}><input name="newFee" required /></Field>
+            </Fields>
           )}
           <div className="fee-grid-wrap">
             <table className="grid fee-grid">
@@ -131,11 +128,11 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
                 </tr>
               </thead>
               <tbody>
-                <tr>
+                <tr className="fee-due-row">
                   <td className="muted fee-level" style={{ verticalAlign: "middle" }}>{tr("feeGrid.due")}</td>
                   {columns.map((c) => (
                     <td key={colKey(c.termId)} className="num">
-                      <input className="field-input" type="date" name={`due:${colKey(c.termId)}`} defaultValue={g.dues.get(colKey(c.termId)) ?? ""} aria-label={`${tr("feeGrid.due")} · ${c.label}`} />
+                      <input className="ctl" type="date" name={`due:${colKey(c.termId)}`} defaultValue={g.dues.get(colKey(c.termId)) ?? ""} aria-label={`${tr("feeGrid.due")} · ${c.label}`} />
                     </td>
                   ))}
                   <td />
@@ -147,7 +144,7 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
                       const k = colKey(c.termId);
                       return (
                         <td key={k} className="num">
-                          <input className="field-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l) != null ? groupDigits(cell(k, l)!, locale) : ""} placeholder="—" aria-label={`${tr("levelName", { n: l })} · ${c.label} (FC)`} />
+                          <input className="ctl num-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l) != null ? groupDigits(cell(k, l)!, locale) : ""} placeholder="—" aria-label={`${tr("levelName", { n: l })} · ${c.label} (FC)`} />
                         </td>
                       );
                     })}
@@ -157,36 +154,35 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
               </tbody>
             </table>
           </div>
-          <div className="row" style={{ justifyContent: "flex-end" }}>
-            <button className="btn" type="submit">{tr("feeGrid.save")}</button>
+          <div className="savebar">
+            <span className="savebar-status"><span className="savebar-dot" aria-hidden /><span>{fee || tr("feeGrid.newFee")} · {year.label}</span></span>
+            <span className="savebar-actions"><SubmitButton variant="lime" icon="check" pending={t(locale, "ui.form.saving")}>{tr("feeGrid.save")}</SubmitButton></span>
           </div>
         </form>
-      </section>
+      </Section>
 
-      <section className="card">
-        <div className="card-head"><h2>{tr("feeGrid.copyTitle")}</h2></div>
-        <p className="muted">{tr("feeGrid.copyIntro", { year: year.label })}</p>
+      <Section id="copy" icon="layers" title={tr("feeGrid.copyTitle")} description={tr("feeGrid.copyIntro", { year: year.label })}>
         {sources.length === 0 ? (
-          <p className="muted">{tr("feeGrid.copyNone")}</p>
+          <EmptyRow icon="layers" title={tr("feeGrid.copyNone")} />
         ) : (
-          <form action={copyFees} className="row">
+          <form action={copyFees}>
             {hidden}
-            <label>{tr("feeGrid.copyFrom")}
-              <select name="source" required>{sources.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
-            </label>
-            <button className="btn secondary" type="submit">{tr("feeGrid.copy")}</button>
+            <Fields>
+              <Field span={8} label={tr("feeGrid.copyFrom")}>
+                <select name="source" required>{sources.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
+              </Field>
+            </Fields>
+            <FormFooter><SubmitButton variant="secondary" pending={t(locale, "ui.form.saving")}>{tr("feeGrid.copy")}</SubmitButton></FormFooter>
           </form>
         )}
-      </section>
+      </Section>
 
-      <section className="card">
-        <div className="card-head"><h2>{tr("feeGrid.exemptTitle")}</h2></div>
-        <p className="muted">{tr("feeGrid.exemptIntro")}</p>
-        <form method="get" className="row">
+      <Section id="exempt" icon="tag" title={tr("feeGrid.exemptTitle")} description={tr("feeGrid.exemptIntro")}>
+        <form method="get" className="filterbar inset">
           <input type="hidden" name="year" value={year.id} />
           {fee && <input type="hidden" name="fee" value={fee} />}
-          <label>{tr("feeGrid.filterClass")}
-            <select name="class" defaultValue={cls}>
+          <label className="tb-field">{tr("feeGrid.filterClass")}
+            <select className="ctl" name="class" defaultValue={cls}>
               <option value="">{tr("feeGrid.allClasses")}</option>
               {yearClasses.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr)}</option>)}
             </select>
@@ -194,19 +190,19 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
           <button className="btn secondary" type="submit">{tr("feeGrid.show")}</button>
         </form>
         {pupils.length === 0 ? (
-          <p className="muted">{tr("common.none")}</p>
+          <EmptyRow icon="users" title={tr("ux.noPupils")} />
         ) : (
-          <form action={bulkExempt} className="stack" style={{ marginTop: 12 }}>
+          <form action={bulkExempt}>
             {hidden}
             {fee && <input type="hidden" name="fee" value={fee} />}
-            <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius-md, 8px)" }}>
+            <div className="pick-list">
               <table className="grid fee-pupils">
                 <tbody>
                   {pupils.map(({ s, c }) => (
                     <tr key={s.id}>
-                      <td style={{ width: 44 }}><input type="checkbox" name="studentId" value={s.id} aria-label={studentName(s)} style={{ width: 22, height: 22 }} /></td>
+                      <td style={{ width: 44 }}><input className="tick" type="checkbox" name="studentId" value={s.id} aria-label={studentName(s)} /></td>
                       <td>
-                        {studentName(s)} <span className="muted">· {s.studentNumber}</span>
+                        <strong>{studentName(s)}</strong> <span className="muted">· {s.studentNumber}</span>
                         <div className="fee-pupil-sub muted">{classLabel(c, tr)}{exempted.has(s.id) && <span className="pill warn">{tr("feeGrid.already")}</span>}</div>
                       </td>
                       <td className="fee-wide">{classLabel(c, tr)}</td>
@@ -216,23 +212,23 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
                 </tbody>
               </table>
             </div>
-            <div className="row">
-              <label>{tr("setup.feeName")}
+            <Fields>
+              <Field span={6} label={tr("setup.feeName")}>
                 <select name="feeItemId" defaultValue="">
                   <option value="">{tr("feeGrid.allFees")}</option>
                   {yearItems.map((i) => <option key={i.id} value={i.id}>{i.name} · {i.levels.join(", ")} · {fc(i.amount)}</option>)}
                 </select>
-              </label>
-              <label className="narrow">{tr("setup.kind")}
+              </Field>
+              <Field span={3} label={tr("setup.kind")}>
                 <select name="kind" defaultValue="full">{(["full", "percent", "fixed"] as const).map((k) => <option key={k} value={k}>{tr(`setup.kinds.${k}`)}</option>)}</select>
-              </label>
-              <label className="narrow">{tr("setup.value")}<input name="value" inputMode="numeric" placeholder="0" /></label>
-              <label>{tr("setup.reason")}<input name="reason" required /></label>
-              <button className="btn" type="submit">{tr("feeGrid.exempt")}</button>
-            </div>
+              </Field>
+              <Field span={3} label={tr("setup.value")} hint={tr("ux.valueHint")}><input name="value" inputMode="numeric" placeholder="0" className="num-input" /></Field>
+              <Field span={12} label={tr("setup.reason")}><input name="reason" required /></Field>
+            </Fields>
+            <FormFooter><SubmitButton icon="tag" pending={t(locale, "ui.form.saving")}>{tr("feeGrid.exempt")}</SubmitButton></FormFooter>
           </form>
         )}
-      </section>
+      </Section>
     </div>
   );
 }

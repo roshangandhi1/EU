@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
-import { Button, Field, Form, Notice, PageHeader, Table } from "@/components/ui";
+import { Field, Fields, FormFooter, Notice, PageHeader, Section, SubmitButton, Table } from "@/components/ui";
 import { formatLocal, requireAction } from "@/lib/admin";
 import { listCutoffs } from "@/lib/evidence";
 import { db } from "@/lib/http";
@@ -20,22 +20,26 @@ export default async function CutoffsPage({ params, searchParams }: { params: Pr
         rows={cutoffs}
         rowKey={(c) => c.id}
         empty={tr("none")}
+        emptyIcon="clock"
         columns={[
           { key: "label", header: tr("label"), render: (c) => <Link href={`/${locale}/admin/evidence/${c.id}`}>{c.label}</Link> },
           { key: "at", header: tr("cutoffAt"), render: (c) => formatLocal(c.cutoffAt, locale) },
         ]}
       />
-      <h2>{tr("newCutoff")}</h2>
-      <Form action={createCutoffAction}>
-        <input type="hidden" name="locale" value={locale} />
-        <Field label={tr("label")}>
-          <input name="label" required minLength={2} placeholder="Q4 2026 verification" />
-        </Field>
-        <Field label={tr("cutoffAt")}>
-          <input name="cutoffAt" type="datetime-local" required />
-        </Field>
-        <Button>{tr("create")}</Button>
-      </Form>
+      <Section icon="plus" title={tr("newCutoff")}>
+        <form action={createCutoffAction}>
+          <input type="hidden" name="locale" value={locale} />
+          <Fields>
+            <Field span={8} label={tr("label")}>
+              <input name="label" required minLength={2} placeholder="Q4 2026 verification" />
+            </Field>
+            <Field span={4} label={tr("cutoffAt")}>
+              <input name="cutoffAt" type="datetime-local" required />
+            </Field>
+          </Fields>
+          <FormFooter><SubmitButton icon="plus">{tr("create")}</SubmitButton></FormFooter>
+        </form>
+      </Section>
     </section>
   );
 }

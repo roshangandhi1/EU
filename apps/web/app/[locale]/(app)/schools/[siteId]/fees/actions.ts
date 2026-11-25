@@ -15,14 +15,16 @@ export async function recordPayment(fd: FormData) {
     receiptNumber: int(fd, "receiptNumber"),
     feeItemIds: fd.getAll("feeItemIds").map(String).filter(Boolean),
   };
-  if (!paymentSchema.safeParse(fields).success || !d.students.some((s) => s.id === fields.studentId)) back(path, { error: "invalid" });
+  // A refused payment comes back with what was typed (as query values the form reads back).
+  const typed = { studentId: str(fd, "studentId"), amount: str(fd, "amount"), receiptNumber: str(fd, "receiptNumber"), paidOn: str(fd, "paidOn") };
+  if (!paymentSchema.safeParse(fields).success || !d.students.some((s) => s.id === fields.studentId)) back(path, { error: "invalid", ...typed });
   const problem = checkReceiptNumber(fields.receiptNumber!, me.user.id, d.receiptBooks, d.payments);
   // Programme staff entering on behalf of a school are not tied to a receipt book; duplicates are still refused.
-  if (problem === "already_used" || (problem === "not_in_assigned_book" && !can(me, "school.configure", siteId))) back(path, { error: problem });
+  if (problem === "already_used" || (problem === "not_in_assigned_book" && !can(me, "school.configure", siteId))) back(path, { error: problem!, ...typed });
   const res = await push(me, [insertMutation("school.payment", siteId, fields, { mutationId: newId(), recordId: newId() })]);
   revalidatePath(`/${locale}/schools/${siteId}`);
   const bad = firstRejection(res);
-  back(path, bad ? { error: bad } : { ok: "1" });
+  back(path, bad ? { error: bad, ...typed } : { ok: "paid", num: String(fields.receiptNumber) });
 }
 
 export async function voidPayment(fd: FormData) {
@@ -34,5 +36,5 @@ export async function voidPayment(fd: FormData) {
   const res = await push(me, [voidMutation("school.payment", siteId, str(fd, "paymentId"), reason, newId())]);
   revalidatePath(`/${locale}/schools/${siteId}`);
   const bad = firstRejection(res);
-  back(path, bad ? { error: bad } : { ok: "1" });
+  back(path, bad ? { error: bad } : { ok: "voided" });
 }

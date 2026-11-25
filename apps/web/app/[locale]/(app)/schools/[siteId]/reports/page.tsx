@@ -1,6 +1,5 @@
 import { activeOn, clockAnomalies, enrolmentBreakdown, placesAsAt, splitAsAt } from "@eu/schools";
-import { Button, ButtonLink, Notice, Stat, Stats, Table } from "@/components/ui";
-import s from "@/components/ui/ui.module.css";
+import { ButtonLink, Notice, Stat, Stats, Table } from "@/components/ui";
 import { can, schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
 import { param, type SP } from "../../flash";
 import { studentName } from "../labels";
@@ -28,10 +27,10 @@ export default async function Reports({ params, searchParams }: { params: Promis
 
   return (
     <>
-      <form method="get" className={s.form}>
-        <label className={s.field}>{evidence ? tr("reports.cutoff") : tr("capacity.asAt")}<input type="date" name="date" defaultValue={date} /></label>
-        <label className={s.check}><input type="checkbox" name="mode" value="evidence" defaultChecked={evidence} />{tr("reports.evidence")}</label>
-        <Button type="submit" variant="secondary">OK</Button>
+      <form method="get" className="filterbar">
+        <label className="tb-field">{evidence ? tr("reports.cutoff") : tr("capacity.asAt")}<input className="ctl" type="date" name="date" defaultValue={date} /></label>
+        <label className="check-row"><input type="checkbox" name="mode" value="evidence" defaultChecked={evidence} /><span>{tr("reports.evidence")}</span></label>
+        <button className="btn secondary" type="submit">{tr("ux.show")}</button>
       </form>
       {evidence && <Notice>{tr("reports.evidenceHint")}</Notice>}
       <Stats>

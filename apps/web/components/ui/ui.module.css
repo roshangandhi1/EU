@@ -31,7 +31,9 @@
 .table tbody tr:hover { background: #f7faf6; }
 .table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .table tr:last-child td { border-bottom: 0; }
-.empty { color: var(--muted); padding: 28px 20px; text-align: center; background: var(--surface); border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg); margin: 12px 0 24px; }
+.empty { background: var(--surface); border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg); margin: 12px 0 24px; }
+.flush { margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.table td.shrink, .table th.shrink { width: 1%; white-space: nowrap; text-align: right; }
 
 .notice { padding: 12px 16px; border-radius: var(--radius); margin: 12px 0; border: 1px solid; border-left-width: 4px; font-size: 14.5px; }
 .info { background: var(--eu-blue-tint); border-color: #b9c8ee; border-left-color: var(--eu-blue); color: #10213f; }
@@ -50,3 +52,18 @@
 .tab { display: inline-flex; align-items: center; padding: 0 16px; min-height: 46px; color: var(--muted); font-weight: 600; text-decoration: none; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .tab:hover { color: var(--text); }
 .tabActive { border-bottom-color: var(--accent, var(--gc-green)); color: var(--text); }
+
+/* Phones: each row becomes a small card; the first column is its title, the others are label/value pairs. */
+@media (max-width: 640px) {
+  .stackable thead { display: none; }
+  .stackable, .stackable tbody { display: block; }
+  .stackable tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .stackable tr:last-child { border-bottom: 0; }
+  .stackable td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 2px 0; border: 0; text-align: right; grid-column: 1 / -1; font-size: 14.5px; }
+  .stackable td::before { content: attr(data-label); color: var(--muted); font-size: 13px; font-weight: 600; text-align: left; }
+  .stackable td:first-child { grid-column: 1; text-align: left; display: block; font-size: 15px; padding-bottom: 4px; }
+  .stackable td:first-child::before { content: none; }
+  .stackable td.shrink { grid-column: 2; grid-row: 1; width: auto; padding: 0; justify-content: flex-end; }
+  .stackable td.shrink::before { content: none; }
+  .stackable td:not([data-label]):not(:first-child)::before { content: none; }
+}

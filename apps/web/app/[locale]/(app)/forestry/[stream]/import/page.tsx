@@ -25,8 +25,7 @@ export default async function ImportPage({ params }: { params: Promise<{ locale:
   const canApprove = permissions.can(me.user, fa(s, "boundary.approve"), { stream: s });
   return (
     <section className="module" data-stream={s}>
-      <PageHeader icon={<Icon name="upload" size={24} />} eyebrow={t(locale, `forestry.${s}`)} title={t(locale, "forestry.import.kmz")} />
-      <p className="muted">{t(locale, "forestry.boundary.draft_note")}</p>
+      <PageHeader icon={<Icon name="upload" size={24} />} eyebrow={t(locale, `forestry.${s}`)} title={t(locale, "forestry.import.kmz")} subtitle={t(locale, "forestry.boundary.draft_note")} />
       <ImportForm
         locale={locale}
         stream={s}
@@ -38,6 +37,7 @@ export default async function ImportPage({ params }: { params: Promise<{ locale:
           plot: t(locale, "forestry.plot"),
           species: t(locale, "forestry.planting.species"),
           problemNames: Object.fromEntries(PROBLEMS.map((p) => [p, t(locale, `forestry.import.problem.${p}`)])),
+          ...Object.fromEntries(["step1", "step2", "step3", "fileHint", "backTo", "selected", "whatFollows", "saving", "optional"].map((k) => [k, t(locale, `ui.form.${k}`)])),
           statuses: Object.fromEntries(["planned", "pegged", "planted", "established"].map((o) => [o, t(locale, `forestry.status.${o}`)])),
         } as never}
       />

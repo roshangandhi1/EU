@@ -1,7 +1,9 @@
 import { activeOn, dailyCollections, duplicateReceipts, formatCdf, live, studentBalance } from "@eu/schools";
-import { Button, Field, Form, Notice, Table } from "@/components/ui";
+import { t } from "@eu/core/i18n";
+import { Chip, ChoiceGroup, Field, Fields, FormFooter, Notice, RowMenu, Section, SubmitButton, Table } from "@/components/ui";
+import { fmtDate } from "../format";
 import { can, schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
-import { Flash, type SP } from "../../flash";
+import { Flash, param, type SP } from "../../flash";
 import { classLabel, studentName } from "../labels";
 import { recordPayment, voidPayment } from "./actions";
 
@@ -29,90 +31,110 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
   const canVoid = can(me, "payment.void", p.siteId);
   const items = live(d.feeItems);
 
+  const saving = t(locale, "ui.form.saving");
+  const monthTotal = daily.reduce((n, x) => n + x.total, 0);
+
   return (
     <>
       <Flash sp={sp} tr={tr} />
       {dupes.length > 0 && <Notice tone="warning">{tr("fees.duplicates", { numbers: dupes.join(", ") })}</Notice>}
       {canPay && (
-        <>
-          <h2>{tr("fees.payment")}</h2>
-          <Form action={recordPayment}>
+        <Section id="pay" icon="receipt" title={tr("fees.payment")} description={tr("ux.payIntro")}>
+          <form action={recordPayment}>
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="siteId" value={p.siteId} />
-            <Field label={tr("fees.student")}>
-              <select name="studentId" required defaultValue="">
-                <option value="" disabled />
-                {active.map((r) => <option key={r.s.id} value={r.s.id}>{studentName(r.s)} · {r.s.studentNumber}</option>)}
-              </select>
-            </Field>
-            <Field label={tr("fees.amount")}><input name="amount" inputMode="numeric" required pattern="[0-9 ,.]+" /></Field>
-            <Field label={tr("fees.receiptNumber")}><input name="receiptNumber" inputMode="numeric" required pattern="[0-9]+" /></Field>
-            <Field label={tr("fees.paidOn")}><input name="paidOn" type="date" defaultValue={date} max={date} required /></Field>
-            {items.length > 0 && (
-              <Field label={tr("setup.feeItems")} hint={tr("common.optional")}>
-                <select name="feeItemIds" multiple size={Math.min(4, items.length)}>
-                  {items.map((i) => <option key={i.id} value={i.id}>{i.name} · {fc(i.amount)}</option>)}
+            <Fields>
+              <Field span={6} label={tr("fees.student")}>
+                <select name="studentId" required defaultValue={param(sp, "studentId")}>
+                  <option value="" disabled>—</option>
+                  {active.map((r) => <option key={r.s.id} value={r.s.id}>{studentName(r.s)} · {r.s.studentNumber} · {classLabel(r.c, tr)}</option>)}
                 </select>
               </Field>
-            )}
-            <Button type="submit">{tr("common.save")}</Button>
-          </Form>
-        </>
+              <Field span={3} label={tr("fees.receiptNumber")} hint={tr("ux.receiptHint")} error={tr("ux.numberError")}><input name="receiptNumber" inputMode="numeric" required pattern="[0-9]+" className="num-input" defaultValue={param(sp, "receiptNumber")} /></Field>
+              <Field span={3} label={tr("fees.paidOn")}><input name="paidOn" type="date" defaultValue={param(sp, "paidOn") || date} max={date} required /></Field>
+              <Field span={4} label={tr("fees.amount")} hint={tr("ux.amountHint")} error={tr("ux.amountError")}><input name="amount" inputMode="numeric" required pattern="[0-9 ,.]+" className="num-input" defaultValue={param(sp, "amount")} /></Field>
+              {items.length > 0 && (
+                <ChoiceGroup span={8} legend={tr("setup.feeItems")} optional={tr("common.optional")} hint={tr("ux.feeItemsHint")}>
+                  {items.map((i) => <Chip key={i.id} name="feeItemIds" value={i.id} label={i.name} sub={fc(i.amount)} />)}
+                </ChoiceGroup>
+              )}
+            </Fields>
+            <FormFooter><SubmitButton icon="check" pending={saving}>{tr("fees.payment")}</SubmitButton></FormFooter>
+          </form>
+        </Section>
       )}
 
-      <h2>{tr("fees.arrears")}</h2>
-      <Table
-        rows={arrears}
-        rowKey={(r) => r.e.id}
-        empty={tr("common.none")}
-        columns={[
-          { key: "name", header: tr("common.name"), render: (r) => `${studentName(r.s)} · ${r.s.studentNumber}` },
-          { key: "class", header: tr("common.class"), render: (r) => classLabel(r.c, tr) },
-          { key: "charged", header: tr("fees.charged"), numeric: true, render: (r) => fc(r.b.charged) },
-          { key: "paid", header: tr("fees.paid"), numeric: true, render: (r) => fc(r.b.paid) },
-          { key: "overdue", header: tr("fees.overdue"), numeric: true, render: (r) => fc(r.b.overdue) },
-          { key: "guardian", header: tr("student.guardianPhone"), render: (r) => r.s.guardianPhone },
-        ]}
-      />
+      <Section flush icon="alert" title={tr("fees.arrears")} count={arrears.length}>
+        <Table
+          flush
+          rows={arrears}
+          rowKey={(r) => r.e.id}
+          empty={tr("ux.noArrears")}
+          emptyHint={tr("ux.noArrearsHint")}
+          emptyIcon="check"
+          columns={[
+            { key: "name", header: tr("common.name"), render: (r) => <><strong>{studentName(r.s)}</strong><div className="muted small">{r.s.studentNumber}</div></> },
+            { key: "class", header: tr("common.class"), render: (r) => classLabel(r.c, tr) },
+            { key: "charged", header: tr("fees.charged"), numeric: true, render: (r) => fc(r.b.charged) },
+            { key: "paid", header: tr("fees.paid"), numeric: true, render: (r) => fc(r.b.paid) },
+            { key: "overdue", header: tr("fees.overdue"), numeric: true, render: (r) => <strong className="text-bad">{fc(r.b.overdue)}</strong> },
+            { key: "guardian", header: tr("student.guardianPhone"), render: (r) => r.s.guardianPhone || <span className="muted">—</span> },
+          ]}
+        />
+      </Section>
 
-      <h2>{tr("fees.daily")}</h2>
-      <Table
-        rows={daily}
-        rowKey={(r) => r.date}
-        empty={tr("common.none")}
-        columns={[
-          { key: "date", header: tr("common.date"), render: (r) => r.date },
-          { key: "count", header: tr("fees.receipts"), numeric: true, render: (r) => `${r.count} (${r.firstReceipt}–${r.lastReceipt})` },
-          { key: "total", header: tr("common.total"), numeric: true, render: (r) => fc(r.total) },
-        ]}
-      />
+      <Section flush icon="coins" title={tr("fees.daily")} actions={<span className="inline-stat"><b>{fc(monthTotal)}</b></span>}>
+        <Table
+          flush
+          rows={daily}
+          rowKey={(r) => r.date}
+          empty={tr("ux.noCollections")}
+          emptyIcon="coins"
+          columns={[
+            { key: "date", header: tr("common.date"), render: (r) => fmtDate(r.date, locale) },
+            { key: "count", header: tr("fees.receipts"), numeric: true, render: (r) => <>{r.count} <span className="muted">({r.firstReceipt}–{r.lastReceipt})</span></> },
+            { key: "total", header: tr("common.total"), numeric: true, render: (r) => <strong>{fc(r.total)}</strong> },
+          ]}
+        />
+      </Section>
 
-      <h2>{tr("fees.recent")}</h2>
-      <Table
-        rows={recent}
-        rowKey={(r) => r.id}
-        empty={tr("common.none")}
-        columns={[
-          { key: "date", header: tr("common.date"), render: (r) => r.paidOn },
-          { key: "receipt", header: tr("fees.receiptNumber"), numeric: true, render: (r) => r.receiptNumber },
-          { key: "name", header: tr("fees.student"), render: (r) => { const s = students.get(r.studentId); return s ? studentName(s) : "—"; } },
-          { key: "amount", header: tr("fees.amount"), numeric: true, render: (r) => (r.voidedAt ? <s>{fc(r.amount)}</s> : fc(r.amount)) },
-          {
-            key: "void",
-            header: tr("common.status"),
-            render: (r) =>
-              r.voidedAt ? `${tr("fees.voided")}: ${r.voidReason ?? ""}` : canVoid ? (
-                <form action={voidPayment} style={{ display: "flex", gap: 6 }}>
-                  <input type="hidden" name="locale" value={locale} />
-                  <input type="hidden" name="siteId" value={p.siteId} />
-                  <input type="hidden" name="paymentId" value={r.id} />
-                  <input name="reason" required minLength={3} placeholder={tr("fees.voidReason")} aria-label={tr("fees.voidReason")} />
-                  <Button small variant="danger" type="submit">{tr("fees.void")}</Button>
-                </form>
-              ) : "",
-          },
-        ]}
-      />
+      <Section flush icon="receipt" title={tr("fees.recent")} count={recent.length}>
+        <Table
+          flush
+          rows={recent}
+          rowKey={(r) => r.id}
+          empty={tr("ux.noPayments")}
+          emptyIcon="receipt"
+          rowClass={(r) => (r.voidedAt ? "voided" : undefined)}
+          columns={[
+            { key: "name", header: tr("fees.student"), render: (r) => { const s = students.get(r.studentId); return s ? <strong>{studentName(s)}</strong> : "—"; } },
+            { key: "date", header: tr("common.date"), render: (r) => fmtDate(r.paidOn, locale) },
+            { key: "receipt", header: tr("fees.receiptNumber"), numeric: true, render: (r) => r.receiptNumber },
+            { key: "amount", header: tr("fees.amount"), numeric: true, render: (r) => (r.voidedAt ? <s>{fc(r.amount)}</s> : <strong>{fc(r.amount)}</strong>) },
+            {
+              key: "void",
+              header: "",
+              shrink: true,
+              render: (r) =>
+                r.voidedAt ? <span className="pill bad" title={r.voidReason ?? ""}>{tr("fees.voided")}{r.voidReason ? `: ${r.voidReason}` : ""}</span> : canVoid ? (
+                  <RowMenu label={tr("fees.void")} icon="x" tone="danger">
+                    <form action={voidPayment}>
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="siteId" value={p.siteId} />
+                      <input type="hidden" name="paymentId" value={r.id} />
+                      <p style={{ margin: "0 0 4px", color: "var(--text)", fontWeight: 650 }}>{tr("ux.voidTitle", { n: r.receiptNumber })}</p>
+                      <p style={{ margin: "0 0 10px" }}>{tr("ux.voidHint")}</p>
+                      <Fields>
+                        <Field span={12} label={tr("fees.voidReason")}><input name="reason" required minLength={3} /></Field>
+                      </Fields>
+                      <FormFooter><SubmitButton small variant="danger" pending={saving}>{tr("fees.void")}</SubmitButton></FormFooter>
+                    </form>
+                  </RowMenu>
+                ) : null,
+            },
+          ]}
+        />
+      </Section>
     </>
   );
 }
