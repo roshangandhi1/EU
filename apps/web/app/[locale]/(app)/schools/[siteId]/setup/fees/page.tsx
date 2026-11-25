@@ -7,6 +7,9 @@ import { Flash, param, type SP } from "../../../flash";
 import { classLabel, studentName } from "../../labels";
 import { bulkExempt, copyFees, saveFeeSchedule } from "./actions";
 
+/** Whole francs with a plain space between thousands (the save action strips spaces). */
+const groupDigits = (n: number, locale: string) => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(n).replace(/[\s\u00a0\u202f.,]/g, " ");
+
 /** Fee schedule: levels down the side, terms across, one amount per cell. */
 export default async function FeeSchedule({ params, searchParams }: { params: Promise<{ locale: string; siteId: string }>; searchParams: SP }) {
   const p = await params;
@@ -81,7 +84,7 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
 
 
   return (
-    <div className="stack">
+    <div className="stack fee-page">
       {err ? <Notice tone="error">{err}</Notice> : <Flash sp={sp} tr={tr} />}
       {saved.length === 3 && <Notice tone="success">{tr("feeGrid.saved", { created: saved[0]!, updated: saved[1]!, voided: saved[2]! })}</Notice>}
       {param(sp, "fee_nothing") && <Notice>{tr("feeGrid.nothing")}</Notice>}
@@ -118,18 +121,18 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
               <label>{tr("feeGrid.newFee")}<input name="newFee" required placeholder={tr("feeGrid.newFeeHint")} /></label>
             </div>
           )}
-          <div className="fee-grid-wrap" style={{ overflowX: "auto" }}>
+          <div className="fee-grid-wrap">
             <table className="grid fee-grid">
               <thead>
                 <tr>
-                  <th>{tr("common.level")}</th>
+                  <th className="fee-level">{tr("common.level")}</th>
                   {columns.map((c) => <th key={colKey(c.termId)} className="num">{c.label}</th>)}
                   <th className="num">{tr("feeGrid.yearTotal")}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="muted" style={{ verticalAlign: "middle" }}>{tr("feeGrid.due")}</td>
+                  <td className="muted fee-level" style={{ verticalAlign: "middle" }}>{tr("feeGrid.due")}</td>
                   {columns.map((c) => (
                     <td key={colKey(c.termId)} className="num">
                       <input className="field-input" type="date" name={`due:${colKey(c.termId)}`} defaultValue={g.dues.get(colKey(c.termId)) ?? ""} aria-label={`${tr("feeGrid.due")} · ${c.label}`} />
@@ -139,12 +142,12 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
                 </tr>
                 {LEVELS.map((l) => (
                   <tr key={l}>
-                    <th scope="row" style={{ position: "static", background: "transparent", fontSize: 14.5, color: "var(--text)", verticalAlign: "middle" }}>{tr("levelName", { n: l })}</th>
+                    <th scope="row" className="fee-level" style={{ top: "auto", fontSize: 14.5, color: "var(--text)", verticalAlign: "middle" }}>{tr("levelName", { n: l })}</th>
                     {columns.map((c) => {
                       const k = colKey(c.termId);
                       return (
                         <td key={k} className="num">
-                          <input className="field-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l)?.toString() ?? ""} placeholder="—" aria-label={`${tr("levelName", { n: l })} · ${c.label} (FC)`} style={{ textAlign: "right", minWidth: 110 }} />
+                          <input className="field-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l) != null ? groupDigits(cell(k, l)!, locale) : ""} placeholder="—" aria-label={`${tr("levelName", { n: l })} · ${c.label} (FC)`} />
                         </td>
                       );
                     })}
@@ -197,14 +200,17 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
             {hidden}
             {fee && <input type="hidden" name="fee" value={fee} />}
             <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius-md, 8px)" }}>
-              <table className="grid">
+              <table className="grid fee-pupils">
                 <tbody>
                   {pupils.map(({ s, c }) => (
                     <tr key={s.id}>
                       <td style={{ width: 44 }}><input type="checkbox" name="studentId" value={s.id} aria-label={studentName(s)} style={{ width: 22, height: 22 }} /></td>
-                      <td>{studentName(s)} <span className="muted">· {s.studentNumber}</span></td>
-                      <td>{classLabel(c, tr)}</td>
-                      <td>{exempted.has(s.id) && <span className="pill warn">{tr("feeGrid.already")}</span>}</td>
+                      <td>
+                        {studentName(s)} <span className="muted">· {s.studentNumber}</span>
+                        <div className="fee-pupil-sub muted">{classLabel(c, tr)}{exempted.has(s.id) && <span className="pill warn">{tr("feeGrid.already")}</span>}</div>
+                      </td>
+                      <td className="fee-wide">{classLabel(c, tr)}</td>
+                      <td className="fee-wide">{exempted.has(s.id) && <span className="pill warn">{tr("feeGrid.already")}</span>}</td>
                     </tr>
                   ))}
                 </tbody>
