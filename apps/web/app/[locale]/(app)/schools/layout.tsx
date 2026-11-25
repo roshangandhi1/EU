@@ -1,5 +1,6 @@
 // Importing the registry registers the schools strings with @eu/core/i18n.
 import "@/lib/registry";
+import "./schools.css";
 
 export const dynamic = "force-dynamic";
 

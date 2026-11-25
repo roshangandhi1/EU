@@ -1,0 +1,91 @@
+/* Schools pages only: additions on top of the shared form system in app/globals.css. */
+
+/* Pupil list toolbar: the two enrol buttons sit together at the end. */
+.list-head > .enrol-buttons { display: inline-flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.list-head > .btn.ghost.no-print { margin-left: 0; }
+tr.row-left td { color: var(--muted); }
+.row-link { color: inherit; text-decoration: none; }
+.row-link:hover strong, .row-link:focus-visible strong { text-decoration: underline; color: var(--gc-green); }
+
+/* Whole-class enrolment. */
+.bulk-intro { margin: 0 0 12px; }
+.bulk-lines { width: 100%; min-height: 200px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.55; }
+.bulk-issues { margin: 6px 0 0; padding-left: 20px; }
+.bulk-issues li { margin: 2px 0; }
+
+/* Pupil page. */
+.pupil-head { display: flex; align-items: flex-start; gap: 12px 16px; flex-wrap: wrap; }
+.pupil-title h2 { margin: 0; font-size: 1.35rem; }
+.pupil-title p { margin: 4px 0 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pupil-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 28px; }
+.pupil-inline .ffoot { padding-top: 0; }
+.pupil-dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; }
+.pupil-dl dt { color: var(--muted); font-weight: 600; }
+.pupil-dl dd { margin: 0; }
+.pupil-stats { padding: 0 20px 16px; }
+.pupil-note { margin: 0; padding: 12px 20px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.fsec:not(.flush) .pupil-note { padding: 12px 0 0; }
+.pupil-sub { margin: 0; padding: 14px 20px 8px; }
+
+/* Payment form: searchable pupil picker and the chosen pupil's balance. */
+.pay-search { position: relative; display: block; width: 100%; }
+.pay-search input { width: 100%; }
+.pay-matches { list-style: none; margin: 4px 0 0; padding: 4px; position: absolute; left: 0; right: 0; top: 100%; z-index: 30;
+  background: var(--surface); border: 1px solid var(--border-strong, var(--border)); border-radius: var(--radius); box-shadow: var(--shadow); max-height: 320px; overflow-y: auto; }
+.pay-matches li.muted { padding: 10px 12px; }
+.pay-matches button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 48px; padding: 8px 12px; border: 0; border-radius: 8px;
+  background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.pay-matches button:hover, .pay-matches button:focus-visible { background: var(--gc-green-tint, var(--surface-alt)); outline: none; }
+.pay-picked { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 6px 8px 6px 12px;
+  border: 1.5px solid var(--gc-green); border-radius: var(--radius); background: var(--gc-green-tint, var(--surface-alt)); }
+.pay-picked-name { display: flex; flex-direction: column; min-width: 0; }
+.pay-balance { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: -4px 0 12px; padding: 10px 14px; border-radius: var(--radius);
+  background: #e3f1e5; color: #155c2a; font-weight: 600; font-size: 14.5px; }
+.pay-balance.owes { background: #fff0d9; color: #7a4b00; }
+.pay-row-actions { display: inline-flex; gap: 4px; align-items: center; }
+
+/* Setup: success message above an "Add" control that has closed. */
+.setup-ok { margin: 0 20px 12px; }
+.fsec:not(.flush) .setup-ok { margin: 0 0 12px; }
+.select-all { margin: 0 0 4px; padding: 0 4px; }
+
+/* Read-only register (for people who can see but not take the register). */
+.register.readonly .reg-toggle { cursor: default; }
+
+/* Reports. */
+.filterbar-end { margin-left: auto; align-self: center; }
+.report-downloads { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+/* Phones: section actions (totals, print, links) go on their own row under the title. */
+@media (max-width: 640px) {
+  [data-stream="schools"] .fsec-head { flex-wrap: wrap; }
+  [data-stream="schools"] .fsec-titles { flex-basis: calc(100% - 60px); }
+  [data-stream="schools"] .fsec-actions { flex-basis: 100%; }
+  [data-stream="schools"] .fsec-actions:empty { display: none; }
+  .filterbar-end { margin-left: 0; }
+  .list-head .toolbar-main select.ctl { flex: 1 1 100%; width: 100%; }
+  .list-head > .enrol-buttons { margin-left: 0; width: 100%; }
+  .list-head > .enrol-buttons .btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ---- Print ---------------------------------------------------------------------------------
+ * A "Print" button marks one element (.print-target) and prints only that; Ctrl+P on its own
+ * prints the page without the sidebar, tabs, forms and buttons. */
+.print-only { display: none; }
+@media print {
+  @page { margin: 14mm 12mm; }
+  html, body { background: #fff !important; }
+  .sidebar, .topbar, .no-print, nav[aria-label], [data-stream="schools"] > nav, .savebar, .rmenu, .adder-open, .adder, form.filterbar, .btn, .icon-btn, .demo-banner { display: none !important; }
+  .app, .page, .content { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  .print-only { display: block; }
+  .print-head { margin: 0 0 10px; font-size: 13pt; }
+  .fsec { box-shadow: none !important; border: 0 !important; break-inside: auto; }
+  table { font-size: 10.5pt; }
+  tr, td, th { break-inside: avoid; }
+  a { color: inherit !important; text-decoration: none !important; }
+  /* Only the chosen part. */
+  html.print-one body * { visibility: hidden; }
+  html.print-one .print-target, html.print-one .print-target * { visibility: visible; }
+  html.print-one .print-target { position: absolute; left: 0; top: 0; width: 100%; }
+  html.print-one .print-target .no-print, html.print-one .print-target .btn { display: none !important; }
+}
