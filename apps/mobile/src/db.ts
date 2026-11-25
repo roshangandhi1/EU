@@ -6,13 +6,20 @@ import { SqlStore, type SqlDriver } from "@eu/sync/sql-store";
  * SQLCipher (enabled by the expo-sqlite config plugin in app.json); the key lives in secure storage.
  * Transactions are queued so two never interleave on the single connection.
  */
-export async function openEncryptedDb(key: string, name = "gocongo.db"): Promise<SQLite.SQLiteDatabase> {
+export const DB_NAME = "gocongo.db";
+
+export async function openEncryptedDb(key: string, name = DB_NAME): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync(name);
-  // The key must be set before any other statement touches the file.
-  await db.execAsync(`PRAGMA key = '${key.replace(/'/g, "''")}';`);
-  await db.execAsync("PRAGMA journal_mode = WAL;");
-  // Fails here (not later, mid-sync) if the key is wrong.
-  await db.getAllAsync("SELECT count(*) FROM sqlite_master;");
+  try {
+    // The key must be set before any other statement touches the file.
+    await db.execAsync(`PRAGMA key = '${key.replace(/'/g, "''")}';`);
+    await db.execAsync("PRAGMA journal_mode = WAL;");
+    // Fails here (not later, mid-sync) if the key is wrong.
+    await db.getAllAsync("SELECT count(*) FROM sqlite_master;");
+  } catch (e) {
+    await db.closeAsync().catch(() => undefined);
+    throw e;
+  }
   return db;
 }
 
@@ -32,7 +39,14 @@ export function expoDriver(db: SQLite.SQLiteDatabase): SqlDriver {
   };
 }
 
-export async function openStore(key: string): Promise<{ store: SqlStore; driver: SqlDriver }> {
-  const driver = expoDriver(await openEncryptedDb(key));
-  return { store: await SqlStore.open(driver), driver };
+export async function openStore(key: string): Promise<{ store: SqlStore; driver: SqlDriver; db: SQLite.SQLiteDatabase }> {
+  const db = await openEncryptedDb(key);
+  const driver = expoDriver(db);
+  return { store: await SqlStore.open(driver), driver, db };
+}
+
+/** Deletes the database file with its -wal/-shm companions (revoked phone, or a file no key can open). */
+export async function deleteDb(db?: SQLite.SQLiteDatabase | null): Promise<void> {
+  if (db) await db.closeAsync().catch(() => undefined);
+  await SQLite.deleteDatabaseAsync(DB_NAME).catch((e: unknown) => console.warn("delete db failed", e));
 }

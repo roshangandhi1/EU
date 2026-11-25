@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
 import { Button, EmptyState, Header, IconBadge, ListGroup, ListRow, Notice, Page, StatusChip, Toast, Txt, type Tone } from "../../ui";
-import { getFix, localToday } from "../location";
+import { localToday, noFixKey, useGps } from "../location";
 import { loadBoreholes, loadSchedule, type BoreholeRow, type Schedule } from "./data";
 import { VisitForm } from "./VisitForm";
 
@@ -25,15 +25,17 @@ export function BoreholesHome({ session, onBack }: { session: Session; onBack: (
       setRows(await loadBoreholes(session.client, s, localToday()));
     })();
   }, [session]);
-  useEffect(reload, [reload, session.status.lastOk]);
+  useEffect(reload, [reload, session.changes]);
+  const gps = useGps();
 
   const findNearest = async () => {
+    if (gps.locating) return;
     const located = (rows ?? []).filter((r) => r.gpsLat !== null && r.gpsLng !== null);
     if (located.length === 0) return setNote(t("boreholes.m.no_gps"));
     setNote(t("forestry.m.locating"));
-    const fix = await getFix();
-    if (fix === "denied") return setNote(t("forestry.m.gps_denied"));
-    if (!fix) return setNote(t("forestry.m.gps_none"));
+    const fix = await gps.locate();
+    if (fix === "busy") return;
+    if (fix === null || typeof fix === "string") return setNote(t(noFixKey(fix)));
     const best = located.map((r) => ({ r, m: distanceM(fix.lat, fix.lng, r.gpsLat!, r.gpsLng!) })).sort((a, b) => a.m - b.m)[0]!;
     setHighlight(best.r.id);
     setNote(t("boreholes.m.nearest", { code: best.r.code, m: Math.round(best.m) }));
@@ -62,7 +64,7 @@ export function BoreholesHome({ session, onBack }: { session: Session; onBack: (
       header={<Header title={t("boreholes.title")} subtitle={rows ? t("ux.boreholesSummary", { n: rows.length, due: dueTotal }) : undefined} onBack={onBack} backLabel={t("forestry.m.back")} accent={streamAccent.boreholes} />}
       toast={<Toast message={flash} onHide={() => setFlash(null)} />}
     >
-      <Button kind="secondary" icon="locate" label={t("boreholes.m.find")} onPress={() => void findNearest()} disabled={!rows || rows.length === 0} />
+      <Button kind="secondary" icon="locate" label={t("boreholes.m.find")} onPress={() => void findNearest()} disabled={!rows || rows.length === 0} busy={gps.locating} />
       {note && <Notice tone={highlight ? "good" : "info"} icon={highlight ? "pin" : "locate"}>{note}</Notice>}
       {rows && rows.length === 0 && <EmptyState icon="drop" color={streamAccent.boreholes} title={t("app.emptyTitle")}><Txt center>{t("boreholes.m.none")}</Txt></EmptyState>}
       {sorted && sorted.length > 0 && (

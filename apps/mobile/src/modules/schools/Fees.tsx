@@ -1,12 +1,17 @@
 import { activeOn, checkReceiptNumber, formatCdf, normaliseName, studentBalance, type Student } from "@eu/schools/mobile";
 import { useContext, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
+import { saveErrorKey } from "../../errors";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
-import { Avatar, Button, Card, Field, Header, IconBadge, ListGroup, ListRow, Notice, Page, Stat, StatusChip, Toast, Txt, useDateLabel } from "../../ui";
+import { addDays } from "../../time";
+import { Avatar, Button, Card, DateField, Field, Header, IconBadge, ListGroup, ListRow, Notice, Page, Stat, StatusChip, Toast, Txt, useDateLabel, useDialog, useLeaveGuard } from "../../ui";
 import { colors } from "@eu/core/tokens";
 import { live, studentName, today, type Local, type SchoolData } from "./data";
-import { ACCENT, classLabel, nextReceipt } from "./parts";
+import { ACCENT, classLabel, nextReceipt, schoolName } from "./parts";
+
+/** Paper receipts are often typed up days later, but not months: older ones go through the web. */
+const BACKDATE_DAYS = 30;
 
 /** Record a cash payment against a paper receipt, and show the pupil's balance. */
 export function Fees({ session, data, onBack }: { session: Session; data: SchoolData; onBack: () => void }) {
@@ -14,12 +19,14 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
   const { locale } = useContext(LocaleContext);
   const dateLabel = useDateLabel();
   const date = today();
+  const { ask, node: dialog } = useDialog();
+  const [paidOn, setPaidOn] = useState(date);
   const [q, setQ] = useState("");
   const [student, setStudent] = useState<Local<Student> | null>(null);
   const [amount, setAmount] = useState("");
   const [receipt, setReceipt] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ field: "amount" | "receipt" | "form"; text: string } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; tone: "good" | "critical" } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const enrolled = activeOn(data.enrolments, date);
@@ -43,20 +50,44 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
   }, [student, next]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
-    if (!student || !session.user) return;
+    if (!student || !session.user || busy) return;
     const a = Number(amount), r = Number(receipt);
-    if (!Number.isInteger(a) || a <= 0 || !Number.isInteger(r) || r <= 0) return setMsg(t("schools.common.invalid"));
+    if (!Number.isInteger(a) || a <= 0) return setMsg({ field: "amount", text: t("ux.amountNeeded") });
+    if (!Number.isInteger(r) || r <= 0) return setMsg({ field: "receipt", text: t("ux.receiptNeeded") });
     const problem = checkReceiptNumber(r, session.user.id, data.receiptBooks, data.payments);
-    if (problem) return setMsg(t(problem === "already_used" ? "schools.fees.alreadyUsed" : "schools.fees.notInBook"));
+    if (problem) return setMsg({ field: "receipt", text: t(problem === "already_used" ? "schools.fees.alreadyUsed" : "schools.fees.notInBook") });
+    // Read it back before it goes in the books: an extra zero is easy to type and hard to undo.
+    const over = bal && a > bal.balance;
+    const ok = await ask<boolean>({
+      title: t("ux.confirmPaymentTitle"),
+      body: (
+        <View style={{ gap: 6 }}>
+          <Txt variant="display">{fmt(a)}</Txt>
+          <Txt weight={700}>{studentName(student)}</Txt>
+          <Txt>{t("ux.receiptNo", { n: r })} · {dateLabel(paidOn, true)}</Txt>
+          {over ? <Notice tone="warning">{t("ux.overBalance", { balance: fmt(bal.balance) })}</Notice> : null}
+        </View>
+      ),
+      actions: [
+        { label: t("ux.confirmSave"), value: true, kind: "primary" },
+        { label: t("ux.correct"), value: false, kind: "secondary" },
+      ],
+    });
+    if (!ok) return;
     setBusy(true);
-    await session.client.create("school.payment", data.school.siteId, { studentId: student.id, paidOn: date, amount: a, receiptNumber: r, feeItemIds: [] });
-    await session.refreshCounts();
-    void session.syncNow();
-    setBusy(false);
-    setAmount("");
-    setReceipt("");
-    setMsg(null);
-    setToast(t("ux.paymentSaved", { amount: fmt(a), receipt: r }));
+    try {
+      await session.client.create("school.payment", data.school.siteId, { studentId: student.id, paidOn, amount: a, receiptNumber: r, feeItemIds: [] });
+      await session.localSaved();
+      void session.syncNow();
+      setAmount("");
+      setReceipt("");
+      setMsg(null);
+      setToast({ msg: t("ux.paymentSaved", { amount: fmt(a), receipt: r }), tone: "good" });
+    } catch (e) {
+      setToast({ msg: t(saveErrorKey(e)), tone: "critical" });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const pick = (s: Local<Student> | null) => {
@@ -65,12 +96,14 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
     setAmount("");
     setReceipt("");
   };
+  const dirty = !!student && (amount !== "" || (receipt !== "" && receipt !== String(next ?? "")));
+  const back = useLeaveGuard(dirty, () => (student ? pick(null) : onBack()), ask);
 
   return (
     <Page
-      header={<Header title={t("schools.fees.payment")} subtitle={data.school.code} onBack={student ? () => pick(null) : onBack} backLabel={t("schools.mobile.back")} accent={ACCENT} />}
-      footer={student ? <Button icon="check" label={t("ux.savePayment")} onPress={() => void save()} disabled={busy || !amount || !receipt} flex={1} /> : undefined}
-      toast={<Toast message={toast} onHide={() => setToast(null)} />}
+      header={<Header title={t("schools.fees.payment")} subtitle={schoolName(data.school)} onBack={back} backLabel={t("schools.mobile.back")} accent={ACCENT} />}
+      footer={student ? <Button icon="check" label={t("ux.savePayment")} onPress={() => void save()} disabled={!amount || !receipt} busy={busy} flex={1} /> : undefined}
+      toast={<Toast message={toast?.msg ?? null} tone={toast?.tone} onHide={() => setToast(null)} />}
     >
       {!student ? (
         <>
@@ -114,16 +147,16 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
               </View>
             )}
           </Card>
+          <DateField label={t("schools.fees.paidOn")} value={paidOn} onChange={setPaidOn} max={date} min={addDays(date, -BACKDATE_DAYS)} todayLabel={t("app.today")} yesterdayLabel={t("app.yesterday")} />
           <Field big label={t("schools.fees.amount")} value={amount} onChangeText={(v) => { setAmount(v.replace(/\D/g, "")); setMsg(null); }} keyboardType="number-pad" suffix="FC"
-            hint={amount ? fmt(Number(amount)) : undefined} />
+            hint={amount ? fmt(Number(amount)) : undefined} error={msg?.field === "amount" ? msg.text : null} />
           {bal && bal.balance > 0 && String(bal.balance) !== amount && (
             <Pressable accessibilityRole="button" onPress={() => setAmount(String(bal.balance))} style={{ alignSelf: "flex-start", minHeight: 48, justifyContent: "center", paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.5, borderColor: colors.gcGreen }}>
               <Txt weight={700} color={colors.gcGreen}>{t("ux.payAll", { amount: fmt(bal.balance) })}</Txt>
             </Pressable>
           )}
           <Field label={t("schools.fees.receiptNumber")} icon="receipt" value={receipt} onChangeText={(v) => { setReceipt(v.replace(/\D/g, "")); setMsg(null); }} keyboardType="number-pad"
-            hint={next && String(next) === receipt ? t("ux.nextReceipt") : undefined} />
-          {msg && <Notice tone="critical">{msg}</Notice>}
+            hint={next && String(next) === receipt ? t("ux.nextReceipt") : undefined} error={msg?.field === "receipt" ? msg.text : null} />
           {mine.length > 0 && (
             <>
               <Txt variant="label" tone="muted">{t("schools.fees.recent")}</Txt>
@@ -142,6 +175,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
           )}
         </>
       )}
+      {dialog}
     </Page>
   );
 }

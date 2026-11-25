@@ -24,6 +24,8 @@ const PATHS = {
   minus: <Path d="M5 12h14" />,
   back: <><Path d="M20 12H5" /><Path d="m11 6-6 6 6 6" /></>,
   chevronRight: <Path d="m9 6 6 6-6 6" />,
+  chevronDown: <Path d="m6 9 6 6 6-6" />,
+  settings: <><Circle cx="12" cy="12" r="3" /><Path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></>,
   chevronLeft: <Path d="m15 6-6 6 6 6" />,
   lock: <><Rect x="5" y="10.5" width="14" height="10" rx="2" /><Path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /></>,
   sync: <><Path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5" /><Path d="M20 4v4.5h-4.5" /><Path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5" /><Path d="M4 20v-4.5h4.5" /></>,
