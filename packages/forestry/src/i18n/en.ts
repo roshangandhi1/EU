@@ -59,7 +59,7 @@ export const en = {
   "forestry.target_2027": "2027 target",
   "forestry.target_2030": "2030 target",
   "forestry.planted_per_ha": "Planted per ha",
-  "forestry.outcome": "Status for the indicator",
+  "forestry.outcome_label": "Status for the indicator",
   "forestry.late_synced": "{n} record(s) received after the date, awaiting review",
   "forestry.no_plots": "No plots yet. Import a KMZ or KML file to start.",
   "forestry.update": "Update",

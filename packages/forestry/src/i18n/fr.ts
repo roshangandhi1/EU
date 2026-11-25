@@ -61,7 +61,7 @@ export const fr: Record<ForestryKey, string> = {
   "forestry.target_2027": "Cible 2027",
   "forestry.target_2030": "Cible 2030",
   "forestry.planted_per_ha": "Plantés par ha",
-  "forestry.outcome": "Statut pour l'indicateur",
+  "forestry.outcome_label": "Statut pour l'indicateur",
   "forestry.late_synced": "{n} enregistrement(s) reçu(s) après la date, en attente de revue",
   "forestry.no_plots": "Aucune parcelle. Importez un fichier KMZ ou KML pour commencer.",
   "forestry.update": "Mettre à jour",

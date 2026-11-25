@@ -84,7 +84,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
             village: t(locale, "forestry.village"),
             area: t(locale, "forestry.area_ha"),
             perHa: t(locale, "forestry.planted_per_ha"),
-            outcome: t(locale, "forestry.outcome"),
+            outcome: t(locale, "forestry.outcome_label"),
             unapproved: t(locale, "forestry.boundary.unapproved"),
             outcomes: Object.fromEntries(["counted", "below_density", "no_authoritative_boundary", "not_planted", "missing_evidence"].map((o) => [o, t(locale, `forestry.outcome.${o}`)])),
             statuses: Object.fromEntries(["planned", "pegged", "planted", "established", "failed", "harvested"].map((o) => [o, t(locale, `forestry.status.${o}`)])),
