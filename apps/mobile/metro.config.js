@@ -12,6 +12,8 @@ config.resolver.nodeModulesPaths = [path.resolve(projectRoot, "node_modules")];
 config.resolver.extraNodeModules = {
   "@eu/core": path.join(packagesRoot, "core"),
   "@eu/sync": path.join(packagesRoot, "sync"),
+  "@eu/forestry": path.join(packagesRoot, "forestry"),
+  "@eu/boreholes": path.join(packagesRoot, "boreholes"),
   "@eu/schools": path.join(packagesRoot, "schools"),
 };
 config.resolver.disableHierarchicalLookup = true;

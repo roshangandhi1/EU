@@ -1,4 +1,4 @@
-import type { ActionMap } from "./platform";
+import type { ActionMap } from "@eu/core";
 
 const tech = ["system_admin", "programme_manager", "stream_lead", "field_officer"] as const;
 const lead = ["system_admin", "programme_manager", "stream_lead"] as const;

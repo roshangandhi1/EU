@@ -1,4 +1,4 @@
-import type { ActionMap, Role } from "./platform";
+import type { ActionMap, Role } from "@eu/core";
 
 export type ForestryStream = "bamboo" | "miombo";
 export const FORESTRY_STREAMS: ForestryStream[] = ["bamboo", "miombo"];
