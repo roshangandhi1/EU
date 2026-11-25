@@ -1,4 +1,5 @@
 import { PermissionRegistry, platformActions, type UserContext } from "@eu/core";
+import { sites } from "@eu/db";
 import { createTestDb } from "@eu/db/testing";
 import { EntityRegistry } from "@eu/sync";
 import { SyncClient, type Transport } from "@eu/sync/client";
@@ -20,6 +21,10 @@ let close: () => Promise<void>;
 beforeEach(async () => {
   // The platform migrations include this module's tables (0001_field_modules).
   ({ db, close } = await createTestDb());
+  await db.insert(sites).values([
+    { id: "plot-MLB-001", kind: "plot", stream: "miombo", name: "MLB-001" },
+    { id: "plot-KBK-001", kind: "plot", stream: "bamboo", name: "KBK-001" },
+  ]);
 });
 afterEach(async () => close());
 
@@ -76,5 +81,14 @@ describe("forestry records through the platform sync engine", () => {
     await m.client.update("miombo.planting", rid, { lines: [{ species: "x", count: 500 }] });
     await m.client.sync();
     expect((await m.store.rejections()).map((r) => r.reason)).toContain("append_only");
+  });
+
+  // TODO: un-skip once PR #5 (sync scope checks) is on main.
+  it.skip("a miombo officer cannot file a miombo record against a bamboo plot", async () => {
+    const m = device(miomboOfficer, "phone-1");
+    await m.client.create("miombo.planting", "plot-KBK-001", { plantedOn: "2026-12-16", lines: [{ species: "x", count: 5 }], isGapFilling: false, photos: [] });
+    await m.client.sync();
+    // Enforced by the platform from PR #5 (scope must be a site in the entity's stream).
+    expect((await m.store.rejections()).length).toBe(1);
   });
 });

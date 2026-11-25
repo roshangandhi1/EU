@@ -12,7 +12,9 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { MultiPolygon } from "geojson";
 import { randomUUID } from "node:crypto";
 import centroidOf from "@turf/centroid";
-import { boundaryApprovals, monitoringVisits, plantingEvents, plotBoundaries, plots } from "../db/schema";
+import { boundaryApprovals, forestrySettings, monitoringVisits, plantingEvents, plotBoundaries, plots } from "../db/schema";
+import { defaultSettings } from "../defaults";
+import type { IndicatorRules } from "../indicators";
 import { areaHa } from "../geo/area";
 import type { PlotInput } from "../indicators";
 import type { ImportCandidate } from "../import/kml";
@@ -166,4 +168,28 @@ export async function commitImport(ctx: ServerCtx, candidates: ImportCandidate[]
     created.push({ code, siteId, areaHa: Math.round(areaHa(c.geom) * 10_000) / 10_000 });
   }
   return { created, rejected };
+}
+
+export type StreamSettings = {
+  densityRulePerHa: number;
+  sampleRadiusM: number;
+  samplesPerHa: number;
+  minSamplesPerPlot: number;
+  maxSamplesPerPlot: number;
+  speciesList: { key: string; latin: string; en?: string; fr?: string; native?: boolean }[];
+};
+
+/** The stream's settings from the database, or the seeded defaults if none are saved yet. */
+export async function loadSettings(db: Db, stream: ForestryStream): Promise<StreamSettings> {
+  const [row] = await (db as AnyDb).select().from(forestrySettings).where(and(eq(forestrySettings.stream, stream), isNull(forestrySettings.voidedAt)));
+  return row ?? (defaultSettings[stream] as unknown as StreamSettings);
+}
+
+/** Indicator rules from settings. Miombo: every species counts as native unless marked otherwise. */
+export function rulesFrom(stream: ForestryStream, s: StreamSettings): IndicatorRules {
+  const nonNative = new Set(s.speciesList.filter((x) => x.native === false).map((x) => x.key));
+  return {
+    densityRulePerHa: s.densityRulePerHa,
+    isNative: stream === "miombo" ? (k) => !nonNative.has(k) : undefined,
+  };
 }

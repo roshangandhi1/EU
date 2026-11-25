@@ -36,3 +36,32 @@ h1 { color: var(--gc-green); }
 .btn.secondary { background: transparent; color: var(--gc-green); border: 2px solid var(--gc-green); }
 .btn:disabled { opacity: 0.6; }
 .error { color: #b3261e; }
+
+/* Field modules (forestry, boreholes) */
+.module-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.module[data-stream="bamboo"] h1 { border-left: 8px solid var(--gc-lime); padding-left: 12px; }
+.module[data-stream="miombo"] h1 { border-left: 8px solid var(--gc-orange); padding-left: 12px; }
+.module[data-stream="boreholes"] h1 { border-left: 8px solid #2b7bb9; padding-left: 12px; }
+.asat { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin: 16px 0; }
+.asat label { display: flex; flex-direction: column; font-weight: 600; gap: 4px; }
+.asat input, .asat select, .form select { font-size: 16px; min-height: 48px; padding: 8px 12px; border: 1px solid #b8c0b4; border-radius: 8px; background: var(--bg); color: var(--text); }
+.indicator { border: 1px solid #d5dad2; border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+.indicator .ind-title { font-weight: 700; color: var(--eu-blue); margin: 0 0 4px; }
+.indicator dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 12px 0 0; }
+.indicator dt { font-size: 14px; color: var(--muted); }
+.indicator dd { margin: 0; font-size: 20px; font-weight: 700; }
+.indicator dd.big { font-size: 32px; color: var(--eu-blue); }
+.muted { color: var(--muted); }
+.small { font-size: 14px; }
+.warn { color: #b26b00; font-weight: 600; }
+.map-list { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 1100px) { .map-list { grid-template-columns: 3fr 2fr; } }
+.content:has(.map-list) { max-width: 1400px; }
+.grid { width: 100%; border-collapse: collapse; font-size: 15px; }
+.grid th, .grid td { text-align: left; padding: 8px; border-bottom: 1px solid #d5dad2; vertical-align: top; }
+.grid th.num, .grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.grid tbody tr { cursor: pointer; }
+.grid tbody tr.sel { background: rgba(0, 51, 153, 0.08); }
+.badge { display: inline-block; border: 2px solid; border-radius: 999px; padding: 2px 10px; font-size: 14px; white-space: nowrap; }
+.check { flex-direction: row !important; align-items: center; font-weight: 400 !important; }
+fieldset { border: 1px solid #d5dad2; border-radius: 8px; }
