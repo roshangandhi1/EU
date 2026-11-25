@@ -1,6 +1,7 @@
-import { activeOn, classDay, dailyCollections, enrolmentBreakdown, formatCdf, live, placesAsAt, studentBalance } from "@eu/schools";
-import { Notice, Stat, Stats } from "@/components/ui";
+import { activeOn, classDay, dailyCollections, enrolmentBreakdown, formatCdf, live, placesAsAt, enrolmentBalance } from "@eu/schools";
+import { Stat, Stats } from "@/components/ui";
 import { schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
+import { NotSetUp } from "./not-set-up";
 
 export default async function Overview({ params }: { params: Promise<{ locale: string; siteId: string }> }) {
   const p = await params;
@@ -8,9 +9,9 @@ export default async function Overview({ params }: { params: Promise<{ locale: s
   const tr = trFor(locale);
   const d = await schoolFor(me, p.siteId);
   const date = today();
-  if (!d.school || live(d.classes).length === 0) return <Notice tone="warning">{tr("overview.notSetUp")}</Notice>;
+  if (!d.school || live(d.classes).length === 0) return <NotSetUp me={me} siteId={p.siteId} locale={locale} />;
 
-  const active = activeOn(d.enrolments, date);
+  const active = activeOn(d.enrolments, date, d.years);
   const students = new Map(d.students.map((s) => [s.id, s]));
   const classes = new Map(d.classes.map((c) => [c.id, c]));
   const breakdown = enrolmentBreakdown(active, students, classes);
@@ -21,7 +22,7 @@ export default async function Overview({ params }: { params: Promise<{ locale: s
   const collected = dailyCollections(d.payments, `${month}-01`, `${month}-31`).reduce((n, x) => n + x.total, 0);
   const overdue = active.reduce((n, e) => {
     const c = classes.get(e.classId);
-    return c ? n + studentBalance(e.studentId, c.level, d.feeItems, d.exemptions, d.payments, date).overdue : n;
+    return c ? n + enrolmentBalance(d, e, date).overdue : n;
   }, 0);
 
   return (

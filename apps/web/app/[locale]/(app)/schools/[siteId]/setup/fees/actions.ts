@@ -1,4 +1,5 @@
 "use server";
+import { parseWholeNumber } from "@eu/schools";
 import { colKey, exemption, insertMutation, LEVELS, live, missingTermsForCopy, planFeeCopy, planFeeSchedule, updateMutation, voidMutation, type FeeGrid } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
 import { revalidatePath } from "next/cache";
@@ -26,9 +27,9 @@ async function apply(me: Parameters<typeof push>[0], muts: Mutation[], locale: s
 
 /** Whole francs only: "15 000", "15,000" and "15000" all mean 15000. */
 function francs(raw: string): number | null | "bad" {
-  const s = raw.replace(/[\s,.  ]/g, "");
-  if (s === "") return null;
-  return /^\d+$/.test(s) && Number(s) > 0 ? Number(s) : "bad";
+  const n = parseWholeNumber(raw);
+  if (n === null) return null;
+  return Number.isInteger(n) && n > 0 ? n : "bad";
 }
 
 /** Saves the levels × terms grid for one fee name, editing existing items in place. */

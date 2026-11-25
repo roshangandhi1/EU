@@ -1,6 +1,7 @@
 import { sites, type Db } from "@eu/db";
 import type { Mutation } from "@eu/sync";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte } from "drizzle-orm";
+import type * as mk from "./marks";
 import type * as m from "./model";
 import * as t from "./db/schema";
 
@@ -41,6 +42,10 @@ export interface SchoolData {
   receiptBooks: m.Synced<m.ReceiptBook>[];
   deviceTags: m.Synced<m.DeviceTag>[];
   payments: m.Synced<m.Payment>[];
+  /** Marks: this school's schemes and subjects plus the programme-wide ones (scope "schools"). */
+  gradingSchemes: m.Synced<mk.GradingScheme>[];
+  subjects: m.Synced<mk.Subject>[];
+  marks: m.Synced<mk.Mark>[];
 }
 
 export async function listSchoolSites(db: Db): Promise<SchoolSite[]> {
@@ -61,6 +66,8 @@ export async function loadSchool(db: Db, siteId: string): Promise<SchoolData | n
   if (!site) return null;
   const all = async <T>(table: any): Promise<m.Synced<T>[]> =>
     ((await d.select().from(table).where(eq(table.scopeId, siteId))) as Record<string, unknown>[]).map((r) => toRecord<T>(r));
+  const withProgramme = async <T>(table: any): Promise<m.Synced<T>[]> =>
+    ((await d.select().from(table).where(inArray(table.scopeId, [siteId, "schools"]))) as Record<string, unknown>[]).map((r) => toRecord<T>(r));
   const [school] = await all<m.School>(t.schoolSchools);
   return {
     site: { id: site.id, name: site.name, active: site.active },
@@ -78,6 +85,9 @@ export async function loadSchool(db: Db, siteId: string): Promise<SchoolData | n
     receiptBooks: await all(t.schoolReceiptBooks),
     deviceTags: await all(t.schoolDeviceTags),
     payments: await all(t.schoolPayments),
+    gradingSchemes: await withProgramme(t.schoolGradingSchemes),
+    subjects: await withProgramme(t.schoolSubjects),
+    marks: await all(t.schoolMarks),
   };
 }
 
@@ -125,3 +135,59 @@ export function updateMutation(
   return { mutationId, entity, recordId, op: "update", scopeId, fields, deviceTime: now.toISOString(), ...(baseFieldVersions ? { baseFieldVersions } : {}) };
 }
 
+
+// ---- Server-side payment rules (SEC-6/DATA-16), run by the sync engine for phone and web alike. ----
+
+/** Reason codes a refused payment comes back with (the fees screens translate them). */
+export const PAYMENT_REJECT_REASONS = ["student_not_in_school", "fee_item_not_in_school", "not_in_assigned_book", "already_used"] as const;
+export type PaymentRejectReason = (typeof PAYMENT_REJECT_REASONS)[number];
+
+/**
+ * Checks a new payment inside the push transaction:
+ * - the pupil is a live pupil of this school, and every named fee item is this school's;
+ * - the receipt number is in a live receipt book assigned to the author, unless the author holds
+ *   payment.any_receipt (programme staff entering on a school's behalf);
+ * - no live payment at the school already uses that receipt number.
+ */
+export async function validatePayment(
+  ctx: { tx: unknown; user: { id: string }; can: (action: string) => boolean },
+  change: { op: "insert" | "update"; scopeId: string; fields: Record<string, unknown> },
+): Promise<PaymentRejectReason | undefined> {
+  if (change.op !== "insert") return undefined;
+  const tx = ctx.tx as AnyDb;
+  const f = change.fields as { studentId: string; receiptNumber: number; feeItemIds: string[] };
+  const [st] = await tx
+    .select({ id: t.schoolStudents.id })
+    .from(t.schoolStudents)
+    .where(and(eq(t.schoolStudents.id, f.studentId), eq(t.schoolStudents.scopeId, change.scopeId), isNull(t.schoolStudents.voidedAt)));
+  if (!st) return "student_not_in_school";
+  if (f.feeItemIds.length > 0) {
+    const found = await tx
+      .select({ id: t.schoolFeeItems.id })
+      .from(t.schoolFeeItems)
+      .where(and(inArray(t.schoolFeeItems.id, f.feeItemIds), eq(t.schoolFeeItems.scopeId, change.scopeId)));
+    if (new Set(found.map((r: { id: string }) => r.id)).size !== new Set(f.feeItemIds).size) return "fee_item_not_in_school";
+  }
+  if (!ctx.can("payment.any_receipt")) {
+    const books = await tx
+      .select({ id: t.schoolReceiptBooks.id })
+      .from(t.schoolReceiptBooks)
+      .where(
+        and(
+          eq(t.schoolReceiptBooks.scopeId, change.scopeId),
+          eq(t.schoolReceiptBooks.assignedTo, ctx.user.id),
+          isNull(t.schoolReceiptBooks.voidedAt),
+          lte(t.schoolReceiptBooks.firstNumber, f.receiptNumber),
+          gte(t.schoolReceiptBooks.lastNumber, f.receiptNumber),
+        ),
+      );
+    if (books.length === 0) return "not_in_assigned_book";
+  }
+  const [dupe] = await tx
+    .select({ id: t.schoolPayments.id })
+    .from(t.schoolPayments)
+    .where(and(eq(t.schoolPayments.scopeId, change.scopeId), eq(t.schoolPayments.receiptNumber, f.receiptNumber), isNull(t.schoolPayments.voidedAt)))
+    .limit(1);
+  if (dupe) return "already_used";
+  return undefined;
+}

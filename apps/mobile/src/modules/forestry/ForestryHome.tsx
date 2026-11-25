@@ -1,11 +1,11 @@
 import { distanceToGeomM, pointInMultiPolygon, type ForestryStream } from "@eu/forestry/mobile";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { View } from "react-native";
 import { colors, streamAccent } from "@eu/core/tokens";
-import { useT } from "../../i18n";
+import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
 import { Button, Card, EmptyState, Header, IconBadge, ListGroup, ListRow, Notice, Page, Stat, StatusChip, Toast, Txt, type Tone } from "../../ui";
-import { getFix } from "../location";
+import { noFixKey, useGps } from "../location";
 import { loadPlots, type PlotLite } from "./data";
 import { MonitoringVisit } from "./MonitoringVisit";
 import { PlantingForm } from "./PlantingForm";
@@ -13,6 +13,9 @@ import { PlantingForm } from "./PlantingForm";
 /** A stream's plots on the phone: find the one you are standing in, then record a planting. */
 export function ForestryHome({ session, stream, onBack }: { session: Session; stream: ForestryStream; onBack: () => void }) {
   const t = useT();
+  const { locale } = useContext(LocaleContext);
+  const num = (n: number) => n.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB");
+  const gps = useGps();
   const [plots, setPlots] = useState<PlotLite[] | null>(null);
   const [gpsNote, setGpsNote] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
@@ -23,14 +26,14 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
   const reload = useCallback(() => {
     void loadPlots(session.client, stream).then(setPlots);
   }, [session, stream]);
-  useEffect(reload, [reload, session.status.lastOk]);
+  useEffect(reload, [reload, session.changes]);
 
   const findPlot = async () => {
-    if (!plots) return;
+    if (!plots || gps.locating) return;
     setGpsNote(t("forestry.m.locating"));
-    const fix = await getFix();
-    if (fix === "denied") return setGpsNote(t("forestry.m.gps_denied"));
-    if (!fix) return setGpsNote(t("forestry.m.gps_none"));
+    const fix = await gps.locate();
+    if (fix === "busy") return;
+    if (fix === null || typeof fix === "string") return setGpsNote(t(noFixKey(fix)));
     const withGeom = plots.filter((p) => p.geom);
     if (withGeom.length === 0) return setGpsNote(t("forestry.m.no_boundaries"));
     const inside = withGeom.find((p) => pointInMultiPolygon(fix.lng, fix.lat, p.geom!));
@@ -64,7 +67,7 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
             {!open.geom && <StatusChip label={t("ux.noBoundary")} tone="warning" />}
           </View>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <Stat value={open.planted.toLocaleString("fr-FR")} label={t("ux.plantsPlanted")} />
+            <Stat value={num(open.planted)} label={t("ux.plantsPlanted")} />
             <Stat value={open.plantings} label={t("ux.plantingsRecorded")} />
           </View>
         </Card>
@@ -84,7 +87,7 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
       header={<Header title={t(`forestry.${stream}`)} subtitle={plots ? t("ux.plotsSummary", { n: plots.length }) : undefined} onBack={onBack} backLabel={t("forestry.m.back")} accent={accent} />}
       toast={<Toast message={flash} onHide={() => setFlash(null)} />}
     >
-      <Button kind="secondary" icon="locate" label={t("forestry.m.find_plot")} onPress={() => void findPlot()} disabled={!plots || plots.length === 0} />
+      <Button kind="secondary" icon="locate" label={t("forestry.m.find_plot")} onPress={() => void findPlot()} disabled={!plots || plots.length === 0} busy={gps.locating} />
       {gpsNote && <Notice tone={highlight ? "good" : "info"} icon={highlight ? "pin" : "locate"}>{gpsNote}</Notice>}
       {plots && plots.length === 0 && <EmptyState icon={stream === "bamboo" ? "bamboo" : "tree"} color={accent} title={t("app.emptyTitle")}><Txt center>{t("forestry.m.no_plots")}</Txt></EmptyState>}
       {sorted && sorted.length > 0 && (
@@ -93,7 +96,7 @@ export function ForestryHome({ session, stream, onBack }: { session: Session; st
             <ListRow
               key={p.id}
               title={p.code}
-              detail={p.plantings > 0 ? `${p.village} · ${t("ux.plantsShort", { n: p.planted.toLocaleString("fr-FR") })}` : p.village}
+              detail={p.plantings > 0 ? `${p.village} · ${t("ux.plantsShort", { n: num(p.planted) })}` : p.village}
               leading={<IconBadge icon={stream === "bamboo" ? "bamboo" : "tree"} color={accent} />}
               status={<StatusChip label={t(`forestry.status.${p.status}`)} tone={statusTone(p.status)} />}
               onPress={() => setOpen(p)}

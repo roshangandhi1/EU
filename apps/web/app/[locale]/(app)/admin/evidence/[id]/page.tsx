@@ -1,12 +1,20 @@
 import { notFound } from "next/navigation";
 import { ButtonLink, Field, Fields, Notice, PageHeader, RowMenu, SubmitButton, Table } from "@/components/ui";
-import { formatLocal, requireAction } from "@/lib/admin";
+import { formatLocal } from "@/lib/admin";
+import { adminAccess } from "@/lib/access";
+import { NoAccess } from "@/components/no-access";
+import { siteNames } from "@/lib/site-names";
+import { titled } from "@/lib/meta";
+import { t } from "@eu/core/i18n";
+import Link from "next/link";
+import { Icon } from "@/components/icons";
 import { getCutoff, lateRecords, summarise, type LateRecord } from "@/lib/evidence";
 import { db } from "@/lib/http";
 import { entities } from "@/lib/registry";
 import { decideAction } from "../../actions";
 
 export const dynamic = "force-dynamic";
+export const generateMetadata = titled(async (l, p) => (await getCutoff(db(), p.id ?? "").catch(() => undefined))?.label ?? t(l, "admin.cutoffs"));
 
 export default async function CutoffPage({
   params,
@@ -16,22 +24,25 @@ export default async function CutoffPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const p = await params;
-  const { locale, tr } = await requireAction(p.locale, "evidence.manage");
+  const { locale, tr, allowed } = await adminAccess(p.locale, "evidence.manage");
+  if (!allowed) return <NoAccess locale={locale} />;
   const sp = await searchParams;
   const cutoff = await getCutoff(db(), p.id);
   if (!cutoff) notFound();
   const summary = await summarise(db(), entities, cutoff);
   const late: LateRecord[] = (await Promise.all(entities.all().map((e) => lateRecords(db(), e, cutoff)))).flat();
   const label = (name: string) => entities.get(name)?.label[locale] ?? name;
+  const where = await siteNames(late.map((r) => r.scopeId));
 
   return (
     <section>
+      <Link className="back-link" href={`/${locale}/admin/evidence`}><Icon name="back" size={16} />{t(locale, "ui.evidence.back")}</Link>
       <PageHeader
         title={cutoff.label}
         subtitle={formatLocal(cutoff.cutoffAt, locale)}
         actions={<ButtonLink href={`/api/admin/evidence/${cutoff.id}`} variant="secondary">{tr("download")}</ButtonLink>}
       />
-      {sp.error === "reason_required" && <Notice tone="error">{tr("reasonRequired")}</Notice>}
+      {sp.error && <Notice tone="error">{sp.error === "invalid" ? t(locale, "ui.evidence.invalidDecision") : tr("reasonRequired")}</Notice>}
       {sp.ok && <Notice tone="success">{tr("saved")}</Notice>}
       <Table
         rows={summary}
@@ -53,6 +64,7 @@ export default async function CutoffPage({
         empty={tr("none")}
         columns={[
           { key: "type", header: tr("recordType"), render: (r) => label(r.entity) },
+          { key: "where", header: t(locale, "ui.evidence.site"), render: (r) => where.get(r.scopeId) ?? <span className="muted">{t(locale, "ui.evidence.deletedSite")}</span> },
           { key: "captured", header: tr("capturedAt"), render: (r) => <>{formatLocal(r.deviceTime, locale)}{r.clockSuspect && <> · <strong>{tr("clockSuspect")}</strong></>}</> },
           { key: "received", header: tr("receivedAt"), render: (r) => formatLocal(r.serverTime, locale) },
           {

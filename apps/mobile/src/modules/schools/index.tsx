@@ -9,7 +9,7 @@ import { Attendance } from "./Attendance";
 import { activeOn } from "@eu/schools/mobile";
 import { listSchools, live, today, useSchool, type Local } from "./data";
 import { Fees } from "./Fees";
-import { ACCENT } from "./parts";
+import { ACCENT, schoolName } from "./parts";
 import { Students } from "./Students";
 
 type View_ = "menu" | "attendance" | "students" | "fees";
@@ -17,11 +17,10 @@ type View_ = "menu" | "attendance" | "students" | "fees";
 /** True when this phone holds at least one school the user can open. */
 export function useHasSchools(session: Session): boolean {
   const [has, setHas] = useState(false);
+  const changes = session.changes;
   useEffect(() => {
-    const check = () => void listSchools(session).then((s) => setHas(s.length > 0));
-    check();
-    return session.subscribe(check);
-  }, [session]);
+    void listSchools(session).then((s) => setHas(s.length > 0));
+  }, [session, changes]);
   return has;
 }
 
@@ -46,7 +45,7 @@ export function SchoolsApp({ session, onExit }: { session: Session; onExit: () =
         {schools.length === 0 && <Notice tone="warning">{t("schools.mobile.noSchools")}</Notice>}
         <ListGroup>
           {schools.map((s) => (
-            <ListRow key={s.id} title={s.code} leading={<IconBadge icon="school" color={ACCENT} />} onPress={() => setSchool(s)} chevron />
+            <ListRow key={s.id} title={schoolName(s)} detail={schoolName(s) !== s.code ? s.code : undefined} leading={<IconBadge icon="school" color={ACCENT} />} onPress={() => setSchool(s)} chevron />
           ))}
         </ListGroup>
       </Page>
@@ -58,7 +57,7 @@ function SchoolMenu({ session, school, onExit }: { session: Session; school: Loc
   const t = useT();
   const { data } = useSchool(session, school);
   const [view, setView] = useState<View_>("menu");
-  if (!data) return <Page header={<Header title={school.code} onBack={onExit} accent={ACCENT} />}><Txt tone="muted">…</Txt></Page>;
+  if (!data) return <Page header={<Header title={schoolName(school)} onBack={onExit} backLabel={t("schools.mobile.back")} accent={ACCENT} />}><Txt tone="muted">…</Txt></Page>;
   const back = () => setView("menu");
   if (view === "attendance") return <Attendance session={session} data={data} onBack={back} />;
   if (view === "students") return <Students session={session} data={data} onBack={back} />;
@@ -68,12 +67,12 @@ function SchoolMenu({ session, school, onExit }: { session: Session; school: Loc
   const year = data.years.find((y) => !y.voidedAt && y.startsOn <= d && y.endsOn >= d);
   const yearClasses = live(data.classes).filter((c) => c.academicYearId === year?.id);
   const taken = yearClasses.filter((c) => live(data.registers).some((r) => r.classId === c.id && r.date === d)).length;
-  const enrolled = activeOn(data.enrolments, d).length;
+  const enrolled = activeOn(data.enrolments, d, data.years).length;
   const paidToday = live(data.payments).filter((p) => p.paidOn === d).length;
   const pct = yearClasses.length ? taken / yearClasses.length : 0;
 
   return (
-    <Page header={<Header title={school.code} subtitle={year ? t("ux.schoolYear", { year: year.label }) : undefined} onBack={onExit} backLabel={t("schools.mobile.back")} accent={ACCENT} />}>
+    <Page header={<Header title={schoolName(data.school)} subtitle={year ? t("ux.schoolYear", { year: year.label }) : undefined} onBack={onExit} backLabel={t("schools.mobile.back")} accent={ACCENT} />}>
       {yearClasses.length > 0 && (
         <Card>
           <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>

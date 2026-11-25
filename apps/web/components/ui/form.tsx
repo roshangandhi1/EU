@@ -78,14 +78,42 @@ export function RowMenu({ label, icon = "more", children, wide, tone }: { label:
   );
 }
 
-/** Small confirm-before-submit for destructive one-click buttons (remove a row, revoke). */
-export function ConfirmButton({ label, confirm, yes, no, icon = "trash" }: { label: string; confirm: string; yes: string; no: string; icon?: string }) {
+/**
+ * Confirm-before-submit for one-click actions that are hard to undo (remove a row, revoke, publish).
+ * Default: a small icon button that turns into "Remove? Remove / Keep". With `text`, the trigger is a
+ * labelled button and the question opens as a short panel that can explain the consequences.
+ */
+export function ConfirmButton({ label, confirm, yes, no, icon = "trash", text, variant = "danger", small = true, pending }: {
+  label: string; confirm: ReactNode; yes: string; no: string; icon?: string;
+  /** Show a labelled button (this text) instead of an icon, and a panel instead of the inline question. */
+  text?: string; variant?: "primary" | "secondary" | "danger"; small?: boolean; pending?: string;
+}) {
   const [asking, setAsking] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => { if (asking && text) ref.current?.querySelector<HTMLElement>("button[type=submit]")?.focus({ preventScroll: true }); }, [asking, text]);
   if (!asking) {
+    if (text) {
+      return (
+        <button type="button" className={cx("btn", variant !== "primary" && variant, small && "sm")} onClick={() => setAsking(true)}>
+          <Icon name={icon} size={small ? 15 : 17} />{text}
+        </button>
+      );
+    }
     return <button type="button" className="icon-btn danger-hover" aria-label={label} title={label} onClick={() => setAsking(true)}><Icon name={icon} size={17} /></button>;
   }
+  if (text) {
+    return (
+      <span className="confirm-panel" role="alertdialog" aria-label={label} ref={ref}>
+        <span className="confirm-q">{confirm}</span>
+        <span className="confirm-actions">
+          <button type="button" className={cx("btn ghost", small && "sm")} onClick={() => setAsking(false)}>{no}</button>
+          <SubmitButton small={small} variant={variant} pending={pending}>{yes}</SubmitButton>
+        </span>
+      </span>
+    );
+  }
   return (
-    <span className="confirm-inline" role="group" aria-label={confirm}>
+    <span className="confirm-inline" role="group" aria-label={label}>
       <span className="confirm-q">{confirm}</span>
       <SubmitButton small variant="danger">{yes}</SubmitButton>
       <button type="button" className="btn sm ghost" onClick={() => setAsking(false)}>{no}</button>
@@ -107,12 +135,22 @@ export function useDirty(ref: React.RefObject<HTMLFormElement | null>) {
   return [dirty, setDirty] as const;
 }
 
-/** Warns before leaving the page with unsaved edits. */
-export function useLeaveGuard(dirty: boolean) {
+/**
+ * Warns before leaving the page with unsaved edits: the browser's own prompt on reload or close,
+ * and, when `message` is given, a confirm on in-app links (which never fire beforeunload).
+ */
+export function useLeaveGuard(dirty: boolean, message?: string) {
   useEffect(() => {
     if (!dirty) return;
     const h = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const click = (e: MouseEvent) => {
+      if (!message || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || a.target === "_blank" || a.href.startsWith(window.location.href.split("#")[0] + "#")) return;
+      if (!window.confirm(message)) { e.preventDefault(); e.stopPropagation(); }
+    };
     window.addEventListener("beforeunload", h);
-    return () => window.removeEventListener("beforeunload", h);
-  }, [dirty]);
+    document.addEventListener("click", click, true);
+    return () => { window.removeEventListener("beforeunload", h); document.removeEventListener("click", click, true); };
+  }, [dirty, message]);
 }

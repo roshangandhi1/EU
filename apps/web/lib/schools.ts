@@ -1,5 +1,6 @@
+import { todayDrc } from "@eu/core";
 import { isLocale, t, type Locale } from "@eu/core/i18n";
-import { loadSchool, listSchoolSites, type SchoolData } from "@eu/schools";
+import { loadSchool, listSchoolSites, parseWholeNumber, type SchoolData } from "@eu/schools";
 import type { Mutation, MutationResult } from "@eu/sync";
 import { handlePush } from "@eu/sync/server";
 import { notFound, redirect } from "next/navigation";
@@ -10,9 +11,9 @@ import { currentPrincipal } from "./session";
 
 export type SchoolAction = Parameters<typeof permissions.can>[1];
 
+/** Today in Haut-Lomami (UTC+2), as YYYY-MM-DD. */
 export function today(): string {
-  // Haut-Lomami is UTC+2 all year.
-  return new Date(Date.now() + 2 * 3_600_000).toISOString().slice(0, 10);
+  return todayDrc();
 }
 
 export function tr(locale: Locale) {
@@ -69,12 +70,11 @@ export function str(fd: FormData, key: string): string {
   const v = fd.get(key);
   return typeof v === "string" ? v.trim() : "";
 }
+/** A whole number from a form ("15 000", "15.000", "15,000"); NaN when it has a decimal part (EDGE-1). */
 export function int(fd: FormData, key: string): number | null {
-  const v = str(fd, key).replace(/[\s,.]/g, "");
-  if (!v) return null;
-  const n = Number(v);
-  return Number.isInteger(n) ? n : NaN;
+  return parseWholeNumber(str(fd, key));
 }
+
 export const orNull = (s: string) => (s === "" ? null : s);
 
 /** Parses "1-6" or "1,2,3" into levels 1..6. */

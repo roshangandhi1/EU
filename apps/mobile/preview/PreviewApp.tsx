@@ -1,7 +1,8 @@
 /**
  * Browser preview of the phone app, for screenshots and design review only (never shipped).
  * Renders the real screens against an in-memory session filled with the same demo set the web
- * loads. URL: ?s=signin|pin|unlock|home|empty|revoked &lang=en|fr &sync=ok|pending|offline|failed
+ * loads. URL: ?s=signin|pin|unlock|home|empty|revoked &lang=en|fr &sync=ok|pending|offline|nonet|failed|clock|never
+ * &notice=<i18n key for the sign-in screen> &other=1 (sign-in blocked by another person's unsent work)
  * Build: see preview/README.md.
  */
 import type { Locale } from "@eu/core/i18n";
@@ -100,27 +101,86 @@ function demoStore(): Map<string, Row[]> {
   return db;
 }
 
-type SyncMode = "ok" | "pending" | "offline" | "failed" | "never";
+type SyncMode = "ok" | "pending" | "offline" | "nonet" | "failed" | "clock" | "never";
 
-function makeSession(phase: Session["phase"], empty: boolean, sync: SyncMode): Session {
+function makeSession(phase: Session["phase"], empty: boolean, sync: SyncMode, notice: string | null, other: boolean): Session {
   const db = empty ? new Map<string, Row[]>() : demoStore();
   const listeners = new Set<() => void>();
   const emit = () => listeners.forEach((l) => l());
   const lastOk = sync === "never" ? null : new Date(Date.now() - 42 * 60_000).toISOString();
+  const drafts = new Map<string, { value: unknown; savedAt: string }>();
+  const rejections = sync === "failed"
+    ? [
+        { rowId: 2, mutationId: "m2", entity: "school.payment", recordId: "r2", status: "rejected", reason: "forbidden", at: new Date(Date.now() - 3 * 3600_000).toISOString(), record: { amount: 15000, receiptNumber: 1019, paidOn: daysAgo(1) } },
+        { rowId: 1, mutationId: "m1", entity: "school.student", recordId: "r1", status: "partial", conflicts: ["guardianPhone"], at: new Date(Date.now() - 26 * 3600_000).toISOString(), record: { lastName: "KABILA", firstName: "Amani", studentNumber: "DEMO-001" } },
+      ]
+    : [];
   const s = {
     phase,
+    changes: 0,
     user: { id: "preview-user", name: "Roshan" },
     roles: [{ role: "system_admin", scope: { type: "global" } }],
-    notice: null,
+    notice,
+    otherUser: other ? { name: "Mukendi Grâce", records: 4, photos: 2, canSendNow: true } : null,
     status: {
       running: false,
-      pending: sync === "pending" ? 3 : 0,
+      pending: sync === "pending" || sync === "offline" ? 3 : 0,
       photosPending: sync === "pending" ? 2 : 0,
       nextCutoff: null,
-      rejected: sync === "failed" ? 1 : 0,
+      rejected: rejections.length,
       lastOk,
-      last: sync === "failed" ? { ok: false } : lastOk ? { ok: true } : null,
+      last: sync === "failed" ? { ok: false } : sync === "nonet" ? { ok: false, error: "offline" } : lastOk ? { ok: true } : null,
       offline: sync === "offline",
+      noInternet: sync === "nonet",
+      clockSuspect: sync === "clock",
+    },
+    drafts: {
+      async get(k: string) {
+        return drafts.get(k) ?? null;
+      },
+      async set(k: string, value: unknown) {
+        drafts.set(k, { value, savedAt: new Date().toISOString() });
+      },
+      async clear(k: string) {
+        drafts.delete(k);
+      },
+      async takeRecovered() {
+        return [];
+      },
+    },
+    async listRejections() {
+      return [...rejections];
+    },
+    async dismissRejection(rowId: number) {
+      const i = rejections.findIndex((r) => r.rowId === rowId);
+      if (i >= 0) rejections.splice(i, 1);
+      s.status.rejected = rejections.length;
+      emit();
+    },
+    async localSaved() {
+      s.changes += 1;
+      emit();
+    },
+    toSignIn() {
+      s.phase = "signIn";
+      s.notice = "app.forgotPinNotice";
+      emit();
+    },
+    async canUnlock() {
+      return true;
+    },
+    backToUnlock() {
+      s.phase = "unlock";
+      emit();
+    },
+    async restart() {
+      s.phase = "signIn";
+      emit();
+    },
+    async sendPreviousWork() {
+      await new Promise((r) => setTimeout(r, 600));
+      s.otherUser = null;
+      return "sent" as const;
     },
     subscribe(l: () => void) {
       listeners.add(l);
@@ -158,7 +218,8 @@ function makeSession(phase: Session["phase"], empty: boolean, sync: SyncMode): S
       s.status.running = true;
       emit();
       await new Promise((r) => setTimeout(r, 900));
-      Object.assign(s.status, { running: false, pending: 0, photosPending: 0, offline: false, rejected: 0, lastOk: new Date().toISOString(), last: { ok: true } });
+      Object.assign(s.status, { running: false, pending: 0, photosPending: 0, offline: false, noInternet: false, lastOk: new Date().toISOString(), last: { ok: true, pushed: 1, pulled: 0 } });
+      s.changes += 1;
       emit();
     },
     lock() {
@@ -172,6 +233,7 @@ function makeSession(phase: Session["phase"], empty: boolean, sync: SyncMode): S
       emit();
     },
     async signIn() {
+      if (s.otherUser) return "app.otherUserPending";
       s.phase = "setPin";
       emit();
       return null;
@@ -194,7 +256,7 @@ export default function PreviewApp() {
   const q = new URLSearchParams(globalThis.location?.search ?? "");
   const which = q.get("s") ?? "home";
   const phase = ({ signin: "signIn", pin: "setPin", unlock: "unlock", revoked: "revoked" } as Record<string, Session["phase"]>)[which] ?? "home";
-  const session = useMemo(() => makeSession(phase, which === "empty", (q.get("sync") as SyncMode) ?? "ok"), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const session = useMemo(() => makeSession(phase, which === "empty", (q.get("sync") as SyncMode) ?? "ok", q.get("notice"), q.get("other") === "1"), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [locale, setLocale] = useState<Locale>((q.get("lang") as Locale) ?? "fr");
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   // On Android the fonts are bundled by the expo-font config plugin; the browser loads them here.
@@ -210,7 +272,7 @@ export default function PreviewApp() {
   if (session.phase === "signIn") screen = <SignIn session={session} />;
   else if (session.phase === "setPin") screen = <SetPin session={session} />;
   else if (session.phase === "unlock") screen = <Unlock session={session} />;
-  else if (session.phase === "revoked") screen = <Revoked />;
+  else if (session.phase === "revoked") screen = <Revoked session={session} />;
   else screen = <Home session={session} />;
   if (!fontsReady) return null;
   return (

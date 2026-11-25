@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PermissionRegistry, platformActions, type UserContext } from "../src";
+import { isRealIsoDate, PermissionRegistry, platformActions, todayDrc, type UserContext } from "../src";
 import { diffKeys, en, fr, t } from "../src/i18n";
 
 const reg = new PermissionRegistry().register(platformActions).register({
@@ -21,6 +21,25 @@ describe("permissions", () => {
     expect(reg.can(lead, "payment.write", { stream: "schools", siteId: "school-B" })).toBe(true);
     expect(reg.can(lead, "payment.void", { stream: "schools", siteId: "school-B" })).toBe(false);
     expect(reg.can(bambooLead, "payment.write", { stream: "schools", siteId: "school-B" })).toBe(false);
+  });
+  it("site roles hold only actions of their own site's stream (SEC-15)", () => {
+    const r = new PermissionRegistry().register({
+      "bamboo.visit.write": { stream: "bamboo", roles: ["field_officer"] },
+      "boreholes.visit.write": { stream: "boreholes", roles: ["field_officer"] },
+    });
+    const tech: UserContext = { id: "t", assignments: [{ role: "field_officer", scope: { type: "site", siteId: "bh-1", stream: "boreholes" } }] };
+    expect(r.can(tech, "boreholes.visit.write", { stream: "boreholes", siteId: "bh-1" })).toBe(true);
+    expect(r.can(tech, "bamboo.visit.write", { stream: "bamboo", siteId: "bh-1" })).toBe(false);
+    expect(r.can(tech, "boreholes.visit.write", { stream: "bamboo", siteId: "bh-1" })).toBe(false);
+  });
+  it("today in Haut-Lomami and strict ISO dates", () => {
+    expect(todayDrc(new Date("2026-11-30T21:59:00Z"))).toBe("2026-11-30");
+    expect(todayDrc(new Date("2026-11-30T22:01:00Z"))).toBe("2026-12-01");
+    expect(isRealIsoDate("2026-02-28")).toBe(true);
+    expect(isRealIsoDate("2028-02-29")).toBe(true);
+    expect(isRealIsoDate("2026-02-30")).toBe(false);
+    expect(isRealIsoDate("2026-13-01")).toBe(false);
+    expect(isRealIsoDate("2026-1-01")).toBe(false);
   });
   it("global admins hold everything granted to them; unknown actions are denied", () => {
     expect(reg.can(admin, "payment.void", { stream: "schools", siteId: "x" })).toBe(true);

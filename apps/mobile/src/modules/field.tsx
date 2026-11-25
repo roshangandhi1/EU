@@ -20,12 +20,12 @@ const ENTITY: Record<ModuleKey, { entity: string; code: string }> = {
 };
 
 /**
- * How many schools, boreholes and plots this phone holds, recounted after every sync.
+ * How many schools, boreholes and plots this phone holds, recounted when records change.
  * The server only sends records the person may read, so a count is also a fair test of access.
  */
 export function useModuleCounts(session: Session): ModuleCounts | null {
   const [counts, setCounts] = useState<ModuleCounts | null>(null);
-  const lastOk = session.status.lastOk;
+  const changes = session.changes;
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -40,7 +40,7 @@ export function useModuleCounts(session: Session): ModuleCounts | null {
     return () => {
       live = false;
     };
-  }, [session, lastOk]);
+  }, [session, changes]);
   return counts;
 }
 

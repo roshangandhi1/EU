@@ -6,7 +6,7 @@ import type { PermissionRegistry, UserContext } from "@eu/core";
 import { sites, type Db } from "@eu/db";
 import type { EntityRegistry } from "@eu/sync";
 import { handlePush } from "@eu/sync/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { boreholes, boreholeSettings, faults, maintenanceTemplates, populationEstimates, visits, type MaintenanceTaskDef } from "../db/schema";
 import { defaultSettings, defaultTemplate } from "../defaults";
@@ -71,7 +71,14 @@ export interface BoreholeRow {
 
 const RANK = { none: 0, ok: 1, due_soon: 2, due: 3, overdue: 4 } as const;
 
-export async function loadBoreholes(db: Db, asAt: string, mode: "captured" | "evidence", today: string): Promise<{ rows: BoreholeRow[]; counted: number }> {
+/** `admitted`: visit ids an admin admitted late for the evidence cut-off being reported (DATA-5). */
+export async function loadBoreholes(
+  db: Db,
+  asAt: string,
+  mode: "captured" | "evidence",
+  today: string,
+  admitted: ReadonlySet<string> = new Set(),
+): Promise<{ rows: BoreholeRow[]; counted: number }> {
   const d = db as AnyDb;
   const [attrs, vs, fs, templates, settings] = await Promise.all([
     d.select().from(boreholes).where(isNull(boreholes.voidedAt)),
@@ -84,7 +91,7 @@ export async function loadBoreholes(db: Db, asAt: string, mode: "captured" | "ev
   const ind = indicator111(
     attrs.map((b: any) => ({
       borehole: { siteId: b.scopeId, code: b.code, pumpRatingKw: b.pumpRatingKw, commissionedOn: b.commissionedOn, waterQuality: b.waterQuality, caretakersTrained: b.caretakersTrained, sopHandedOver: b.sopHandedOver },
-      visits: vs.filter((v: any) => v.scopeId === b.scopeId).map((v: any) => ({ id: v.id, visitedOn: v.visitedOn, operational: v.operational, deviceTime: v.deviceTime, serverTime: v.serverTime, voidedAt: v.voidedAt })),
+      visits: vs.filter((v: any) => v.scopeId === b.scopeId).map((v: any) => ({ id: v.id, visitedOn: v.visitedOn, operational: v.operational, deviceTime: v.deviceTime, serverTime: v.serverTime, voidedAt: v.voidedAt, lateAccepted: admitted.has(v.id) })),
     })),
     asAt, mode, settings,
   );
@@ -109,22 +116,39 @@ const mut = (entity: string, scopeId: string, fields: Record<string, unknown>, n
   mutationId: randomUUID(), entity, recordId, op, scopeId, deviceTime: now.toISOString(), fields,
 });
 
-/** Create a borehole: a platform site plus its attribute record. */
+/**
+ * Create a borehole: a platform site plus its attribute record, in one transaction, so a refused
+ * record never leaves an orphan site (SEC-18). Codes are unique in any letter case (EDGE-7).
+ */
 export async function createBorehole(ctx: ServerCtx, input: { code: string; village: string; lat?: number | null; lng?: number | null; lifecycle?: string; pumpRatingKw?: number | null }) {
   if (!ctx.permissions.can(ctx.user, "boreholes.write", { stream: "boreholes" })) return { ok: false as const, reason: "forbidden" };
   const d = ctx.db as AnyDb;
-  const dup = await d.select({ id: boreholes.id }).from(boreholes).where(eq(boreholes.code, input.code));
+  const code = input.code.trim();
+  const dup = await d.select({ id: boreholes.id }).from(boreholes).where(and(sql`lower(${boreholes.code}) = ${code.toLowerCase()}`, isNull(boreholes.voidedAt)));
   if (dup.length) return { ok: false as const, reason: "already_exists" };
   const now = ctx.now?.() ?? new Date();
   const siteId = randomUUID();
-  await d.insert(sites).values({ id: siteId, kind: "borehole", stream: "boreholes", name: input.code, lat: input.lat ?? null, lng: input.lng ?? null });
-  const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [mut("boreholes.borehole", siteId, {
-    code: input.code, village: input.village, gpsLat: input.lat ?? null, gpsLng: input.lng ?? null,
-    lifecycle: input.lifecycle ?? "planned", pumpRatingKw: input.pumpRatingKw ?? null, sopHandedOver: false,
-  }, now)] });
-  const r = res.results[0]!;
-  return r.status === "applied" ? { ok: true as const, siteId } : { ok: false as const, reason: r.reason ?? r.status };
+  let reason: string | null = null;
+  await d
+    .transaction(async (tx: AnyDb) => {
+      await tx.insert(sites).values({ id: siteId, kind: "borehole", stream: "boreholes", name: code, lat: input.lat ?? null, lng: input.lng ?? null });
+      const res = await handlePush({ ...ctx, db: tx }, { deviceNow: now.toISOString(), mutations: [mut("boreholes.borehole", siteId, {
+        code, village: input.village, gpsLat: input.lat ?? null, gpsLng: input.lng ?? null,
+        lifecycle: input.lifecycle ?? "planned", pumpRatingKw: input.pumpRatingKw ?? null, sopHandedOver: false,
+      }, now)] });
+      const r = res.results[0]!;
+      if (r.status !== "applied") {
+        reason = r.reason ?? r.status;
+        throw ROLLBACK;
+      }
+    })
+    .catch((err: unknown) => {
+      if (err !== ROLLBACK) throw err;
+    });
+  return reason ? { ok: false as const, reason } : { ok: true as const, siteId };
 }
+
+const ROLLBACK = new Error("rollback");
 
 /**
  * Save a template as a new version (stream-wide record, scope "boreholes"). Visits keep the version

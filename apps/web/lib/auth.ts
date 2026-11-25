@@ -41,36 +41,80 @@ export type LoginResult =
   | { ok: true; userId: string }
   | { ok: false; reason: "invalid" | "locked" };
 
-/** Checks email and password, with a lockout after repeated failures. */
-export async function checkCredentials(db: Db, email: string, password: string, now = new Date()): Promise<LoginResult> {
+/** Failed sign-ins from one network address allowed per window, across all accounts (SEC-3). */
+export const MAX_FAILED_PER_IP = 20;
+const WINDOW_MS = LOCK_MINUTES * 60_000;
+/** login_attempts has no address column: per-address failures are stored as rows with this email prefix. */
+const IP_KEY = "ip:";
+
+/**
+ * Checks email and password.
+ * - Each guess first reserves a slot with one atomic UPDATE, so parallel guesses cannot exceed
+ *   MAX_FAILED_LOGINS per window; the account then locks for LOCK_MINUTES (never indefinitely).
+ * - At most MAX_FAILED_PER_IP failures per address per window, whichever accounts they target.
+ * - An unknown email always answers "invalid" (401), so the answer never reveals which emails exist.
+ */
+export async function checkCredentials(
+  db: Db,
+  email: string,
+  password: string,
+  now = new Date(),
+  ip: string | null = null,
+): Promise<LoginResult> {
   const d = db as AnyDb;
   const normalised = email.trim().toLowerCase();
+  const since = new Date(now.getTime() - WINDOW_MS);
+  const fail = async () => {
+    const rows = [{ email: normalised, ok: false, at: now }];
+    if (ip) rows.push({ email: IP_KEY + ip, ok: false, at: now });
+    await d.insert(loginAttempts).values(rows);
+  };
+
+  if (ip) {
+    const [{ n }] = await d
+      .select({ n: sql<number>`count(*)::int` })
+      .from(loginAttempts)
+      .where(and(eq(loginAttempts.email, IP_KEY + ip), eq(loginAttempts.ok, false), gt(loginAttempts.at, since)));
+    if (n >= MAX_FAILED_PER_IP) return { ok: false, reason: "locked" };
+  }
+
   const [user] = await d.select().from(users).where(eq(sql`lower(${users.email})`, normalised));
-  const record = (ok: boolean) => d.insert(loginAttempts).values({ email: normalised, ok, at: now });
   if (!user || !user.active) {
     // Spend comparable time so unknown emails are not distinguishable by timing.
     await verifyPassword(password, "scrypt$AAAAAAAAAAAAAAAAAAAAAA==$" + "A".repeat(86) + "==");
-    await record(false);
+    await fail();
     return { ok: false, reason: "invalid" };
   }
-  if (user.lockedUntil && new Date(user.lockedUntil) > now) {
-    await record(false);
+
+  // Reserve this attempt atomically; no row back means the account is locked right now.
+  const [slot] = (await d
+    .update(users)
+    .set({ failedLogins: sql`${users.failedLogins} + 1` })
+    .where(and(eq(users.id, user.id), sql`(${users.lockedUntil} is null or ${users.lockedUntil} <= ${now})`))
+    .returning({ attempts: users.failedLogins })) as { attempts: number }[];
+  if (!slot) {
+    await fail();
+    return { ok: false, reason: "locked" };
+  }
+  const lock = async () => {
+    await d.update(users).set({ failedLogins: 0, lockedUntil: new Date(now.getTime() + WINDOW_MS) }).where(eq(users.id, user.id));
+  };
+  if (slot.attempts > MAX_FAILED_LOGINS) {
+    // Parallel guesses beyond the limit are refused without checking the password.
+    await lock();
+    await fail();
     return { ok: false, reason: "locked" };
   }
   if (!(await verifyPassword(password, user.passwordHash))) {
-    const failed = user.failedLogins + 1;
-    await d
-      .update(users)
-      .set({
-        failedLogins: failed >= MAX_FAILED_LOGINS ? 0 : failed,
-        lockedUntil: failed >= MAX_FAILED_LOGINS ? new Date(now.getTime() + LOCK_MINUTES * 60_000) : user.lockedUntil,
-      })
-      .where(eq(users.id, user.id));
-    await record(false);
-    return { ok: false, reason: failed >= MAX_FAILED_LOGINS ? "locked" : "invalid" };
+    await fail();
+    if (slot.attempts >= MAX_FAILED_LOGINS) {
+      await lock();
+      return { ok: false, reason: "locked" };
+    }
+    return { ok: false, reason: "invalid" };
   }
   await d.update(users).set({ failedLogins: 0, lockedUntil: null }).where(eq(users.id, user.id));
-  await record(true);
+  await d.insert(loginAttempts).values({ email: normalised, ok: true, at: now });
   return { ok: true, userId: user.id };
 }
 
@@ -107,24 +151,34 @@ export interface Principal {
   deviceId: string | null;
 }
 
-export type ResolveResult = { ok: true; principal: Principal } | { ok: false; reason: "unauthenticated" | "device_revoked" };
+/**
+ * Why a token was refused (the 401 body's "error"):
+ * - "device_revoked": the phone itself was removed by an admin. Only then may a phone wipe itself.
+ * - "session_ended": a phone token whose session ended while the phone is still enrolled (password
+ *   reset, deactivation, a newer sign-in on the same phone, or the token expired). The phone must
+ *   ask for an online sign-in and keep all its data.
+ * - "unauthenticated": no token, an unknown token, or a web session that ended.
+ */
+export type ResolveResult =
+  | { ok: true; principal: Principal }
+  | { ok: false; reason: "unauthenticated" | "device_revoked" | "session_ended" };
 
 /** Turns a session token (cookie or Bearer) into a user with roles. */
 export async function resolveToken(db: Db, token: string | null | undefined, now = new Date()): Promise<ResolveResult> {
   if (!token) return { ok: false, reason: "unauthenticated" };
   const d = db as AnyDb;
-  const [s] = await d
-    .select()
-    .from(sessions)
-    .where(and(eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, now)));
+  const [s] = await d.select().from(sessions).where(eq(sessions.tokenHash, hashToken(token)));
   if (!s) return { ok: false, reason: "unauthenticated" };
+  const ended = s.kind === "device" || s.deviceId ? "session_ended" : "unauthenticated";
   if (s.deviceId) {
     const [dev] = await d.select().from(devices).where(eq(devices.id, s.deviceId));
     if (!dev || dev.revokedAt) return { ok: false, reason: "device_revoked" };
+    // The phone was handed to another user since this token was issued.
+    if (dev.userId !== s.userId) return { ok: false, reason: "session_ended" };
   }
-  if (s.revokedAt) return { ok: false, reason: s.deviceId ? "device_revoked" : "unauthenticated" };
+  if (s.revokedAt || new Date(s.expiresAt) <= now) return { ok: false, reason: ended };
   const [u] = await d.select().from(users).where(eq(users.id, s.userId));
-  if (!u || !u.active) return { ok: false, reason: "unauthenticated" };
+  if (!u || !u.active) return { ok: false, reason: ended };
   return {
     ok: true,
     principal: {
@@ -164,7 +218,16 @@ export async function loadAssignments(db: Db, userId: string): Promise<RoleAssig
   return out;
 }
 
-/** Registers (or re-registers) a phone and issues its long-lived token. */
+/** Device ids phones may register: letters, digits and dashes (a UUID in practice). Never "web:...". */
+export const DEVICE_ID_PATTERN = /^[A-Za-z0-9-]{8,100}$/;
+
+/**
+ * Registers (or re-registers) a phone and issues its long-lived token.
+ * - A removed (revoked) device id stays blocked for good; a wiped phone registers again under a
+ *   NEW device id, which is allowed like any new phone.
+ * - A phone may change hands: signing in as another user re-binds it to that user and ends the
+ *   previous user's token. The phone itself refuses this while the previous user's work is unsynced.
+ */
 export async function registerDevice(
   db: Db,
   userId: string,
@@ -172,15 +235,19 @@ export async function registerDevice(
   name: string,
   appVersion: string | null,
   now = new Date(),
-): Promise<{ ok: true; token: string } | { ok: false; reason: "device_revoked" | "device_owned_by_other_user" }> {
+): Promise<{ ok: true; token: string } | { ok: false; reason: "device_revoked" | "invalid_device_id" }> {
+  if (!DEVICE_ID_PATTERN.test(deviceId)) return { ok: false, reason: "invalid_device_id" };
   const d = db as AnyDb;
   const [existing] = await d.select().from(devices).where(eq(devices.id, deviceId));
   if (existing?.revokedAt) return { ok: false, reason: "device_revoked" };
-  if (existing && existing.userId !== userId) return { ok: false, reason: "device_owned_by_other_user" };
   if (!existing) {
     await d.insert(devices).values({ id: deviceId, userId, name, appVersion, registeredAt: now, lastSeenAt: now });
   } else {
-    await d.update(devices).set({ name, appVersion, lastSeenAt: now }).where(eq(devices.id, deviceId));
+    const handover = existing.userId !== userId;
+    await d
+      .update(devices)
+      .set({ userId, name, appVersion, lastSeenAt: now, ...(handover ? { pendingChanges: null, pendingPhotos: null, statusAt: null } : {}) })
+      .where(eq(devices.id, deviceId));
     // One live token per phone.
     await d
       .update(sessions)

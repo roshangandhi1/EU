@@ -59,7 +59,7 @@ export default async function AppLayout({ children, params }: { children: React.
       locale={locale}
       groups={groups}
       user={{ name: me.name, role }}
-      labels={{ brandSub: u("brandSub"), funded: t(locale, "common.fundedByEu"), signOut: u("signOut"), menu: u("menu"), close: u("closeMenu") }}
+      labels={{ brandSub: u("brandSub"), funded: t(locale, "common.fundedByEu"), signOut: u("signOut"), menu: u("menu"), close: u("closeMenu"), nav: u("navAria") }}
     >
       <main className="page">
         {demo?.loaded && (

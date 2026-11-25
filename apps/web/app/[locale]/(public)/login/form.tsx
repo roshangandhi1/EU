@@ -1,11 +1,16 @@
 "use client";
 import { useState } from "react";
 
-type Labels = { email: string; password: string; submit: string; invalid: string; locked: string };
+type Labels = { email: string; password: string; submit: string; invalid: string; locked: string; show: string; hide: string; showAria: string; hideAria: string; forgot: string; network: string; busy: string };
 
+/**
+ * Sign-in. After success the person lands on the app in their own language (from their profile),
+ * keeping a ?next= path inside the app when there is one.
+ */
 export function LoginForm({ locale, labels }: { locale: string; labels: Labels }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
   return (
     <form
       className="form"
@@ -14,14 +19,22 @@ export function LoginForm({ locale, labels }: { locale: string; labels: Labels }
         setBusy(true);
         setError(null);
         const data = new FormData(e.currentTarget);
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email: data.get("email"), password: data.get("password") }),
-        });
-        setBusy(false);
-        if (res.ok) window.location.href = `/${locale}`;
-        else setError(res.status === 429 ? labels.locked : labels.invalid);
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: data.get("email"), password: data.get("password") }),
+          });
+          if (!res.ok) {
+            setBusy(false);
+            return setError(res.status === 429 ? labels.locked : labels.invalid);
+          }
+          const me = (await fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { locale?: string } | null;
+          window.location.href = `/${me?.locale === "en" || me?.locale === "fr" ? me.locale : locale}`;
+        } catch {
+          setBusy(false);
+          setError(labels.network);
+        }
       }}
     >
       <label>
@@ -30,10 +43,16 @@ export function LoginForm({ locale, labels }: { locale: string; labels: Labels }
       </label>
       <label>
         {labels.password}
-        <input name="password" type="password" autoComplete="current-password" required />
+        <span className="pw-row">
+          <input name="password" type={show ? "text" : "password"} autoComplete="current-password" required />
+          <button type="button" className="btn ghost sm" aria-pressed={show} aria-label={show ? labels.hideAria : labels.showAria} onClick={() => setShow(!show)}>
+            {show ? labels.hide : labels.show}
+          </button>
+        </span>
       </label>
       {error && <p role="alert" className="error">{error}</p>}
-      <button className="btn" disabled={busy}>{labels.submit}</button>
+      <button className="btn" disabled={busy} aria-busy={busy || undefined}>{busy ? <><span className="spinner" aria-hidden />{labels.busy}</> : labels.submit}</button>
+      <p className="muted small">{labels.forgot}</p>
     </form>
   );
 }

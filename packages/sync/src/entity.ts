@@ -1,4 +1,4 @@
-import type { ConflictPolicy, Stream } from "@eu/core";
+import type { ConflictPolicy, Stream, UserContext } from "@eu/core";
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 
@@ -29,6 +29,36 @@ export interface EntityDef {
    * the entity's stream. A record may also be scoped to the stream itself (scope_id = stream name).
    */
   siteKinds?: readonly string[];
+  /**
+   * Server-side business rules beyond the zod shape, run inside the push transaction after the
+   * permission and scope checks. Return a short reason code to reject the change (the phone shows
+   * it translated), or undefined to accept. Runs on the server only; never on the phone.
+   */
+  validate?: (ctx: EntityValidateContext, change: EntityChange) => Promise<string | undefined>;
+  /**
+   * Optional: add read-only fields to records sent to phones on pull (for example a name kept on
+   * another table). The extra fields are for display; phones never send them back. Server only.
+   */
+  decorate?: (tx: any, records: Record<string, unknown>[]) => Promise<Record<string, unknown>[]>;
+}
+
+/** What `validate` receives. `tx` is the Drizzle transaction (typed loosely to keep this file phone-safe). */
+export interface EntityValidateContext {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any;
+  user: UserContext;
+  /** True when the user holds `action` at the record's scope. */
+  can: (action: string) => boolean;
+}
+
+export interface EntityChange {
+  op: "insert" | "update";
+  recordId: string;
+  scopeId: string;
+  /** The parsed incoming fields (dates as Date objects, as they will be written). */
+  fields: Record<string, unknown>;
+  /** The row before the change (update only). */
+  existing?: Record<string, unknown>;
 }
 
 export function defineEntity<T extends EntityDef>(def: T): T {

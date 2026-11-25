@@ -5,20 +5,24 @@ import { db } from "@/lib/http";
 import "@/lib/registry";
 import { PublicMap } from "./public-map";
 import { PublicChrome } from "@/components/shell/public-chrome";
+import { currentPrincipal } from "@/lib/session";
+import { titled } from "@/lib/meta";
+import { fmtDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+export const generateMetadata = titled("ui.meta.publicMap");
 
 /** The public map: published snapshots only, no sign-in. */
 export default async function PublicMapPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  const layers = await latestSnapshots(db());
+  const [layers, me] = await Promise.all([latestSnapshots(db()), currentPrincipal().catch(() => null)]);
   const fmt = (n: number) => n.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB");
-  const date = (iso: string) => new Date(iso).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const date = (iso: string) => fmtDate(new Date(iso), locale);
   const tt = (k: string, v?: Record<string, string | number>) => t(locale, `publicmap.${k}`, v);
 
   return (
-    <PublicChrome locale={locale} path="map">
+    <PublicChrome locale={locale} path="map" signedIn={!!me}>
     <section className="module public-map">
       <h1>{tt("title")}</h1>
       <p className="muted">{tt("intro")}</p>

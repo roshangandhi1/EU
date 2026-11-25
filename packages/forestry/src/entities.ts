@@ -5,11 +5,11 @@ import { fa, FORESTRY_STREAMS, type ForestryStream } from "./actions";
 import { z } from "zod";
 
 const settingsSchema = z.object({
-  densityRulePerHa: z.number().int().positive(),
-  sampleRadiusM: z.number().positive(),
-  samplesPerHa: z.number().positive(),
-  minSamplesPerPlot: z.number().int().positive(),
-  maxSamplesPerPlot: z.number().int().positive(),
+  densityRulePerHa: z.number().int().positive().max(100_000),
+  sampleRadiusM: z.number().positive().max(1000),
+  samplesPerHa: z.number().positive().max(1000),
+  minSamplesPerPlot: z.number().int().positive().max(10_000),
+  maxSamplesPerPlot: z.number().int().positive().max(10_000),
   speciesList: z.array(z.object({ key: z.string(), latin: z.string(), en: z.string().optional(), fr: z.string().optional() })),
 });
 const imagerySchema = z.object({
@@ -18,7 +18,7 @@ const imagerySchema = z.object({
   kind: z.enum(["orthomosaic", "satellite"]),
   pmtilesUrl: z.string().nullable().optional(),
   bounds: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable().optional(),
-  sizeBytes: z.number().int().nullable().optional(),
+  sizeBytes: z.number().int().min(0).max(2_000_000_000).nullable().optional(),
   offline: z.boolean().default(false),
 });
 
@@ -34,7 +34,17 @@ function forStream(s: ForestryStream) {
   const voidA = fa(s, "record.void");
   return [
     defineEntity({ name: `${s}.plot`, stream: s, siteKinds: ["plot"], table: t.plots, schema: v.plotSchema, policy: "field_merge",
-      actions: { read, write: fa(s, "plot.propose") }, label: L("plot", "parcelle") }),
+      actions: { read, write: fa(s, "plot.propose") }, label: L("plot", "parcelle"),
+      validate: async (ctx, change) => {
+        // A plot's stream is fixed by its site: to move a plot, void it and import it in the other stream.
+        if ("stream" in change.fields && change.fields.stream !== s) return change.op === "insert" ? "scope_wrong_stream" : "stream_immutable";
+        // Publishing a plot on the public map is a lead's decision, not a field officer's (SEC-7).
+        if ("publicVisible" in change.fields && !ctx.can(fa(s, "plot.write"))) {
+          const changed = change.op === "insert" ? change.fields.publicVisible === true : change.fields.publicVisible !== change.existing?.publicVisible;
+          if (changed) return "forbidden_field";
+        }
+        return undefined;
+      } }),
     defineEntity({ name: `${s}.boundary`, stream: s, siteKinds: ["plot"], table: t.plotBoundaries, schema: v.boundarySchema, policy: "append_only",
       actions: { read, write: fa(s, "boundary.write"), void: voidA }, label: L("plot boundary", "limite de parcelle") }),
     defineEntity({ name: `${s}.boundary_approval`, stream: s, siteKinds: ["plot"], table: t.boundaryApprovals, schema: v.boundaryApprovalSchema, policy: "append_only",

@@ -67,6 +67,9 @@ describe("public layer", () => {
     expect(layer.data.features).toHaveLength(1);
     const f = layer.data.features[0]!;
     expect(Object.keys(f.properties!).every((k) => PUBLIC_PLOT_PROPS.includes(k))).toBe(true);
+    // The placemark name (often a landholder's name) is never published (SEC-8).
+    expect(f.properties!.code).toBe("B-001");
+    expect(JSON.stringify(layer)).not.toContain("KBK-B-001");
     const [x] = (f.geometry as any).coordinates[0][0][0];
     expect(Math.round(x * 1e4)).toBeCloseTo(x * 1e4, 6);
     expect(layer.summary.plots).toBe(1);

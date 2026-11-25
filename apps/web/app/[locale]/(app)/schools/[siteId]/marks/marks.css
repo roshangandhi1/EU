@@ -1,0 +1,109 @@
+/* Marks (notes): entry grid, results sheet and print layout. Imported by the marks pages only. */
+
+.marks-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.marks-switch { display: inline-flex; padding: 4px; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.marks-switch a { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 16px; border-radius: 9px; font-weight: 650; font-size: 14.5px; color: var(--muted); text-decoration: none; }
+.marks-switch a:hover { background: var(--surface-alt); color: var(--text); }
+.marks-switch a[aria-current="page"] { background: var(--gc-green); color: #fff; }
+
+.marks-filter { margin: 0; }
+.marks-hint { margin: 0 20px 12px; }
+
+/* Grids: pupils down, sticky first column, horizontal scroll on phones. */
+.marks-grid-wrap { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+.marks-grid, .marks-progress, .marks-sheet { width: auto; min-width: 100%; }
+.marks-grid tbody tr, .marks-progress tbody tr, .marks-sheet tbody tr { cursor: default; }
+.marks-grid tbody tr:hover, .marks-progress tbody tr:hover { background: transparent; }
+.mg-pupil { position: sticky; left: 0; z-index: 2; background: var(--surface); text-align: left; box-shadow: 1px 0 0 var(--line); min-width: 200px; }
+thead .mg-pupil { background: var(--surface-alt); z-index: 3; }
+.marks-grid th.mg-pupil[scope="row"], .marks-sheet th.mg-pupil[scope="row"], .marks-progress th.mg-pupil[scope="row"] { position: sticky; top: auto; font-size: 14.5px; font-weight: 600; color: var(--text); white-space: normal; vertical-align: middle; }
+.mg-who { display: flex; align-items: center; gap: 6px; }
+.mg-n { display: inline-block; min-width: 22px; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.mg-name { display: inline-flex; flex-direction: column; vertical-align: middle; line-height: 1.25; }
+.mg-name .muted { font-size: 12px; font-weight: 500; }
+.mg-col { white-space: normal !important; min-width: 92px; max-width: 130px; vertical-align: bottom; }
+.mg-title { display: block; color: var(--text); font-size: 12.5px; line-height: 1.25; }
+.mg-max { display: block; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.marks-grid td { padding: 6px 8px; vertical-align: middle; }
+.mg-input { width: 76px; min-height: 40px; padding: 6px 10px; text-align: right; }
+.mg-input[aria-invalid="true"] { border-color: var(--critical); background: #fdf0ef; box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.14); }
+.mg-abs .mg-input { background: #fff6e6; color: #7a4b00; font-weight: 650; }
+.mg-err { display: block; max-width: 110px; margin-top: 3px; font-size: 11.5px; line-height: 1.25; color: var(--critical); text-align: right; white-space: normal; }
+.mg-total { white-space: nowrap; font-weight: 600; color: var(--muted); }
+.marks-progress td { vertical-align: middle; }
+.marks-progress .pill { text-decoration: none; min-width: 52px; justify-content: center; }
+
+/* Grading setup */
+.marks-setup td, .marks-setup th { vertical-align: middle; }
+.marks-setup tbody tr { cursor: default; }
+.marks-setup tbody th { position: static; background: var(--surface); color: var(--text); font-size: 14px; }
+.marks-setup .ctl { min-height: 40px; min-width: 120px; }
+.marks-setup input.ctl[name^="name:"] { min-width: 190px; }
+.marks-setup input.ctl.num-input { min-width: 70px; }
+.marks-setup select.ctl { min-width: 130px; }
+.marks-setup td .num-input { max-width: 110px; }
+.marks-subhead { margin: 22px 0 4px; font-size: 1rem; }
+.marks-restore { display: flex; justify-content: flex-end; padding-top: 10px; }
+
+/* Results sheet */
+.grid .mg-pupil { background: var(--surface); }
+.grid thead .mg-pupil { background: var(--surface-alt); }
+.marks-sheet .mg-col { min-width: 64px; max-width: 104px; }
+.marks-sheet td.num { white-space: nowrap; }
+.marks-sheet th, .marks-sheet td { padding: 9px 8px; }
+.marks-sheet th:first-child, .marks-sheet td:first-child { padding-left: 16px; }
+.marks-sheet .mg-pupil { min-width: 170px; }
+.marks-sheet .mg-pupil .ms-sub { font-size: 12px; }
+.marks-sheet td, .marks-sheet th { vertical-align: middle; }
+.marks-sheet .ms-sub { display: block; font-weight: 500; color: var(--muted); }
+.marks-sheet td.ms-strong { font-weight: 700; }
+.marks-sheet .ms-missing { color: var(--warning); font-size: 12px; font-weight: 600; display: block; }
+.marks-sheet tr.ms-group th { background: var(--surface); color: var(--text); font-size: 13px; }
+.marks-sheet tr.ms-subtotal td, .marks-sheet tr.ms-subtotal th { background: var(--surface-alt); font-weight: 650; }
+.marks-sheet tfoot td, .marks-sheet tfoot th { font-weight: 650; }
+.marks-sheet tfoot tr:first-child td, .marks-sheet tfoot tr:first-child th { border-top: 2px solid var(--border-strong); }
+.marks-sheet td.ms-col-total, .marks-sheet th.ms-col-total { background: var(--surface-alt); }
+.marks-summary { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 12px 20px; color: var(--muted); font-size: 14px; }
+.marks-summary b { color: var(--text); font-variant-numeric: tabular-nums; }
+.print-head { display: none; }
+
+@media (max-width: 640px) {
+  .marks-sec .fsec-head { flex-wrap: wrap; }
+  .marks-sec .fsec-titles { flex: 1 1 calc(100% - 56px); }
+  .marks-sec .fsec-actions { width: 100%; }
+  .mg-pupil { min-width: 132px; }
+  .marks-grid .mg-name { font-size: 13.5px; }
+  .marks-switch { width: 100%; }
+  .marks-switch a { flex: 1; justify-content: center; padding: 0 10px; }
+  .marks-nav > .btn { width: 100%; justify-content: center; }
+}
+
+/* Print: only the sheet, on white, with a plain heading. Scoped to pages that hold a sheet. */
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body:has(.marks-root) { background: #fff; }
+  body:has(.marks-root) .sidebar,
+  body:has(.marks-root) .mobilebar,
+  body:has(.marks-root) .no-print,
+  body:has(.marks-root) .savebar,
+  body:has(.marks-root) section[data-stream="schools"] > :not(.marks-root),
+  body:has(.marks-root) .page > :not(section) { display: none !important; }
+  body:has(.marks-root) .app { display: block; }
+  body:has(.marks-root) .page { padding: 0; max-width: none; }
+  .marks-root .print-head { display: block; margin: 0 0 8mm; color: #000; }
+  .print-head h1 { font-size: 16pt; margin: 0 0 2mm; }
+  .print-head p { margin: 0; font-size: 10.5pt; }
+  .marks-root .fsec { border: 0; margin: 0; background: none; }
+  .marks-root .fsec-head { display: none; }
+  .marks-root .fsec-body { padding: 0; }
+  .marks-root .marks-grid-wrap { overflow: visible; }
+  .marks-sheet { font-size: 9.5pt; border: 1px solid #000; }
+  .marks-sheet th, .marks-sheet td { border: 1px solid #555 !important; padding: 3px 5px !important; color: #000 !important; background: #fff !important; position: static !important; box-shadow: none !important; }
+  .marks-sheet a { color: #000; text-decoration: none; }
+  .marks-summary { padding: 3mm 0 0; color: #000; }
+  .marks-sheet thead { display: table-header-group; }
+  .marks-sheet tr { break-inside: avoid; }
+  .marks-sheet .pill { background: none; padding: 0; color: #000; }
+  .print-sign { display: flex !important; justify-content: space-between; margin-top: 14mm; font-size: 10pt; }
+}
+.print-sign { display: none; }
