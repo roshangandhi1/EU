@@ -1,0 +1,29 @@
+{
+  "name": "@eu/sync",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts",
+    "./memory-store": "./src/memory-store.ts",
+    "./sql-store": "./src/sql-store.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@eu/core": "*",
+    "@eu/db": "*",
+    "drizzle-orm": "0.45.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.6.0",
+    "@types/node": "22.20.6",
+    "drizzle-kit": "0.31.11",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1"
+  }
+}
