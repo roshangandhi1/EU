@@ -14,7 +14,7 @@ import { handlePull, handlePush } from "@eu/sync/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   activeOn, attendanceRate, checkReceiptNumber, classDay, createSchoolSite, enrolmentBreakdown, findLikelyDuplicates, loadSchool,
-  nextStudentNumber, placesAsAt, planRegister, schoolsActions, schoolsEntities, splitAsAt, studentBalance, tagForDevice, type Absence, type Synced,
+  nextStudentNumber, placesAsAt, schoolsIndicators, planRegister, schoolsActions, schoolsEntities, splitAsAt, studentBalance, tagForDevice, type Absence, type Synced,
 } from "../src";
 
 const permissions = new PermissionRegistry().register(platformActions).register(schoolsActions);
@@ -185,5 +185,18 @@ describe("a month at École Luniemu", () => {
     expect(ev.counted.map((p) => p.receiptNumber).sort((x, y) => x - y)).toEqual([1, 51, 52]);
     expect(ev.lateSynced.map((p) => p.receiptNumber)).toEqual([2]);
     expect(splitAsAt(d.payments, "2026-10-31", "operational").counted).toHaveLength(4);
+  });
+
+  it("6. the programme dashboard gets 3.2.2 and 3.2.1 from the same data", async () => {
+    const byCode = async (asAt: string) => new Map((await schoolsIndicators(db, asAt, "evidence")).map((i) => [i.code, i]));
+    const oct = await byCode("2026-10-31");
+    expect(oct.get("3.2.2")).toMatchObject({ value: 0, target2027: 400, target2030: 1600 });
+    expect(oct.get("3.2.1")?.value).toBe(0);
+    const nov = await byCode("2026-11-30");
+    expect(nov.get("3.2.2")?.value).toBe(90);
+    expect(nov.get("3.2.2")?.note).toMatch(/Baseline places \(not counted\): 160/);
+    expect(nov.get("3.2.2")?.note).toMatch(/1 new classroom\(s\) have no evidence link/);
+    expect(nov.get("3.2.1")?.value).toBe(1);
+    expect(nov.get("3.1.4")).toMatchObject({ value: null, target2030: 500 });
   });
 });
