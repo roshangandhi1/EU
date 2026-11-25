@@ -1,6 +1,10 @@
 import { sites, users, type Db } from "@eu/db";
 import { createTestDb } from "@eu/db/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { loadBoreholes } from "@eu/boreholes/server";
+import { computeIndicator } from "@eu/forestry";
+import { loadSettings, loadStream, photoUploads, rulesFrom } from "@eu/forestry/server";
+import { schoolsTables } from "@eu/schools";
 import { demoStatus, loadDemo, removeDemo } from "../lib/demo";
 import { entities, permissions } from "../lib/registry";
 
@@ -22,6 +26,16 @@ describe("demo data", () => {
     expect(new Set(st.sites.map((s) => s.stream))).toEqual(new Set(["schools", "bamboo", "miombo", "boreholes"]));
     expect(st.sites.every((s) => s.name.startsWith("DEMO-"))).toBe(true);
     expect(await loadDemo(ctx)).toMatchObject({ ok: false, reason: "already_loaded" });
+
+    // Every screen has something meaningful: counted boreholes, counted hectares, attendance and fees.
+    const today = new Date().toISOString().slice(0, 10);
+    const bhr = await loadBoreholes(db, today, "captured", today);
+    expect(bhr.counted).toBeGreaterThanOrEqual(2);
+    const { inputs } = await loadStream(db, "bamboo");
+    const bamboo = computeIndicator(inputs, today, "captured", { ...rulesFrom("bamboo", await loadSettings(db, "bamboo")), photoUploadedAt: await photoUploads(db, inputs) });
+    expect(bamboo.hectaresCounted).toBeGreaterThan(0);
+    expect((await (db as any).select().from(schoolsTables.schoolRegisters)).length).toBeGreaterThan(0);
+    expect((await (db as any).select().from(schoolsTables.schoolPayments)).length).toBeGreaterThan(0);
 
     const rm = await removeDemo(ctx);
     expect(rm.ok && rm.voided).toBeGreaterThan(40);

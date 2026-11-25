@@ -1,34 +1,42 @@
 /**
  * Design tokens shared by the web app and the Android app.
- * Colours are provisional, sampled from the GoCongo logo, until the brand kit arrives.
+ * GoCongo (gocongo.cd: green #1A6B33, orange #EBAC27, Inter Tight) crossed with EU Global Gateway
+ * (EU blue #003399, gold #FFCC00). Provisional until the brand kit arrives.
+ * The web mirrors these as CSS variables in apps/web/app/globals.css; keep the two in step.
  */
 export const colors = {
-  gcGreen: "#1C6B33",
+  gcGreen: "#1A6B33",
+  gcGreenDark: "#124A23",
+  gcGreenDeep: "#0E3519",
+  gcGreenTint: "#EAF3EA",
   gcLime: "#AFC437",
   gcYellow: "#E8D72C",
-  gcOrange: "#E8A827",
+  gcOrange: "#EBAC27",
   euBlue: "#003399",
+  euBlueTint: "#E8EEFA",
   euYellow: "#FFCC00",
-  text: "#1A1A1A",
-  textMuted: "#5A5A5A",
+  text: "#18231B",
+  textMuted: "#5B665D",
   surface: "#FFFFFF",
   surfaceAlt: "#F3F5F1",
-  border: "#D5DAD2",
-  statusGood: "#1C6B33",
+  border: "#DFE5DB",
+  statusGood: "#1A6B33",
   statusWarning: "#B26B00",
   statusCritical: "#B3261E",
+  statusInfo: "#2B6CB0",
 } as const;
 
 /** One accent per stream; paired with an icon and a word, never colour alone. */
 export const streamAccent = {
-  schools: colors.gcYellow,
-  bamboo: colors.gcLime,
-  miombo: colors.gcOrange,
+  schools: "#C9A400",
+  bamboo: "#7FA02B",
+  miombo: "#D9861A",
   boreholes: "#2B7BB9",
   platform: colors.gcGreen,
 } as const;
 
+export const font = { family: "Inter Tight", fallback: "Arial, sans-serif" } as const;
 export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 } as const;
-export const radius = { sm: 4, md: 8, lg: 16 } as const;
+export const radius = { sm: 6, md: 10, lg: 16 } as const;
 /** Minimum sizes for field use on low-end phones. */
 export const touch = { minTarget: 48, bodyText: 16 } as const;

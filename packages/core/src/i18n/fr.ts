@@ -45,7 +45,7 @@ export const fr: Dictionary = {
   },
   admin: {
     demoTitle: "Données de démonstration",
-    demoIntro: "Chargez un petit jeu de démonstration bien signalé (une école, quatre parcelles, trois forages, tous nommés DEMO-…) pour que l'application mobile et ces pages ne soient pas vides. Ces données comptent dans le tableau de bord tant qu'elles ne sont pas retirées.",
+    demoIntro: "Chargez un petit jeu de démonstration bien signalé (une école de 24 élèves avec présences et frais, six parcelles de bambou et de miombo, cinq forages avec visites d'entretien, tous nommés DEMO-…) pour que l'application mobile et ces pages ne soient pas vides. Ces données comptent dans le tableau de bord tant qu'elles ne sont pas retirées.",
     demoLoadedIntro: "Les données de démonstration sont chargées ({count} sites nommés DEMO-…). Retirez-les avant les vrais rapports : les téléphones les effacent à la prochaine synchronisation.",
     demoLoad: "Charger les données de démonstration",
     demoRemove: "Retirer les données de démonstration",

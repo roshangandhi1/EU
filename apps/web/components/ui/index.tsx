@@ -4,12 +4,16 @@ import s from "./ui.module.css";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({ title, subtitle, actions, icon, eyebrow }: { title: string; subtitle?: ReactNode; actions?: ReactNode; icon?: ReactNode; eyebrow?: string }) {
   return (
     <div className={s.header}>
-      <div>
-        <h1>{title}</h1>
-        {subtitle && <p>{subtitle}</p>}
+      <div className={s.headTitle}>
+        {icon && <span className={s.headIcon} aria-hidden>{icon}</span>}
+        <div>
+          {eyebrow && <div className={s.eyebrow}>{eyebrow}</div>}
+          <h1>{title}</h1>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
       </div>
       {actions && <div className={s.actions}>{actions}</div>}
     </div>

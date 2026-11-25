@@ -7,6 +7,7 @@ import { forestryActions, forestryEntities, registerForestryStrings } from "@eu/
 import { publicMapStrings } from "@eu/maps";
 import { dashboardActions } from "./dashboard-actions";
 import { dashboardStrings } from "./dashboard-strings";
+import { uiStrings } from "./ui-strings";
 
 /**
  * The one place modules plug in. Each module exports its ActionMap and entities;
@@ -30,3 +31,4 @@ registerForestryStrings();
 registerBoreholesStrings();
 registerNamespace("publicmap", publicMapStrings);
 registerNamespace("dashboard", dashboardStrings);
+registerNamespace("ui", uiStrings);
