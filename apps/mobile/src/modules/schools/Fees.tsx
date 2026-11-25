@@ -1,4 +1,4 @@
-import { activeOn, checkReceiptNumber, formatCdf, normaliseName, studentBalance, type Student } from "@eu/schools/rules";
+import { activeOn, checkReceiptNumber, formatCdf, normaliseName, studentBalance, type Student } from "@eu/schools/mobile";
 import { useContext, useState } from "react";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";

@@ -1,10 +1,11 @@
-import { activeOn, findLikelyDuplicates, nextStudentNumber, normaliseName, type Sex } from "@eu/schools/rules";
+import { activeOn, findLikelyDuplicates, nextStudentNumber, normaliseName, tagForDevice, type Sex } from "@eu/schools/mobile";
+import { useEffect } from "react";
 import { useMemo, useState } from "react";
 import { deviceId } from "../../secure";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";
 import { Body, Button, Field, Title } from "../../ui";
-import { currentYear, deviceTag, live, studentName, today, type SchoolData } from "./data";
+import { currentYear, live, studentName, today, type SchoolData } from "./data";
 import { Choice, Row, Scroll } from "./parts";
 
 /** Pupils enrolled this year, with search, and enrolment of a new pupil. */
@@ -52,6 +53,9 @@ function Enrol({ session, data, onDone }: { session: Session; data: SchoolData; 
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [myDevice, setMyDevice] = useState<string | null>(null);
+  useEffect(() => void deviceId().then(setMyDevice), []);
+  const tag = myDevice ? tagForDevice(data.deviceTags, myDevice) : null;
   const set = (k: keyof typeof f) => (v: string) => { setF({ ...f, [k]: v }); setConfirmed(false); };
 
   const dob = /^\d{4}-\d{2}-\d{2}$/.test(f.dateOfBirth) ? f.dateOfBirth : null;
@@ -63,8 +67,8 @@ function Enrol({ session, data, onDone }: { session: Session; data: SchoolData; 
   const save = async () => {
     if (!year || !candidate || !classId || !f.firstName.trim() || !f.lastName.trim() || (!dob && !by)) return setError(t("schools.common.invalid"));
     if (matches.length && !confirmed) return setError(null);
+    if (!tag) return;
     setBusy(true);
-    const tag = deviceTag(await deviceId());
     const studentNumber = nextStudentNumber(data.school.code, Number(year.startsOn.slice(0, 4)), tag, data.students.map((s) => s.studentNumber));
     const site = data.school.siteId;
     const studentId = await session.client.create("school.student", site, {
@@ -83,6 +87,7 @@ function Enrol({ session, data, onDone }: { session: Session; data: SchoolData; 
   return (
     <Scroll>
       <Title>{t("schools.student.add")}</Title>
+      {myDevice && !tag && <Body tone="critical">{t("schools.mobile.noTag")}</Body>}
       <Field label={t("schools.student.lastName")} value={f.lastName} onChangeText={set("lastName")} autoCapitalize="characters" />
       <Field label={t("schools.student.postName")} value={f.postName} onChangeText={set("postName")} autoCapitalize="characters" />
       <Field label={t("schools.student.firstName")} value={f.firstName} onChangeText={set("firstName")} autoCapitalize="words" />
@@ -103,7 +108,7 @@ function Enrol({ session, data, onDone }: { session: Session; data: SchoolData; 
         </>
       )}
       {error && <Body tone="critical">{error}</Body>}
-      <Button label={t("schools.common.save")} onPress={() => void save()} disabled={busy || (matches.length > 0 && !confirmed)} />
+      <Button label={t("schools.common.save")} onPress={() => void save()} disabled={busy || !tag || (matches.length > 0 && !confirmed)} />
       <Button kind="secondary" label={t("schools.common.cancel")} onPress={onDone} />
     </Scroll>
   );

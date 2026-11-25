@@ -10,6 +10,7 @@ export function Flash({ sp, tr }: { sp: Record<string, string | string[] | undef
       invalid: tr("common.invalid"),
       not_in_assigned_book: tr("fees.notInBook"),
       already_used: tr("fees.alreadyUsed"),
+      letter_taken: tr("setup.letterTaken"),
     };
     return <Notice tone="error">{known[error] ?? tr("common.rejected", { reason: error })}</Notice>;
   }

@@ -1,8 +1,8 @@
 import { registerNamespace } from "@eu/core/i18n";
 import type {
-  AcademicYear, Absence, Enrolment, Exemption, FeeItem, Payment, ReceiptBook, RegisterTaken, School, SchoolClass, Student, Synced,
-} from "@eu/schools/rules";
-import { schoolsEn, schoolsFr } from "@eu/schools/rules";
+  AcademicYear, Absence, DeviceTag, Enrolment, Exemption, FeeItem, Payment, ReceiptBook, RegisterTaken, School, SchoolClass, Student, Synced,
+} from "@eu/schools/mobile";
+import { schoolsEn, schoolsFr } from "@eu/schools/mobile";
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "../../session";
 
@@ -23,6 +23,7 @@ export interface SchoolData {
   exemptions: Local<Exemption>[];
   receiptBooks: Local<ReceiptBook>[];
   payments: Local<Payment>[];
+  deviceTags: Local<DeviceTag>[];
 }
 
 /** Today in the DRC's eastern time (UTC+2), as YYYY-MM-DD. */
@@ -52,7 +53,7 @@ export async function listSchools(session: Session): Promise<Local<School>[]> {
 
 export async function loadSchool(session: Session, school: Local<School>): Promise<SchoolData> {
   const id = school.siteId;
-  const [years, classes, students, enrolments, absences, registers, feeItems, exemptions, receiptBooks, payments] = await Promise.all([
+  const [years, classes, students, enrolments, absences, registers, feeItems, exemptions, receiptBooks, payments, deviceTags] = await Promise.all([
     all<AcademicYear>(session, "school.academic_year", id),
     all<SchoolClass>(session, "school.class", id),
     all<Student>(session, "school.student", id),
@@ -63,8 +64,9 @@ export async function loadSchool(session: Session, school: Local<School>): Promi
     all<Exemption>(session, "school.exemption", id),
     all<ReceiptBook>(session, "school.receipt_book", id),
     all<Payment>(session, "school.payment", id),
+    all<DeviceTag>(session, "school.device_tag", id),
   ]);
-  return { school, years, classes, students, enrolments, absences, registers, feeItems, exemptions, receiptBooks, payments };
+  return { school, years, classes, students, enrolments, absences, registers, feeItems, exemptions, receiptBooks, payments, deviceTags };
 }
 
 /** Loads one school and reloads it whenever the session changes (a sync finished, a record was saved). */
@@ -86,12 +88,4 @@ export function currentYear(d: SchoolData, date: string) {
 
 export function studentName(s: Pick<Student, "firstName" | "lastName" | "postName">): string {
   return [s.lastName, s.postName, s.firstName].filter(Boolean).join(" ");
-}
-
-/** One capital letter per phone for student numbers; "W" is the web's. */
-export function deviceTag(deviceId: string): string {
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVXYZ"; // no W
-  let h = 0;
-  for (const c of deviceId) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return letters[h % letters.length] ?? "A";
 }

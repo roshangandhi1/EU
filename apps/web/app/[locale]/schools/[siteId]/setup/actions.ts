@@ -3,7 +3,7 @@ import { insertMutation, updateMutation, voidMutation, schoolsEntities } from "@
 import { revalidatePath } from "next/cache";
 import { back, can, firstRejection, int, newId, orNull, parseLevels, push, schoolFor, signedIn, str } from "@/lib/schools";
 
-const CONFIG = new Set(["school.academic_year", "school.term", "school.classroom", "school.class", "school.fee_item", "school.receipt_book", "school.exemption"]);
+const CONFIG = new Set(["school.academic_year", "school.term", "school.classroom", "school.class", "school.fee_item", "school.receipt_book", "school.exemption", "school.device_tag"]);
 
 async function ctx(fd: FormData) {
   const { me, locale } = await signedIn(str(fd, "locale"));
@@ -89,4 +89,14 @@ export async function voidConfig(fd: FormData) {
   revalidatePath(`/${locale}/schools/${siteId}`, "layout");
   const bad = firstRejection(res);
   back(path, bad ? { error: bad } : { ok: "1" });
+}
+
+/** One letter per phone per school, never W (the web's), never reused while assigned. */
+export async function addDeviceTag(fd: FormData) {
+  const { me, siteId, path } = await ctx(fd);
+  const d = await schoolFor(me, siteId);
+  const deviceId = str(fd, "deviceId");
+  const tag = str(fd, "tag").toUpperCase();
+  if (d.deviceTags.some((x) => !x.voidedAt && (x.tag === tag || x.phoneId === deviceId))) back(path, { error: "letter_taken" });
+  return insert(fd, "school.device_tag", { phoneId: deviceId, tag });
 }

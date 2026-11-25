@@ -1,6 +1,6 @@
 /**
  * Phone-safe entry point: the schools model, domain rules and strings, with no database
- * code. The Android app imports this as "@eu/schools/rules"; nothing here may import @eu/db.
+ * code. The Android app imports this as "@eu/schools/mobile" (alias "@eu/schools/rules"); nothing here may import @eu/db.
  */
 export * from "./model";
 export * from "./evidence";

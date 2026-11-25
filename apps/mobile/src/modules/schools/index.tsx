@@ -1,4 +1,4 @@
-import type { School } from "@eu/schools/rules";
+import type { School } from "@eu/schools/mobile";
 import { useEffect, useState } from "react";
 import { useT } from "../../i18n";
 import type { Session } from "../../session";

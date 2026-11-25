@@ -1,4 +1,4 @@
-import { absenceReason, activeOn, type Absence } from "@eu/schools/rules";
+import { absenceReason, activeOn, type Absence } from "@eu/schools/mobile";
 import { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 import { useT } from "../../i18n";

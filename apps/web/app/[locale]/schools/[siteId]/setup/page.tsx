@@ -1,6 +1,6 @@
 import { activeOn, formatCdf, live, placesAsAt } from "@eu/schools";
 import { Button, Check, Field, Form, Notice, Table } from "@/components/ui";
-import { can, schoolFor, schoolStaff, signedIn, today, tr as trFor } from "@/lib/schools";
+import { can, schoolDevices, schoolFor, schoolStaff, signedIn, today, tr as trFor } from "@/lib/schools";
 import { Flash, type SP } from "../../flash";
 import { byLevel, classLabel, studentName } from "../labels";
 import * as A from "./actions";
@@ -13,6 +13,10 @@ export default async function Setup({ params, searchParams }: { params: Promise<
   if (!can(me, "school.configure", p.siteId)) return <Notice tone="warning">{tr("setup.configureOnly")}</Notice>;
   const d = await schoolFor(me, p.siteId);
   const staff = await schoolStaff(p.siteId);
+  const phones = await schoolDevices(p.siteId);
+  const tags = live(d.deviceTags);
+  const freeLetters = "ABCDEFGHIJKLMNOPQRSTUVXYZ".split("").filter((l) => !tags.some((x) => x.tag === l));
+  const freePhones = phones.filter((ph) => !tags.some((x) => x.phoneId === ph.id));
   const staffName = (id: string) => staff.find((u) => u.id === id)?.name ?? id;
   const date = today();
   const hidden = (
@@ -162,6 +166,22 @@ export default async function Setup({ params, searchParams }: { params: Promise<
         <Field label={tr("setup.assignedTo")}><select name="assignedTo" required>{staff.map((u) => <option key={u.id + u.role} value={u.id}>{u.name} ({u.role})</option>)}</select></Field>
         <Button type="submit">{tr("common.add")}</Button>
       </Form>
+
+      <h2>{tr("setup.devices")}</h2>
+      <Notice>{tr("setup.devicesHint")}</Notice>
+      <Table rows={tags} rowKey={(r) => r.id} empty={tr("common.none")} columns={[
+        { key: "l", header: tr("setup.letter"), render: (r) => r.tag },
+        { key: "d", header: tr("setup.device"), render: (r) => { const ph = phones.find((x) => x.id === r.phoneId); return ph ? `${ph.userName} · ${ph.name}` : r.phoneId; } },
+        { key: "x", header: "", render: (r) => remove("school.device_tag", r.id) },
+      ]} />
+      {freePhones.length === 0 ? <p>{tr("setup.noDevices")}</p> : (
+        <Form action={A.addDeviceTag}>
+          {hidden}
+          <Field label={tr("setup.device")}><select name="deviceId" required>{freePhones.map((ph) => <option key={ph.id} value={ph.id}>{ph.userName} · {ph.name}</option>)}</select></Field>
+          <Field label={tr("setup.letter")}><select name="tag" required>{freeLetters.map((l) => <option key={l} value={l}>{l}</option>)}</select></Field>
+          <Button type="submit">{tr("common.add")}</Button>
+        </Form>
+      )}
 
       <h2>{tr("setup.exemptions")}</h2>
       <Table rows={live(d.exemptions)} rowKey={(r) => r.id} empty={tr("common.none")} columns={[

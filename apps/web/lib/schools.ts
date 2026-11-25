@@ -107,3 +107,17 @@ export async function schoolStaff(siteId: string): Promise<{ id: string; name: s
     .where(and(eq(roleAssignments.scopeType, "site"), eq(roleAssignments.scopeValue, siteId)));
   return rows;
 }
+
+/** Phones registered by this school's staff, for assigning student-number letters. */
+export async function schoolDevices(siteId: string): Promise<{ id: string; name: string; userName: string }[]> {
+  const { devices, roleAssignments, users } = await import("@eu/db");
+  const { and, eq, isNull } = await import("drizzle-orm");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: { id: string; name: string; userName: string }[] = await (db() as any)
+    .selectDistinct({ id: devices.id, name: devices.name, userName: users.name })
+    .from(devices)
+    .innerJoin(users, eq(users.id, devices.userId))
+    .innerJoin(roleAssignments, eq(roleAssignments.userId, devices.userId))
+    .where(and(eq(roleAssignments.scopeType, "site"), eq(roleAssignments.scopeValue, siteId), isNull(devices.revokedAt)));
+  return rows;
+}

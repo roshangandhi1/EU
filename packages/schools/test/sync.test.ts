@@ -6,7 +6,7 @@ import { SyncClient, type Transport } from "@eu/sync/client";
 import { MemoryStore } from "@eu/sync/memory-store";
 import { handlePull, handlePush } from "@eu/sync/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createSchoolSite, schoolsActions, schoolsEntities, schoolsTables, splitAsAt, studentBalance, type Synced, type Payment, type FeeItem } from "../src";
+import { tagForDevice, createSchoolSite, schoolsActions, schoolsEntities, schoolsTables, splitAsAt, studentBalance, type Synced, type Payment, type FeeItem } from "../src";
 
 const permissions = new PermissionRegistry().register(platformActions).register(schoolsActions);
 const entities = new EntityRegistry().register(...schoolsEntities);
@@ -119,6 +119,23 @@ describe("schools entities on the sync engine", () => {
     expect((await m.client.sync()).ok).toBe(true);
     await a.client.sync();
     expect((await a.store.getServerRecord("school.fee_item", fid))?.amount).toBe(30_000);
+  });
+
+  it("phone letters for student numbers are assigned by programme staff only, and W is reserved", async () => {
+    const a = device("phone-admin", admin);
+    const m = device("web-manager", manager);
+    await a.client.create("school.device_tag", SITE, { phoneId: "phone-admin", tag: "A" });
+    await m.client.create("school.device_tag", SITE, { phoneId: "phone-admin", tag: "W" });
+    await a.client.sync();
+    await m.client.sync();
+    expect((await a.store.rejections())[0]?.reason).toBe("forbidden");
+    expect((await m.store.rejections())[0]?.reason).toMatch(/invalid/);
+    await m.client.create("school.device_tag", SITE, { phoneId: "phone-admin", tag: "B" });
+    await m.client.sync();
+    await a.client.sync();
+    const tags = (await a.store.listServerRecords("school.device_tag")) as unknown as Array<{ phoneId: string; tag: string; voidedAt: string | null }>;
+    expect(tagForDevice(tags, "phone-admin")).toBe("B");
+    expect(tagForDevice(tags, "phone-other")).toBeNull();
   });
 
   it("server records feed the domain rules: balances and the evidence cut-off", async () => {
