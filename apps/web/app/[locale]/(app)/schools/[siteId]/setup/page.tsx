@@ -131,7 +131,10 @@ export default async function Setup({ params, searchParams }: { params: Promise<
         </Form>
       )}
 
-      <h2>{tr("setup.feeItems")}</h2>
+      <div className="card-head">
+        <h2>{tr("setup.feeItems")}</h2>
+        <a className="btn secondary sm" href={`/${locale}/schools/${p.siteId}/setup/fees`}>{tr("feeGrid.open")}</a>
+      </div>
       <Table rows={items} rowKey={(r) => r.id} empty={tr("common.none")} columns={[
         { key: "n", header: tr("setup.feeName"), render: (r) => r.name },
         { key: "a", header: tr("fees.amount"), numeric: true, render: (r) => formatCdf(r.amount, locale) },
