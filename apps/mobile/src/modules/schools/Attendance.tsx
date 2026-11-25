@@ -1,4 +1,4 @@
-import { absenceReason, activeOn, type Absence } from "@eu/schools/mobile";
+import { absenceReason, activeOn, planRegister, type Absence } from "@eu/schools/mobile";
 import { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 import { useT } from "../../i18n";
@@ -67,13 +67,12 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
     setBusy(true);
     const c = session.client;
     const site = data.school.siteId;
-    if (!taken) await c.create("school.register", site, { classId: cls.id, date });
-    for (const [studentId, reason] of absent) {
-      const prior = existing.find((a) => a.studentId === studentId);
-      if (!prior) await c.create("school.absence", site, { studentId, classId: cls.id, date, reason });
-      else if (prior.reason !== reason) await c.update("school.absence", prior.id, { reason });
+    for (const o of planRegister(cls.id, date, data.absences, data.registers, absent)) {
+      if (o.op === "create_register") await c.create("school.register", site, { classId: cls.id, date });
+      else if (o.op === "create_absence") await c.create("school.absence", site, { studentId: o.studentId, classId: cls.id, date, reason: o.reason });
+      else if (o.op === "update_reason") await c.update("school.absence", o.absenceId, { reason: o.reason });
+      else await c.void("school.absence", o.absenceId, "marked present");
     }
-    for (const a of existing) if (!absent.has(a.studentId)) await c.void("school.absence", a.id, "marked present");
     await session.refreshCounts();
     void session.syncNow();
     setBusy(false);
