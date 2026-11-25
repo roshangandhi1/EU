@@ -26,5 +26,7 @@ export async function usersAction(fd: FormData) {
     default: r = { ok: false, code: "invalid" };
   }
   revalidatePath(`/${locale}/admin/users`);
-  redirect(`/${locale}/admin/users?${r.ok ? "done" : "err"}=${r.code}`);
+  // A failed create keeps what was typed (never the password) so the form can be corrected.
+  const kept = !r.ok && s(fd, "op") === "create" ? `&${new URLSearchParams({ name: s(fd, "name"), email: s(fd, "email"), roleScope: s(fd, "roleScope"), userLocale: s(fd, "userLocale") })}` : "";
+  redirect(`/${locale}/admin/users?${r.ok ? "done" : "err"}=${r.code}${kept}${!r.ok && s(fd, "op") === "create" ? "#add" : ""}`);
 }

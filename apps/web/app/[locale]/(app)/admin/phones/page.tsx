@@ -3,14 +3,21 @@ import { Icon } from "@/components/icons";
 import { devices, users } from "@eu/db";
 import { desc, eq } from "drizzle-orm";
 import { Check, FormFooter, Notice, PageHeader, RowMenu, SubmitButton, Table } from "@/components/ui";
-import { formatLocal, requireAction } from "@/lib/admin";
+import { formatLocal } from "@/lib/admin";
+import { adminAccess } from "@/lib/access";
+import { NoAccess } from "@/components/no-access";
+import { titled } from "@/lib/meta";
+import { t } from "@eu/core/i18n";
+import { tn } from "@/lib/format";
 import { db } from "@/lib/http";
 import { revokeAction } from "../actions";
 
 export const dynamic = "force-dynamic";
+export const generateMetadata = titled("admin.phones");
 
 export default async function PhonesPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<Record<string, string | undefined>> }) {
-  const { locale, tr } = await requireAction((await params).locale, "devices.manage");
+  const { locale, tr, allowed } = await adminAccess((await params).locale, "devices.manage");
+  if (!allowed) return <NoAccess locale={locale} />;
   const sp = await searchParams;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rows = (await (db() as any)
@@ -23,7 +30,7 @@ export default async function PhonesPage({ params, searchParams }: { params: Pro
     <section>
       <PageHeader icon={<Icon name="phone" size={24} />} title={tr("phones")} subtitle={tr("phonesIntro")} />
       {sp.error === "confirm" && <Notice tone="error">{tr("revokeConfirm")}</Notice>}
-      {sp.ok && <Notice tone="success">{tr("saved")}</Notice>}
+      {sp.ok && <Notice tone="success">{t(locale, "ui.phones.revoked")}</Notice>}
       <Table
         rows={rows}
         rowKey={(r) => r.d.id}
@@ -36,7 +43,7 @@ export default async function PhonesPage({ params, searchParams }: { params: Pro
           {
             key: "unsynced",
             header: tr("unsynced"),
-            render: (r) => (r.d.statusAt ? `${r.d.pendingChanges ?? 0} / ${r.d.pendingPhotos ?? 0}` : "—"),
+            render: (r) => (r.d.statusAt ? `${tn(locale, "ui.phones.changes", r.d.pendingChanges ?? 0)} · ${tn(locale, "ui.phones.photos", r.d.pendingPhotos ?? 0)}` : <span className="muted">{t(locale, "ui.phones.notReported")}</span>),
           },
           {
             key: "clock",

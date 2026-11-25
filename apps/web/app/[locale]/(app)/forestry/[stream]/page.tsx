@@ -12,8 +12,14 @@ import { PublishButton } from "@/components/publish-button";
 import { canPublish } from "@/lib/public-map";
 import { PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icons";
+import { NoAccess } from "@/components/no-access";
+import { plotExtras } from "@/lib/plot-detail";
+import { publishLabels } from "@/lib/publish-labels";
+import { fmtEur, fmtNum, tn } from "@/lib/format";
+import { titled } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
+export const generateMetadata = titled((l, p) => t(l, p.stream === "miombo" ? "ui.nav.miombo" : "ui.nav.bamboo"));
 
 const TARGETS = { bamboo: { code: "2.2.1", t2027: 100, t2030: 500 }, miombo: { code: "2.1.1", t2027: 200, t2030: 3000 } } as const;
 
@@ -27,7 +33,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
   const me = await currentPrincipal();
   if (!me) redirect(`/${locale}/login`);
   if (!permissions.can(me.user, fa(s, "plot.read"), { stream: s })) {
-    return <p className="error">{t(locale, "forestry.forbidden")}</p>;
+    return <NoAccess locale={locale} reason={t(locale, "forestry.forbidden")} />;
   }
   const sp = await searchParams;
   const asAt = isIsoDate(sp.asAt) ? sp.asAt : todayDrc();
@@ -39,7 +45,9 @@ export default async function ForestryStreamPage({ params, searchParams }: {
   const unit = UNIT_EUR[target.code];
   const late = result.plots.reduce((n, p) => n + p.lateSynced.length, 0);
   const canImport = permissions.can(me.user, fa(s, "import.run"), { stream: s });
-  const fmt = (n: number, d = 2) => n.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB", { maximumFractionDigits: d });
+  const fmt = (n: number, d = 2) => fmtNum(n, locale, d);
+  const pub = canPublish(me.user, s) ? await publishLabels(locale, s) : null;
+  const canReview = permissions.can(me.user, "evidence.manage", { stream: "platform" });
 
   return (
     <section className="module" data-stream={s}>
@@ -49,7 +57,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
         subtitle={t(locale, s === "bamboo" ? "ui.home.bamboo.sub" : "ui.home.miombo.sub")}
         actions={<>
           {canImport && <Link className="btn" href={`/${locale}/forestry/${s}/import`}><Icon name="upload" size={16} />{t(locale, "forestry.import.kmz")}</Link>}
-          {canPublish(me.user, s) && <PublishButton layer={s} locale={locale} labels={{ button: t(locale, "publicmap.publish.button"), help: t(locale, "publicmap.publish.help"), done: t(locale, "publicmap.publish.done"), failed: t(locale, "publicmap.publish.failed"), view: t(locale, "publicmap.publish.view") }} />}
+          {pub && <PublishButton layer={s} locale={locale} labels={pub} />}
         </>}
       />
 
@@ -69,13 +77,14 @@ export default async function ForestryStreamPage({ params, searchParams }: {
         {s === "miombo" && <p className="muted">{t(locale, "forestry.indicator.211a")}</p>}
         <dl>
           <div><dt>{t(locale, "forestry.ha_counted")}</dt><dd className="big">{fmt(result.hectaresCounted)}</dd></div>
-          <div><dt>{t(locale, "forestry.value_eur")}</dt><dd>{fmt(result.hectaresCounted * unit, 0)}</dd></div>
+          <div><dt>{t(locale, "forestry.value_eur")}</dt><dd>{fmtEur(result.hectaresCounted * unit, locale)}</dd></div>
           <div><dt>{t(locale, "forestry.target_2027")}</dt><dd>{fmt(target.t2027, 0)}</dd></div>
           <div><dt>{t(locale, "forestry.target_2030")}</dt><dd>{fmt(target.t2030, 0)}</dd></div>
           <div><dt>{t(locale, "forestry.ha_pipeline")}</dt><dd>{fmt(result.hectaresPipeline)}</dd></div>
           {s === "miombo" && <div><dt>{t(locale, "forestry.regenerating_ha")}</dt><dd>{fmt(miomboRegeneratingHa(result))}</dd></div>}
         </dl>
-        {late > 0 && <p className="warn">{t(locale, "forestry.late_synced", { n: late })}</p>}
+        {late > 0 && <p className="warn">{tn(locale, "forestry.late_synced", late)}{" "}
+          {canReview ? <Link href={`/${locale}/admin/evidence`}>{t(locale, "forestry.late_review")}</Link> : <span className="muted">{t(locale, "forestry.late_who")}</span>}</p>}
       </div>
 
       {plots.length === 0 ? (
@@ -90,7 +99,8 @@ export default async function ForestryStreamPage({ params, searchParams }: {
           stream={s}
           plots={plots.map((p) => {
             const r = result.plots.find((x) => x.siteId === p.siteId)!;
-            return { ...p, areaHa: p.geom ? areaHa(p.geom) : r.areaHa, plantedPerHa: r.plantedPerHa, outcome: r.outcome };
+            const x = plotExtras(inputs.find((i) => i.siteId === p.siteId)!);
+            return { ...p, areaHa: p.geom ? areaHa(p.geom) : r.areaHa, plantedPerHa: r.plantedPerHa, outcome: r.outcome, plantedOn: x.plantedOn, plants: x.plants, survivalPct: x.survivalPct };
           })}
           labels={{
             plot: t(locale, "forestry.plot"),
@@ -99,6 +109,9 @@ export default async function ForestryStreamPage({ params, searchParams }: {
             perHa: t(locale, "forestry.planted_per_ha"),
             outcome: t(locale, "forestry.outcome_label"),
             unapproved: t(locale, "forestry.boundary.unapproved"),
+            plantedOn: t(locale, "forestry.planted_on"), plants: t(locale, "forestry.plants"), survival: t(locale, "forestry.survival"),
+            search: t(locale, "forestry.search"), noMatch: t(locale, "forestry.no_match"), shown: t(locale, "forestry.shown"),
+            filters: { all: t(locale, "forestry.filter.all"), unapproved: t(locale, "forestry.filter.unapproved"), not_counted: t(locale, "forestry.filter.not_counted") },
             outcomes: Object.fromEntries(["counted", "below_density", "no_authoritative_boundary", "not_planted", "missing_evidence"].map((o) => [o, t(locale, `forestry.outcome.${o}`)])),
             statuses: Object.fromEntries(["planned", "pegged", "planted", "established", "failed", "harvested"].map((o) => [o, t(locale, `forestry.status.${o}`)])),
           }}

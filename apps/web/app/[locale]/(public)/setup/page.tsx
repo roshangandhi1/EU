@@ -1,6 +1,10 @@
 import { isLocale, t } from "@eu/core/i18n";
 import { SetupForm } from "./form";
 import { AuthLayout } from "@/components/shell/public-chrome";
+import { titled } from "@/lib/meta";
+
+export const generateMetadata = titled("ui.meta.setup");
+const ERRS = ["bad_token", "setup_disabled", "invalid_request", "closed", "unknown", "network"] as const;
 
 export default async function SetupPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -18,7 +22,9 @@ export default async function SetupPage({ params }: { params: Promise<{ locale: 
           password: t(locale, "common.password"),
           submit: t(locale, "common.save"),
           done: t(locale, "setup.done"),
-          closed: t(locale, "setup.closed"),
+          saving: t(locale, "ui.form.saving"),
+          toLogin: t(locale, "ui.setupErr.toLogin"),
+          errors: Object.fromEntries(ERRS.map((k) => [k, t(locale, `ui.setupErr.${k}`)])),
         }}
       />
     </AuthLayout>

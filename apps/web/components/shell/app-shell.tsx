@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { EuFlag, Icon } from "@/components/icons";
 
@@ -13,10 +13,11 @@ export function AppShell({ locale, groups, user, labels, children }: {
   locale: string;
   groups: NavGroup[];
   user: { name: string; role: string };
-  labels: { brandSub: string; funded: string; signOut: string; menu: string; close: string };
+  labels: { brandSub: string; funded: string; signOut: string; menu: string; close: string; nav: string };
   children: ReactNode;
 }) {
   const path = usePathname() ?? "";
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path]);
   const other = locale === "fr" ? "en" : "fr";
@@ -25,11 +26,17 @@ export function AppShell({ locale, groups, user, labels, children }: {
   const active = all
     .filter((i) => (i.exact ? path === i.href : path === i.href || path.startsWith(`${i.href}/`)))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  // Switching language keeps the page, its query (selected class, date, filters) and the #section.
+  const switchLang = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    router.push(`${otherPath}${window.location.search}${window.location.hash}`);
+  };
   const initials = user.name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
   return (
     <div className="app" data-open={open}>
-      <aside className="sidebar" aria-label="Navigation">
+      <aside className="sidebar" aria-label={labels.nav}>
         <div className="brand">
           <Link href={`/${locale}`} aria-label="GoCongo">
             <Image src="/gocongo-logo-white.png" alt="GoCongo" width={150} height={35} priority />
@@ -59,7 +66,7 @@ export function AppShell({ locale, groups, user, labels, children }: {
             </div>
           </div>
           <div className="foot-row">
-            <Link href={otherPath} hrefLang={other} lang={other}>
+            <Link href={otherPath} hrefLang={other} lang={other} onClick={switchLang}>
               <Icon name="globe" size={15} /> {other === "fr" ? "Français" : "English"}
             </Link>
             <button
@@ -82,7 +89,7 @@ export function AppShell({ locale, groups, user, labels, children }: {
             <Icon name="menu" size={24} />
           </button>
           <Image src="/gocongo-logo-white.png" alt="GoCongo" width={120} height={28} />
-          <Link href={otherPath} className="lang" style={{ color: "#fff" }}>{other.toUpperCase()}</Link>
+          <Link href={otherPath} className="lang" style={{ color: "#fff" }} hrefLang={other} lang={other} onClick={switchLang}>{other.toUpperCase()}</Link>
         </div>
         {children}
       </div>

@@ -21,10 +21,21 @@ export interface NavAccess {
   demo: boolean;
 }
 
+/**
+ * Can the user read at least one school? `school.read` is held per school for headteachers and
+ * school administrators, so this checks the roles behind it rather than one site.
+ */
+export function readsSchools(me: Principal): boolean {
+  const roles = permissions.get("school.read")?.roles ?? [];
+  return me.user.assignments.some(
+    (a) => roles.includes(a.role) && (a.scope.type === "global" || ("stream" in a.scope && a.scope.stream === "schools")),
+  );
+}
+
 export function navAccess(me: Principal): NavAccess {
   const P = { stream: "platform" as const };
   const streams = {
-    schools: inStream(me, "schools"),
+    schools: readsSchools(me),
     boreholes: inStream(me, "boreholes") && permissions.can(me.user, "boreholes.read", { stream: "boreholes" }),
     bamboo: inStream(me, "bamboo") && permissions.can(me.user, "bamboo.plot.read", { stream: "bamboo" }),
     miombo: inStream(me, "miombo") && permissions.can(me.user, "miombo.plot.read", { stream: "miombo" }),

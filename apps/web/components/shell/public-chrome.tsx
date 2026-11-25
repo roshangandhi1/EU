@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { t, type Locale } from "@eu/core/i18n";
 import { EuFlag, Icon } from "@/components/icons";
+import { LangLink } from "./lang-link";
 
 const otherOf = (l: Locale): Locale => (l === "fr" ? "en" : "fr");
 
@@ -29,7 +30,7 @@ export function AuthLayout({ locale, path, children }: { locale: Locale; path: s
       <div className="auth-panel">
         <div className="auth-top">
           <span />
-          <Link className="lang" href={`/${other}/${path}`} hrefLang={other}>{other === "fr" ? "Français" : "English"}</Link>
+          <LangLink className="lang" href={`/${other}/${path}`} hrefLang={other}>{other === "fr" ? "Français" : "English"}</LangLink>
         </div>
         <div className="card">{children}</div>
       </div>
@@ -38,15 +39,17 @@ export function AuthLayout({ locale, path, children }: { locale: Locale; path: s
 }
 
 /** Top bar and EU band for public pages (the public map). */
-export function PublicChrome({ locale, path, children }: { locale: Locale; path: string; children: ReactNode }) {
+export function PublicChrome({ locale, path, signedIn = false, children }: { locale: Locale; path: string; signedIn?: boolean; children: ReactNode }) {
   const other = otherOf(locale);
   return (
     <div className="shell">
       <header className="topbar">
         <Link href={`/${locale}`} aria-label="GoCongo"><Image src="/gocongo-logo.png" alt="GoCongo" width={132} height={44} priority /></Link>
         <nav>
-          <Link className="lang" href={`/${other}/${path}`} hrefLang={other}>{other.toUpperCase()}</Link>
-          <Link className="btn secondary sm" href={`/${locale}/login`}>{t(locale, "common.signIn")}</Link>
+          <LangLink className="lang" href={`/${other}/${path}`} hrefLang={other}>{other.toUpperCase()}</LangLink>
+          {signedIn
+            ? <Link className="btn secondary sm" href={`/${locale}`}><Icon name="back" size={15} />{t(locale, "ui.backToApp")}</Link>
+            : <Link className="btn secondary sm" href={`/${locale}/login`}>{t(locale, "common.signIn")}</Link>}
         </nav>
       </header>
       <main className="content">{children}</main>
