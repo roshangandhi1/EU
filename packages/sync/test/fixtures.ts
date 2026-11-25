@@ -8,6 +8,9 @@ import { defineEntity, EntityRegistry } from "../src";
 import { handlePull, handlePush, type SyncContext } from "../src/server";
 import { DeviceRevokedError, SyncClient, type Transport } from "../src/client";
 import { MemoryStore } from "../src/memory-store";
+import { SqlStore } from "../src/sql-store";
+import type { LocalStore } from "../src/client";
+import { nodeSqliteDriver } from "./node-sqlite";
 
 // Four test record types, one per conflict policy.
 export const readings = pgTable("test_readings", { ...syncColumns(), value: integer("value").notNull(), note: text("note") });
@@ -107,10 +110,16 @@ export class FlakyTransport implements Transport {
   }
 }
 
+export type StoreKind = "memory" | "sqlite";
+
+export async function openStore(kind: StoreKind): Promise<LocalStore> {
+  return kind === "memory" ? new MemoryStore() : SqlStore.open(nodeSqliteDriver());
+}
+
 export interface Device {
   id: string;
   user: UserContext;
-  store: MemoryStore;
+  store: LocalStore;
   transport: FlakyTransport;
   client: SyncClient;
   clock: { now: Date };
@@ -119,8 +128,7 @@ export interface Device {
 /** The server's clock; devices have their own (which can be wrong). */
 export const serverClock = { now: new Date("2026-12-01T08:00:00Z") };
 
-export function makeDevice(db: Db, id: string, user: UserContext, random?: () => number, prefix = 1): Device {
-  const store = new MemoryStore();
+export function makeDevice(db: Db, id: string, user: UserContext, random?: () => number, prefix = 1, store: LocalStore = new MemoryStore()): Device {
   const clock = { now: new Date("2026-12-01T08:00:00Z") };
   const transport = new FlakyTransport(
     () => ({ db, user, deviceId: id, permissions, entities, now: () => new Date(serverClock.now.getTime()) }),
