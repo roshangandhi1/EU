@@ -16,7 +16,8 @@ export type Stream = (typeof STREAMS)[number];
 export type Scope =
   | { type: "global" }
   | { type: "stream"; stream: Stream }
-  | { type: "site"; siteId: string };
+  /** `stream` is the site's own stream; it lets a site role read that stream's stream-wide records. */
+  | { type: "site"; siteId: string; stream?: Stream };
 
 export interface RoleAssignment {
   role: Role;
@@ -39,10 +40,16 @@ export interface ActionDef {
 
 export type ActionMap = Record<string, ActionDef>;
 
-/** Where the action is being performed: a site and the stream that site belongs to. */
+/**
+ * Where the action is being performed: a site and the stream that site belongs to.
+ * `streamWide` marks a record scoped to the whole stream (scope_id = the stream name), such as
+ * templates and settings. Site roles in that stream can read them; only stream or global roles
+ * can write them. Callers set it only for read checks.
+ */
 export interface ActionTarget {
   stream: Stream;
   siteId?: string | null;
+  streamWide?: boolean;
 }
 
 export class PermissionRegistry {
@@ -68,7 +75,7 @@ export class PermissionRegistry {
    * Does `user` hold `action` at `target`?
    * - global assignments cover every site and stream;
    * - stream assignments cover every site in that stream, if the action's stream matches;
-   * - site assignments cover only that site.
+   * - site assignments cover only that site, plus reads of stream-wide records in the site's stream.
    * Unknown actions are always denied.
    */
   can(user: UserContext, action: string, target: ActionTarget): boolean {
@@ -82,6 +89,7 @@ export class PermissionRegistry {
         case "stream":
           return a.scope.stream === def.stream && a.scope.stream === target.stream;
         case "site":
+          if (target.streamWide) return a.scope.stream === target.stream && def.stream === target.stream;
           return target.siteId != null && a.scope.siteId === target.siteId;
       }
     });

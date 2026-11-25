@@ -1,5 +1,5 @@
 import { PermissionRegistry, platformActions, type UserContext } from "@eu/core";
-import { syncColumns, type Db } from "@eu/db";
+import { sites, syncColumns, type Db } from "@eu/db";
 import { createTestDb } from "@eu/db/testing";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -21,7 +21,7 @@ export const settings = pgTable("test_settings", { ...syncColumns(), value: text
 const label = { en: "x", fr: "x" };
 export const entities = new EntityRegistry().register(
   defineEntity({
-    name: "test.reading", stream: "schools", table: readings, policy: "append_only", label,
+    name: "test.reading", stream: "schools", table: readings, policy: "append_only", label, siteKinds: ["school"],
     schema: z.object({ value: z.number().int(), note: z.string().nullable().optional() }),
     actions: { read: "t.read", write: "t.write", void: "t.void" },
   }),
@@ -58,7 +58,15 @@ export async function setupDb(): Promise<{ db: Db; close: () => Promise<void> }>
   const empty = generateDrizzleJson({});
   const cur = generateDrizzleJson({ readings, people, marks, settings });
   const stmts = await generateMigration(empty, cur);
-  return createTestDb(stmts);
+  const t = await createTestDb(stmts);
+  await t.db.insert(sites).values([
+    { id: "A", kind: "school", stream: "schools", name: "School A" },
+    { id: "B", kind: "school", stream: "schools", name: "School B" },
+    { id: "P1", kind: "plot", stream: "bamboo", name: "Bamboo plot 1" },
+    { id: "N1", kind: "nursery", stream: "schools", name: "Nursery 1" },
+    { id: "OLD", kind: "school", stream: "schools", name: "Closed school", active: false },
+  ]);
+  return t;
 }
 
 let n = 0;
