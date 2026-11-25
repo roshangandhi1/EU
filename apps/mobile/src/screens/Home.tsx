@@ -1,9 +1,10 @@
 import type { Locale } from "@eu/core/i18n";
-import { useContext, useState } from "react";
+import { useContext, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { Body, Button, EuBand, Screen, Title } from "../ui";
 import { LocaleContext, useT } from "../i18n";
 import type { Session } from "../session";
+import { ModuleTiles, useModuleTiles } from "../modules/field";
 import { SchoolsApp, useHasSchools } from "../modules/schools";
 
 /**
@@ -17,6 +18,9 @@ export function Home({ session }: { session: Session }) {
   const hasSchools = useHasSchools(session);
   const st = session.status;
   const when = st.lastOk ? new Date(st.lastOk).toLocaleString(locale) : null;
+  const tiles = useModuleTiles(session);
+  const [open, setOpen] = useState<ReactNode>(null);
+  if (open) return <>{open}</>;
 
   if (module === "schools") return <SchoolsApp session={session} onExit={() => setModule(null)} />;
 
@@ -41,6 +45,8 @@ export function Home({ session }: { session: Session }) {
       </View>
 
       {hasSchools && <Button label={t("schools.nav.schools")} onPress={() => setModule("schools")} />}
+      <ModuleTiles tiles={tiles} onOpen={(tile) => setOpen(tile.open(() => setOpen(null)))} />
+
       <Button label={st.running ? t("sync.syncing") : t("sync.syncNow")} onPress={() => void session.syncNow()} disabled={st.running} />
       <Button
         kind="secondary"

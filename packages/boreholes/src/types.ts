@@ -26,3 +26,14 @@ export interface OperationalCheck {
   flowLpm: number | null;
   tankFillsTapsOk: boolean;
 }
+
+export interface MaintenanceTaskDef {
+  key: string; // stable across versions so history lines up
+  label: { en: string; fr: string };
+  frequency: Frequency;
+  assignee?: string; // team or technician user id
+  appliesTo: AppliesTo;
+  proof: ProofSpec;
+  /** A failed result opens a fault. */
+  failOpensFault: boolean;
+}

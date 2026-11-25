@@ -11,14 +11,28 @@
       "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "plugins": [
-      ["expo-sqlite", { "useSQLCipher": true }],
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
       "expo-secure-store",
       "expo-localization",
       ["expo-image-picker", { "cameraPermission": "GoCongo uses the camera to take evidence photos." }],
-      ["expo-location", { "locationWhenInUsePermission": "GoCongo records where evidence photos are taken." }]
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GoCongo uses your location to find the plot or borehole you are at and to stamp records and photos with GPS."
+        }
+      ]
     ],
     "extra": {
-      "apiBase": "https://eu2-roan.vercel.app"
-    }
+      "apiBase": "https://eu2-roan.vercel.app",
+      "eas": {
+        "projectId": "3360412d-5e27-4140-abf3-d3335d34f729"
+      }
+    },
+    "owner": "roshangocongos-team"
   }
 }
