@@ -30,7 +30,11 @@
       ]
     ],
     "extra": {
-      "apiBase": "https://eu2-roan.vercel.app"
-    }
+      "apiBase": "https://eu2-roan.vercel.app",
+      "eas": {
+        "projectId": "3360412d-5e27-4140-abf3-d3335d34f729"
+      }
+    },
+    "owner": "roshangocongos-team"
   }
 }
