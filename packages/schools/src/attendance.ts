@@ -70,3 +70,32 @@ export function chronicAbsentees(
     .filter((r) => r.days >= threshold)
     .sort((a, b) => b.days - a.days);
 }
+
+export type RegisterOp =
+  | { op: "create_register" }
+  | { op: "create_absence"; studentId: string; reason: Absence["reason"] }
+  | { op: "update_reason"; absenceId: string; reason: Absence["reason"] }
+  | { op: "void_absence"; absenceId: string };
+
+/**
+ * What saving a typed-up register must write, given what is already recorded for
+ * this class and day and who is now marked absent (with reasons).
+ */
+export function planRegister(
+  classId: string,
+  date: string,
+  absences: readonly Synced<Absence>[],
+  registers: readonly Synced<RegisterTaken>[],
+  absent: ReadonlyMap<string, Absence["reason"]>,
+): RegisterOp[] {
+  const ops: RegisterOp[] = [];
+  if (!registers.some((r) => !r.voidedAt && r.classId === classId && r.date === date)) ops.push({ op: "create_register" });
+  const existing = absences.filter((a) => !a.voidedAt && a.classId === classId && a.date === date);
+  for (const [studentId, reason] of absent) {
+    const prior = existing.find((a) => a.studentId === studentId);
+    if (!prior) ops.push({ op: "create_absence", studentId, reason });
+    else if (prior.reason !== reason) ops.push({ op: "update_reason", absenceId: prior.id, reason });
+  }
+  for (const a of existing) if (!absent.has(a.studentId)) ops.push({ op: "void_absence", absenceId: a.id });
+  return ops;
+}
