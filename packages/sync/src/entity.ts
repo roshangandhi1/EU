@@ -24,6 +24,11 @@ export interface EntityDef {
     configure?: string;
   };
   label: { en: string; fr: string };
+  /**
+   * Site kinds (sites.kind) a record may be scoped to, e.g. ["plot"]. Omit to allow any kind in
+   * the entity's stream. A record may also be scoped to the stream itself (scope_id = stream name).
+   */
+  siteKinds?: readonly string[];
 }
 
 export function defineEntity<T extends EntityDef>(def: T): T {
