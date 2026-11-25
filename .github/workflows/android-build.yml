@@ -1,0 +1,36 @@
+name: Android APK
+
+# Builds a signed APK on Expo's servers (EAS). Run it from the Actions tab: "Run workflow".
+# Needs the repository secret EXPO_TOKEN (an Expo access token). EAS creates and keeps the
+# Android signing key on the first build; the APK download link appears in the job log and on expo.dev.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        default: preview
+        type: choice
+        options: [preview, production]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Link the Expo project (creates it on the first run)
+        run: eas init --non-interactive --force
+      - name: Build
+        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive --wait
