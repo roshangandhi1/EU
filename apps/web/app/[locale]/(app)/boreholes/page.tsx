@@ -18,6 +18,9 @@ import { boreholeExtras } from "@/lib/borehole-detail";
 import { publishLabels } from "@/lib/publish-labels";
 import { fmtEur, fmtNum } from "@/lib/format";
 import { titled } from "@/lib/meta";
+import { INDICATORS, milestone } from "@/lib/indicator-defs";
+
+const BH = INDICATORS.find((i) => i.code === "1.1.1")!;
 
 export const dynamic = "force-dynamic";
 export const generateMetadata = titled("boreholes.title");
@@ -71,8 +74,8 @@ export default async function BoreholesPage({ params, searchParams }: {
         <dl>
           <div><dt>{t(locale, "boreholes.counted")}</dt><dd className="big">{counted}</dd></div>
           <div><dt>{t(locale, "boreholes.value_eur")}</dt><dd>{fmtEur(counted * UNIT_EUR_111, locale)}</dd></div>
-          <div><dt>{t(locale, "boreholes.target_2027")}</dt><dd>{fmtNum(30, locale)}</dd></div>
-          <div><dt>{t(locale, "boreholes.target_2030")}</dt><dd>{fmtNum(140, locale)}</dd></div>
+          <div><dt>{t(locale, "boreholes.milestone_2027")}</dt><dd>{fmtNum(milestone(BH), locale)}</dd></div>
+          <div><dt>{t(locale, "boreholes.target_2030")}</dt><dd>{fmtNum(BH.finalTarget, locale)}</dd></div>
         </dl>
       </div>
       {rows.length === 0 ? <div className="empty-state"><div className="es-icon"><Icon name="drop" size={28} /></div><p>{t(locale, "boreholes.no_boreholes")}</p></div> : (

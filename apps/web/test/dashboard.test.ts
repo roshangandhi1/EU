@@ -1,10 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { assemble, INDICATORS, totals } from "../lib/indicator-defs";
+import { assemble, INDICATORS, milestone, PERIODS, totals } from "../lib/indicator-defs";
 
 describe("programme dashboard", () => {
   it("lists all 13 Annex III indicators and their caps add to the contract ceiling", () => {
     expect(INDICATORS.map((i) => i.code)).toHaveLength(13);
-    for (const i of INDICATORS) expect(i.capEur).toBe(i.unitEur * i.target2030);
+    for (const i of INDICATORS) expect(i.capEur).toBe(i.unitEur * i.finalTarget);
+  });
+
+  it("matches the Year 1 submission: period 1 validated and period 2 forecast amounts", () => {
+    const eur = (f: (i: (typeof INDICATORS)[number]) => number) => INDICATORS.reduce((s, i) => s + f(i) * i.unitEur, 0);
+    expect(eur((i) => i.p1.target)).toBe(PERIODS[0].budgetEur);
+    expect(eur((i) => i.p1.validated)).toBe(PERIODS[0].validatedEur);
+    expect(eur((i) => i.p2.units)).toBe(PERIODS[1].budgetEur);
+  });
+
+  it("period 2 milestones are cumulative and never pass the end target", () => {
+    const m = (c: string) => milestone(INDICATORS.find((i) => i.code === c)!);
+    expect(m("1.1.1")).toBe(67);
+    expect(m("2.2.1")).toBe(299);
+    expect(m("3.2.2")).toBe(1_600);
+    for (const i of INDICATORS) expect(milestone(i)).toBeLessThanOrEqual(i.finalTarget);
   });
 
   it("values measured indicators at the unit rate, capped at the maximum", () => {

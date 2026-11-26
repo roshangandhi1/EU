@@ -68,7 +68,7 @@ export const en = {
   "forestry.ha_counted": "Hectares counted",
   "forestry.ha_pipeline": "Planted, not yet counted",
   "forestry.value_eur": "Value (EUR)",
-  "forestry.target_2027": "2027 target",
+  "forestry.milestone_2027": "Milestone Oct 2027",
   "forestry.target_2030": "2030 target",
   "forestry.planted_per_ha": "Planted per ha",
   "forestry.outcome_label": "Status for the indicator",

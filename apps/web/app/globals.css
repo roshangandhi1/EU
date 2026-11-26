@@ -334,7 +334,34 @@ table.dash .num { text-align: right; font-variant-numeric: tabular-nums; white-s
 table.dash td.big { font-size: 20px; font-weight: 700; }
 table.dash tr:not([data-status="live"]) td.big { color: var(--muted); font-weight: 400; }
 .dashboard .bar { height: 6px; background: var(--line); border-radius: 3px; margin-top: 8px; max-width: 240px; overflow: hidden; }
-.dashboard .bar span { display: block; height: 100%; background: var(--gc-green); }
+.dashboard .bar { position: relative; overflow: visible; }
+.dashboard .bar span { display: block; height: 100%; background: var(--gc-green); border-radius: 3px; }
+.dashboard .bar i { position: absolute; top: -3px; width: 2px; height: 12px; margin-left: -1px; background: var(--gc-orange, #E8A827); border-radius: 1px; }
+.dashboard .periods { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.dashboard .period header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dashboard .period h3 { margin: 0; font-size: 1.05rem; }
+.dashboard .period > p { margin: 4px 0 0; }
+.dashboard .period dl { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 16px 0 12px; }
+.dashboard .period dt { font-size: 12.5px; color: var(--muted); }
+.dashboard .period dd { margin: 2px 0 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.dashboard .period dd.big { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; }
+.dashboard .period[data-period="2"] { border-top: 3px solid var(--eu-blue); }
+.dashboard .period[data-period="1"] { border-top: 3px solid var(--gc-green); }
+table.dash td.milestone b { font-size: 16px; }
+table.dash td .good { color: #155c2a; font-weight: 650; }
+@media (max-width: 720px) {
+  .dashboard .table-wrap { overflow: visible; }
+  table.dash, table.dash tbody { display: block; }
+  table.dash thead { display: none; }
+  table.dash tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; padding: 14px; border-bottom: 1px solid var(--line); }
+  table.dash tr:last-child { border-bottom: 0; }
+  table.dash td { padding: 0; border: 0; }
+  table.dash td.code { grid-column: 1 / -1; font-weight: 650; color: var(--muted); font-size: 13px; }
+  table.dash td.ind { grid-column: 1 / -1; margin-top: -8px; }
+  table.dash td.num { text-align: left; white-space: normal; }
+  table.dash td.num::before { content: attr(data-label); display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+  table.dash td.big { font-size: 18px; }
+}
 
 /* MapLibre polish */
 .maplibregl-ctrl-group { border-radius: 8px !important; box-shadow: var(--shadow) !important; }
