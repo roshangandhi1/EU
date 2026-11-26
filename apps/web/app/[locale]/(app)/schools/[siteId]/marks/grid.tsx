@@ -1,10 +1,10 @@
 "use client";
-import { formatScore, readScore } from "@eu/schools/rules";
+import { formatScore, readLetter, readScore } from "@eu/schools/rules";
 import { useMemo, useRef, useState } from "react";
 import { SubmitButton } from "@/components/ui";
 import { useLeaveGuard } from "@/components/ui/form";
 
-export interface GridColumn { key: string; subject: string; period: string; title: string; sub: string; max: number }
+export interface GridColumn { key: string; subject: string; period: string; title: string; sub: string; max: number; /** Letter-graded column (Application, Conduite). */ letters?: string[] }
 export interface GridPupil { id: string; name: string; number: string }
 
 /**
@@ -21,7 +21,7 @@ export function MarksGrid({ action, hidden, pupils, columns, values, locale, l }
   locale: "en" | "fr";
   l: {
     pupil: string; total: string; save: string; saving: string; unsaved: string; noChanges: string; hint: string;
-    errors: { format: string; step: string; range: string }; badCount: string; filled: string; absentShort: string;
+    errors: { format: string; step: string; range: string; letter: string }; badCount: string; filled: string; absentShort: string;
   };
 }) {
   const form = useRef<HTMLFormElement>(null);
@@ -33,11 +33,11 @@ export function MarksGrid({ action, hidden, pupils, columns, values, locale, l }
   const cell = (pid: string, c: GridColumn) => `${pid}|${c.subject}|${c.period}`;
   const parsed = useMemo(() => {
     const out = new Map<string, ReturnType<typeof readScore>>();
-    for (const p of pupils) for (const c of columns) out.set(cell(p.id, c), readScore(vals[cell(p.id, c)] ?? "", c.max));
+    for (const p of pupils) for (const c of columns) out.set(cell(p.id, c), c.letters ? readLetter(vals[cell(p.id, c)] ?? "", c.letters) : readScore(vals[cell(p.id, c)] ?? "", c.max));
     return out;
   }, [vals, pupils, columns]);
   const bad = [...parsed.values()].filter((v) => v.kind === "error").length;
-  const filled = [...parsed.values()].filter((v) => v.kind === "score" || v.kind === "absent").length;
+  const filled = [...parsed.values()].filter((v) => v.kind === "score" || v.kind === "absent" || v.kind === "letter").length;
   const total = pupils.length * columns.length;
 
   const move = (e: React.KeyboardEvent<HTMLInputElement>, row: number, col: number) => {
@@ -63,6 +63,7 @@ export function MarksGrid({ action, hidden, pupils, columns, values, locale, l }
   const rowTotal = (pid: string) => {
     let got = 0, max = 0, any = false;
     for (const c of columns) {
+      if (c.letters) continue;
       const v = parsed.get(cell(pid, c));
       if (v?.kind === "score") { got += v.value; max += c.max; any = true; }
       else if (v?.kind === "absent") { max += c.max; any = true; }
@@ -85,7 +86,7 @@ export function MarksGrid({ action, hidden, pupils, columns, values, locale, l }
                   <span className="mg-max">{c.sub}</span>
                 </th>
               ))}
-              {columns.length > 1 && <th className="num mg-total" scope="col">{l.total}</th>}
+              {columns.some((c) => !c.letters) && columns.length > 1 && <th className="num mg-total" scope="col">{l.total}</th>}
             </tr>
           </thead>
           <tbody>
@@ -98,7 +99,7 @@ export function MarksGrid({ action, hidden, pupils, columns, values, locale, l }
                 {columns.map((c, ci) => {
                   const k = cell(p.id, c);
                   const v = parsed.get(k);
-                  const err = v?.kind === "error" ? l.errors[v.error].replace("{max}", String(c.max)) : undefined;
+                  const err = v?.kind === "error" ? l.errors[v.error].replace("{max}", String(c.max)).replace("{letters}", (c.letters ?? []).join(", ")) : undefined;
                   return (
                     <td key={c.key} className={`num${v?.kind === "absent" ? " mg-abs" : ""}`}>
                       <input
@@ -110,10 +111,10 @@ export function MarksGrid({ action, hidden, pupils, columns, values, locale, l }
                         onKeyDown={(e) => move(e, r, ci)}
                         onFocus={(e) => { e.target.select(); justFocused.current = true; }}
                         onMouseUp={(e) => { if (justFocused.current) e.preventDefault(); justFocused.current = false; }}
-                        inputMode="decimal"
+                        inputMode={c.letters ? "text" : "decimal"}
                         autoComplete="off"
                         enterKeyHint="next"
-                        aria-label={`${p.name} · ${c.title} (/${c.max})`}
+                        aria-label={c.letters ? `${p.name} · ${c.title}` : `${p.name} · ${c.title} (/${c.max})`}
                         aria-invalid={err ? true : undefined}
                         title={err}
                         placeholder="·"
@@ -122,7 +123,7 @@ export function MarksGrid({ action, hidden, pupils, columns, values, locale, l }
                     </td>
                   );
                 })}
-                {columns.length > 1 && <td className="num mg-total">{rowTotal(p.id)}</td>}
+                {columns.some((c) => !c.letters) && columns.length > 1 && <td className="num mg-total">{rowTotal(p.id)}</td>}
               </tr>
             ))}
           </tbody>

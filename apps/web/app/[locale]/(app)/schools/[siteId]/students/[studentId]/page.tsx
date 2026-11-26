@@ -73,7 +73,7 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
   const editLabels = {
     lastName: el("lastName"), postName: el("postName"), firstName: el("firstName"), sex: el("sex"), female: el("female"), male: el("male"),
     dateOfBirth: el("dateOfBirth"), birthHint: el("birthHint"), birthYearEstimate: el("birthYearEstimate"), guardianName: el("guardianName"),
-    guardianPhone: el("guardianPhone"), village: el("village"), optional: tr("common.optional"), save: tr("pupil.saveDetails"), saving,
+    guardianPhone: el("guardianPhone"), village: el("village"), birthPlace: el("birthPlace"), idNumber: el("idNumber"), permNumber: el("permNumber"), bulletinHint: el("bulletinHint"), optional: tr("common.optional"), save: tr("pupil.saveDetails"), saving,
     saved: tr("pupil.edited"), conflict: tr("err.conflict"), pupilGroup: tr("ux.pupilGroup"), familyGroup: tr("ux.familyGroup"), unsaved: tr("pupil.unsavedLeave"),
   };
 
@@ -128,7 +128,7 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
       <Section id="details" icon="user" title={tr("pupil.details")}>
         {canWrite ? (
           <EditPupil locale={locale} siteId={p.siteId} studentId={s.id} fv={fvs} today={date} l={editLabels}
-            v={{ lastName: s.lastName, postName: s.postName, firstName: s.firstName, sex: s.sex, dateOfBirth: s.dateOfBirth ?? "", birthYearEstimate: s.birthYearEstimate != null ? String(s.birthYearEstimate) : "", guardianName: s.guardianName, guardianPhone: s.guardianPhone, village: s.village }} />
+            v={{ lastName: s.lastName, postName: s.postName, firstName: s.firstName, sex: s.sex, dateOfBirth: s.dateOfBirth ?? "", birthYearEstimate: s.birthYearEstimate != null ? String(s.birthYearEstimate) : "", guardianName: s.guardianName, guardianPhone: s.guardianPhone, village: s.village, birthPlace: s.birthPlace ?? "", idNumber: s.idNumber ?? "", permNumber: s.permNumber ?? "" }} />
         ) : (
           <dl className="pupil-dl">
             <dt>{el("sex")}</dt><dd>{s.sex === "F" ? el("female") : el("male")}</dd>
@@ -136,6 +136,9 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
             <dt>{el("guardianName")}</dt><dd>{s.guardianName || "—"}</dd>
             <dt>{el("guardianPhone")}</dt><dd>{s.guardianPhone || "—"}</dd>
             <dt>{el("village")}</dt><dd>{s.village || "—"}</dd>
+            <dt>{el("birthPlace")}</dt><dd>{s.birthPlace || "—"}</dd>
+            <dt>{el("idNumber")}</dt><dd>{s.idNumber || "—"}</dd>
+            <dt>{el("permNumber")}</dt><dd>{s.permNumber || "—"}</dd>
           </dl>
         )}
       </Section>

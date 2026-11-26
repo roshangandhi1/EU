@@ -56,7 +56,7 @@ export default async function PupilResults({ params, searchParams }: { params: P
         <p>{tr("marks.schemeLine", { name: ctx.scheme.name, pass: ctx.scheme.passPercent })}</p>
       </div>
       <Section className="marks-sec" id="pupil" flush icon="user" title={studentName(student)} description={`${student.studentNumber} · ${classLabel(cls, tr)} · ${ctx.year?.label ?? ""}`}
-        actions={<><PrintButton label={tr("marks.print")} /><Link className="btn ghost sm no-print" href={`${base}/results?class=${cls.id}`}>{tr("marks.backToClass")}</Link></>}>
+        actions={<><Link className="btn secondary sm no-print" href={`${base}/bulletin?class=${cls.id}&student=${student.id}`}>{tr("marks.bulletin")}</Link><PrintButton label={tr("marks.print")} /><Link className="btn ghost sm no-print" href={`${base}/results?class=${cls.id}`}>{tr("marks.backToClass")}</Link></>}>
         <div className="marks-grid-wrap">
           <table className="grid marks-sheet">
             <thead>

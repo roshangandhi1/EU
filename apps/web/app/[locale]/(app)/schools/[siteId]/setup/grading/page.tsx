@@ -1,4 +1,4 @@
-import { DRC_SCHEME, LEVELS, live, maxFor, periodsOf, resolveScheme, resolveSubjects } from "@eu/schools";
+import { DRC_SCHEME, LEVELS, domainsOf, lettersOf, live, maxFor, periodsOf, resolveScheme, resolveSubjects } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Check, ChoiceGroup, Chip, ConfirmButton, Field, Fields, Notice, Section, SubmitButton, Table } from "@/components/ui";
@@ -61,7 +61,7 @@ export default async function GradingSetup({ params, searchParams }: { params: P
   );
   // The subjects table shows exam maxima with the scheme that grades the level shown.
   const levelScheme = programme ? resolveScheme(d.gradingSchemes.filter((s) => s.scopeId === "schools"), "", level).scheme : resolveScheme(d.gradingSchemes, p.siteId, level).scheme;
-  const errors: Record<string, string> = { scheme_levels: tr("marks.errLevels", { levels: param(sp, "levels") }), scheme_fallback: tr("marks.errFallback"), not_found: tr("err.notFound"), scheme_terms: tr("marks.errTerms"), scheme_mentions: tr("marks.errMentions"), scheme_invalid: tr("common.invalid"), subjects_invalid: tr("marks.errSubjects"), subjects_empty: tr("marks.errSubjectsEmpty") };
+  const errors: Record<string, string> = { scheme_levels: tr("marks.errLevels", { levels: param(sp, "levels") }), scheme_fallback: tr("marks.errFallback"), not_found: tr("err.notFound"), scheme_terms: tr("marks.errTerms"), scheme_mentions: tr("marks.errMentions"), scheme_invalid: tr("common.invalid"), scheme_letters: tr("marks.errLetters"), subjects_invalid: tr("marks.errSubjects"), subjects_empty: tr("marks.errSubjectsEmpty") };
   const err = errors[param(sp, "error")];
 
   return (
@@ -163,6 +163,11 @@ export default async function GradingSetup({ params, searchParams }: { params: P
               </tbody>
             </table>
           </div>
+          <h3 className="marks-subhead">{tr("marks.lettersTitle")}</h3>
+          <p className="muted small">{tr("marks.lettersIntro")}</p>
+          <Fields>
+            <Field span={6} label={tr("marks.lettersLabel")} hint={tr("marks.lettersHint")}><input name="letters" defaultValue={lettersOf(scheme).join(", ")} maxLength={60} /></Field>
+          </Fields>
           {!programme && marksCount > 0 && <Notice tone="warning">{tr("marks.changeWarning", { n: marksCount })}</Notice>}
           <div className="savebar">
             <span className="savebar-status"><span className="savebar-dot" aria-hidden /><span>{programme ? tr("marks.scopeProgramme") : d.site.name}</span></span>
@@ -191,8 +196,8 @@ export default async function GradingSetup({ params, searchParams }: { params: P
             <table className="grid marks-setup">
               <thead>
                 <tr>
-                  <th>#</th><th>{tr("marks.subjectName")}</th><th className="num">{tr("marks.maxPerPeriod")}</th>
-                  <th className="num">{tr("marks.examMax")}</th><th>{tr("marks.remove")}</th>
+                  <th>#</th><th>{tr("marks.subjectName")}</th><th>{tr("marks.domain")}</th><th>{tr("marks.branch")}</th><th className="num">{tr("marks.maxPerPeriod")}</th>
+                  <th className="num">{tr("marks.examMax")}</th><th>{tr("marks.optional")}</th><th>{tr("marks.remove")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -203,8 +208,16 @@ export default async function GradingSetup({ params, searchParams }: { params: P
                       <input type="hidden" name={`code:${i}`} value={s?.code ?? ""} />
                       <input className="ctl" name={`name:${i}`} maxLength={60} defaultValue={s?.name ?? ""} placeholder={s ? undefined : tr("marks.newSubject")} aria-label={`${tr("marks.subjectName")} ${i + 1}`} />
                     </td>
+                    <td>
+                      <select className="ctl" name={`domain:${i}`} defaultValue={s?.domain ?? ""} aria-label={`${tr("marks.domain")} ${i + 1}`}>
+                        <option value="">—</option>
+                        {domainsOf(levelScheme).map((x) => <option key={x.key} value={x.key}>{x[locale]}</option>)}
+                      </select>
+                    </td>
+                    <td><input className="ctl" name={`branch:${i}`} maxLength={60} defaultValue={s?.branch ?? ""} placeholder={tr("marks.branchPh")} aria-label={`${tr("marks.branch")} ${i + 1}`} /></td>
                     <td className="num"><input className="ctl num-input mg-input" name={`max:${i}`} inputMode="numeric" pattern="[0-9]{1,3}" defaultValue={s ? String(s.maxPoints) : ""} aria-label={`${tr("marks.maxPerPeriod")} ${i + 1}`} /></td>
                     <td className="num muted">{s ? maxFor(s, { kind: "exam" }, levelScheme) : ""}</td>
+                    <td><Check name={`opt:${i}`} label={tr("marks.optional")} defaultChecked={!!s?.optional} /></td>
                     <td>{s && <Check name={`del:${i}`} label={tr("marks.remove")} />}</td>
                   </tr>
                 ))}

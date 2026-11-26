@@ -1,4 +1,4 @@
-import { formatScore, maxFor } from "@eu/schools";
+import { BEHAVIOUR, formatScore, lettersOf, maxFor } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
@@ -129,12 +129,15 @@ export default async function Marks({ params, searchParams }: { params: Promise<
   const idx = ctx.index(cls.id);
   const columns: GridColumn[] = shown.map((s) => {
     const max = maxFor(s, period, ctx.scheme);
-    return { key: s.code, subject: s.code, period: period.key, title: s.name, sub: `/ ${max}`, max };
+    return { key: s.code, subject: s.code, period: period.key, title: s.branch ? `${s.branch} · ${s.name}` : s.name, sub: `/ ${max}`, max };
   });
+  // Application and Conduite: a letter per period (not for exams), after the subjects.
+  if (period.kind === "period" && !param(sp, "subject"))
+    for (const code of BEHAVIOUR) columns.push({ key: code, subject: code, period: period.key, title: tr(`marks.${code.slice(1)}`), sub: lettersOf(ctx.scheme).join(" "), max: 0, letters: lettersOf(ctx.scheme) });
   const values: Record<string, string> = {};
   for (const s of pupils) for (const c of columns) {
     const m = idx.get(`${s.id}|${c.subject}|${c.period}`);
-    if (m) values[`${s.id}|${c.subject}|${c.period}`] = m.absent ? "A" : m.score != null ? formatScore(m.score, locale) : "";
+    if (m) values[`${s.id}|${c.subject}|${c.period}`] = m.letter ?? (m.absent ? "A" : m.score != null ? formatScore(m.score, locale) : "");
   }
 
   return (
@@ -156,7 +159,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
             l={{
               pupil: tr("marks.pupil"), total: tr("common.total"), save: tr("marks.save"), saving: t(locale, "ui.form.saving"), unsaved: t(locale, "ui.form.unsaved"),
               noChanges: tr("marks.nothing"), hint: tr("marks.gridHint"),
-              errors: { format: tr("marks.errFormat"), step: tr("marks.errStep"), range: tr("marks.errRange") },
+              errors: { format: tr("marks.errFormat"), step: tr("marks.errStep"), range: tr("marks.errRange"), letter: tr("marks.errLetter") },
               badCount: tr("marks.badCount"), filled: tr("marks.filled"), absentShort: tr("marks.absentShort"),
             }}
           />

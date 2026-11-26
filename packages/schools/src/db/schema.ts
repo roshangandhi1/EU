@@ -16,6 +16,10 @@ export const schoolSchools = pgTable("school_schools", {
   shiftsRunning: jsonb("shifts_running").$type<string[]>().notNull(),
   /** Whether every payment must carry the number of a paper receipt from the school's books. */
   paperReceiptRequired: boolean("paper_receipt_required").notNull().default(true),
+  ministryCode: text("ministry_code").notNull().default(""),
+  province: text("province").notNull().default(""),
+  city: text("city").notNull().default(""),
+  commune: text("commune").notNull().default(""),
 });
 
 export const schoolAcademicYears = pgTable("school_academic_years", {
@@ -67,6 +71,9 @@ export const schoolStudents = pgTable(
     guardianName: text("guardian_name").notNull().default(""),
     guardianPhone: text("guardian_phone").notNull().default(""),
     village: text("village").notNull().default(""),
+    idNumber: text("id_number").notNull().default(""),
+    permNumber: text("perm_number").notNull().default(""),
+    birthPlace: text("birth_place").notNull().default(""),
   },
   (t) => [index("school_students_scope").on(t.scopeId)],
 );
@@ -192,6 +199,10 @@ export const schoolGradingSchemes = pgTable("school_grading_schemes", {
   examFactor: doublePrecision("exam_factor").notNull().default(2),
   passPercent: integer("pass_percent").notNull().default(50),
   mentions: jsonb("mentions").$type<{ minPercent: number; en: string; fr: string }[]>().notNull().default([]),
+  /** Report card domains, in order; subjects name one by key. */
+  domains: jsonb("domains").$type<{ key: string; en: string; fr: string; subtotal: "branch" | "domain" }[]>().notNull().default([]),
+  /** Letter grades for Application and Conduite, best first. */
+  letters: jsonb("letters").$type<string[]>().notNull().default(["E", "TB", "B", "AB", "M"]),
 });
 
 /** Subjects ("branches") per level, with the maximum points for one period. */
@@ -205,6 +216,11 @@ export const schoolSubjects = pgTable(
     name: text("name").notNull(),
     maxPoints: integer("max_points").notNull(),
     position: integer("position").notNull().default(0),
+    /** Report card grouping: domain key (from the scheme) and branch heading, e.g. "Français". */
+    domain: text("domain").notNull().default(""),
+    branch: text("branch").notNull().default(""),
+    /** Optional per pupil (Religion): a pupil with no mark in a period is not graded on it. */
+    optional: boolean("optional").notNull().default(false),
   },
   (t) => [index("school_subjects_scope_level").on(t.scopeId, t.level)],
 );
@@ -221,6 +237,8 @@ export const schoolMarks = pgTable(
     /** Points, in steps of 0.5; null when the pupil was absent. */
     score: doublePrecision("score"),
     absent: boolean("absent").notNull().default(false),
+    /** Letter grade (Application, Conduite), from the scheme's letters. */
+    letter: text("letter"),
   },
   (t) => [index("school_marks_class_period").on(t.classId, t.period)],
 );

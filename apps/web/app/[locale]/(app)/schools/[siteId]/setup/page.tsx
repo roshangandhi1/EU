@@ -147,6 +147,10 @@ export default async function Setup({ params, searchParams }: { params: Promise<
                 <Chip name="shiftsRunning" value="morning" label={tr("shift.morning")} defaultChecked={d.school?.shiftsRunning.includes("morning")} />
                 <Chip name="shiftsRunning" value="afternoon" label={tr("shift.afternoon")} defaultChecked={d.school?.shiftsRunning.includes("afternoon")} />
               </ChoiceGroup>
+              <Field span={3} label={tr("info.ministryCode")} optional={optional} hint={tr("info.bulletinHint")}><input name="ministryCode" maxLength={20} defaultValue={d.school?.ministryCode ?? ""} /></Field>
+              <Field span={3} label={tr("info.province")} optional={optional}><input name="province" maxLength={80} defaultValue={d.school?.province ?? ""} /></Field>
+              <Field span={3} label={tr("info.city")} optional={optional}><input name="city" maxLength={80} defaultValue={d.school?.city ?? ""} /></Field>
+              <Field span={3} label={tr("info.commune")} optional={optional}><input name="commune" maxLength={80} defaultValue={d.school?.commune ?? ""} /></Field>
               <ChoiceGroup span={6} legend={tr("fees.paperNumber")} hint={tr("fees.paperRequiredHint")}>
                 <Chip name="paperReceiptRequired" value="1" label={tr("fees.paperRequiredSetting")} defaultChecked={d.school?.paperReceiptRequired !== false} />
               </ChoiceGroup>

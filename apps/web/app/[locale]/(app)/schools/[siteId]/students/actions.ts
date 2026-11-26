@@ -231,7 +231,7 @@ export async function changeClass(fd: FormData) {
 
 export interface EditState { error?: string; message?: string; ok?: boolean; conflict?: boolean; n?: number }
 
-const EDITABLE = ["firstName", "lastName", "postName", "sex", "dateOfBirth", "birthYearEstimate", "guardianName", "guardianPhone", "village"] as const;
+const EDITABLE = ["firstName", "lastName", "postName", "sex", "dateOfBirth", "birthYearEstimate", "guardianName", "guardianPhone", "village", "idNumber", "permNumber", "birthPlace"] as const;
 
 /** Corrects a pupil's details. Only changed fields are sent, against the versions the form was opened with. */
 export async function editStudent(prev: EditState, fd: FormData): Promise<EditState> {
@@ -251,6 +251,7 @@ async function edit(prev: EditState, fd: FormData): Promise<EditState> {
     firstName: str(fd, "firstName"), lastName: str(fd, "lastName"), postName: str(fd, "postName"), sex: str(fd, "sex") as "F" | "M",
     dateOfBirth: orNull(str(fd, "dateOfBirth")), birthYearEstimate: int(fd, "birthYearEstimate"),
     guardianName: str(fd, "guardianName"), guardianPhone: str(fd, "guardianPhone"), village: str(fd, "village"),
+    idNumber: str(fd, "idNumber").slice(0, 30), permNumber: str(fd, "permNumber").slice(0, 30), birthPlace: str(fd, "birthPlace").slice(0, 80),
   };
   const bad = pupilProblem(next);
   if (bad) return { error: bad, n };

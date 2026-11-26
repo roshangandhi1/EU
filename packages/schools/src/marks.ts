@@ -19,6 +19,17 @@ export const mentionBand = z.object({
 });
 export type MentionBand = z.infer<typeof mentionBand>;
 
+/** A report card domain ("Domaine des langues"); sub-totals are per branch or for the whole domain. */
+export const reportDomain = z.object({
+  key: z.string().regex(/^[a-z0-9_]{1,24}$/),
+  en: z.string().min(1).max(80),
+  fr: z.string().min(1).max(80),
+  subtotal: z.enum(["branch", "domain"]),
+});
+export type ReportDomain = z.infer<typeof reportDomain>;
+
+export const DEFAULT_LETTERS = ["E", "TB", "B", "AB", "M"];
+
 export const gradingScheme = z.object({
   name: z.string().min(1).max(80),
   /**
@@ -31,6 +42,10 @@ export const gradingScheme = z.object({
   examFactor: z.number().min(0.5).max(10).multipleOf(0.5),
   passPercent: z.number().int().min(1).max(100),
   mentions: z.array(mentionBand).max(8),
+  /** Report card domains in order (empty: subjects are listed without domains). */
+  domains: z.array(reportDomain).max(12).default([]),
+  /** Letter grades for Application and Conduite, best first. */
+  letters: z.array(z.string().min(1).max(4)).min(2).max(10).default(DEFAULT_LETTERS),
 });
 export type GradingScheme = z.infer<typeof gradingScheme>;
 
@@ -40,8 +55,13 @@ export const subject = z.object({
   name: z.string().min(1).max(60),
   maxPoints: z.number().int().min(1).max(500),
   position: z.number().int().min(0).max(99),
+  /** Report card grouping: a domain key of the scheme, and the branch heading ("Français"). */
+  domain: z.string().max(24).default(""),
+  branch: z.string().max(60).default(""),
+  /** Optional per pupil (Religion): left out of a pupil's totals for a period with no mark. */
+  optional: z.boolean().default(false),
 });
-export type Subject = z.infer<typeof subject>;
+export type Subject = z.input<typeof subject>;
 
 /** Points in steps of 0.5 (the maximum is checked against the subject when entered). */
 export const markScore = z.number().min(0).max(1000).multipleOf(0.5);
@@ -53,8 +73,14 @@ export const mark = z.object({
   period: z.string().regex(/^(P[1-9]|Ex[1-4])$/),
   score: markScore.nullable(),
   absent: z.boolean(),
+  /** Letter grade for Application / Conduite (subject "_application" / "_conduct"). */
+  letter: z.string().min(1).max(4).nullable().default(null),
 });
-export type Mark = z.infer<typeof mark>;
+export type Mark = z.input<typeof mark>;
+
+/** The two letter-graded rows of the report card, stored as marks with these subject codes. */
+export const BEHAVIOUR = ["_application", "_conduct"] as const;
+export const isBehaviour = (code: string) => (BEHAVIOUR as readonly string[]).includes(code);
 
 // ---- The DRC primary standard (built-in default) ----
 
@@ -73,27 +99,102 @@ export const DRC_SCHEME: GradingScheme = {
   examFactor: 2,
   passPercent: 50,
   mentions: DRC_MENTIONS,
+  domains: [
+    { key: "langues", fr: "Domaine des langues", en: "Languages", subtotal: "branch" },
+    { key: "mst", fr: "Domaine des mathématiques, sciences et technologie", en: "Mathematics, science and technology", subtotal: "domain" },
+    { key: "social", fr: "Domaine de l'univers social et environnement", en: "Social world and environment", subtotal: "domain" },
+    { key: "arts", fr: "Domaine des arts", en: "Arts", subtotal: "domain" },
+    { key: "perso", fr: "Domaine du développement personnel", en: "Personal development", subtotal: "domain" },
+  ],
+  letters: DEFAULT_LETTERS,
 };
 
-/**
- * Default subjects for levels 1-6, with the maximum for one period. A starting point to be
- * confirmed with the school; the headteacher can edit names and maxima per level.
- */
-const DEFAULT_SUBJECTS: { code: string; en: string; fr: string; lower: number; upper: number }[] = [
-  { code: "fr", en: "French", fr: "Français", lower: 20, upper: 30 },
-  { code: "math", en: "Mathematics", fr: "Mathématiques", lower: 20, upper: 30 },
-  { code: "lang", en: "Congolese language", fr: "Langue congolaise", lower: 10, upper: 10 },
-  { code: "science", en: "Science", fr: "Éveil scientifique", lower: 10, upper: 20 },
-  { code: "civic", en: "Civic and moral education", fr: "Éducation civique et morale", lower: 10, upper: 10 },
-  { code: "art", en: "Art and drawing", fr: "Dessin / Éducation artistique", lower: 10, upper: 10 },
-  { code: "pe", en: "Physical education", fr: "Éducation physique", lower: 10, upper: 10 },
-  { code: "religion", en: "Religion", fr: "Religion", lower: 10, upper: 10 },
+type Def = { fr: string; en: string; max: number; domain: string; branch?: [string, string]; optional?: boolean };
+const LC: [string, string] = ["Langues congolaises", "Congolese languages"];
+const FR: [string, string] = ["Français", "French"];
+const MA: [string, string] = ["Mathématiques", "Mathematics"];
+const SC: [string, string] = ["Sciences", "Science"];
+const TE: [string, string] = ["Technologie", "Technology"];
+const COMMON_TAIL: Def[] = [
+  { fr: "Arts plastiques", en: "Visual arts", max: 10, domain: "arts" },
+  { fr: "Arts dramatiques", en: "Drama", max: 10, domain: "arts" },
+  { fr: "Éd. physique et sportive", en: "Physical education and sport", max: 10, domain: "perso" },
+  { fr: "Initiation aux travaux productifs", en: "Introduction to productive work", max: 10, domain: "perso" },
+  { fr: "Religion", en: "Religion", max: 10, domain: "perso", optional: true },
 ];
 
-/** The DRC default subjects for a level, named in the given language. */
+/** Degré élémentaire (1re-2e année), from the ministry bulletin IMPRIGE/P.S/004. Maxima are per period. */
+const ELEMENTAIRE: Def[] = [
+  { fr: "Expression orale", en: "Speaking", max: 20, domain: "langues", branch: LC },
+  { fr: "Expression écrite", en: "Writing", max: 20, domain: "langues", branch: LC },
+  { fr: "Vocabulaire", en: "Vocabulary", max: 10, domain: "langues", branch: FR },
+  { fr: "Expression orale", en: "Speaking", max: 20, domain: "langues", branch: FR },
+  { fr: "Lecture - écriture en langues congolaises", en: "Reading and writing in Congolese languages", max: 30, domain: "langues" },
+  { fr: "Mesures des grandeurs", en: "Measurement", max: 10, domain: "mst", branch: MA },
+  { fr: "Formes géométriques", en: "Geometric shapes", max: 10, domain: "mst", branch: MA },
+  { fr: "Numération", en: "Numeracy", max: 20, domain: "mst", branch: MA },
+  { fr: "Opérations", en: "Operations", max: 20, domain: "mst", branch: MA },
+  { fr: "Problèmes", en: "Problems", max: 20, domain: "mst", branch: MA },
+  { fr: "Sciences d'éveil", en: "Early science", max: 20, domain: "mst", branch: SC },
+  { fr: "Technologie", en: "Technology", max: 10, domain: "mst", branch: TE },
+  { fr: "Éd. civique et morale", en: "Civic and moral education", max: 10, domain: "social" },
+  { fr: "Éd. à la santé et environnement", en: "Health and environment", max: 10, domain: "social" },
+  ...COMMON_TAIL,
+];
+
+/** Degré moyen (3e-4e année), from the ministry bulletin IMPRIGE/P.S/005. */
+const MOYEN: Def[] = [
+  { fr: "Expr. orale et vocabulaire", en: "Speaking and vocabulary", max: 10, domain: "langues", branch: LC },
+  { fr: "Grammaire et conjugaison", en: "Grammar and conjugation", max: 10, domain: "langues", branch: LC },
+  { fr: "Orthographe et rédaction", en: "Spelling and composition", max: 5, domain: "langues", branch: LC },
+  { fr: "Expr. orale - récitation - vocabulaire", en: "Speaking, recitation, vocabulary", max: 10, domain: "langues", branch: FR },
+  { fr: "Orthographe, phraséologie écrite, rédaction", en: "Spelling, written phrasing, composition", max: 10, domain: "langues", branch: FR },
+  { fr: "Grammaire - conjugaison - analyse", en: "Grammar, conjugation, analysis", max: 15, domain: "langues", branch: FR },
+  { fr: "Lecture - écriture en langues congolaises", en: "Reading and writing in Congolese languages", max: 30, domain: "langues" },
+  { fr: "Lecture - écriture en langue française", en: "Reading and writing in French", max: 30, domain: "langues" },
+  { fr: "Numération", en: "Numeracy", max: 10, domain: "mst", branch: MA },
+  { fr: "Opérations", en: "Operations", max: 10, domain: "mst", branch: MA },
+  { fr: "Mesures des grandeurs", en: "Measurement", max: 10, domain: "mst", branch: MA },
+  { fr: "Formes géométriques", en: "Geometric shapes", max: 10, domain: "mst", branch: MA },
+  { fr: "Problèmes", en: "Problems", max: 20, domain: "mst", branch: MA },
+  { fr: "Zoologie - botanique et info.", en: "Zoology, botany and IT", max: 10, domain: "mst", branch: SC },
+  { fr: "Technologie", en: "Technology", max: 20, domain: "mst", branch: TE },
+  { fr: "Éd. civique et morale", en: "Civic and moral education", max: 10, domain: "social" },
+  { fr: "Éd. à la santé et environnement", en: "Health and environment", max: 10, domain: "social" },
+  { fr: "Géographie", en: "Geography", max: 10, domain: "social" },
+  { fr: "Histoire", en: "History", max: 10, domain: "social" },
+  ...COMMON_TAIL,
+];
+
+/**
+ * Levels 5 and up: no ministry bulletin received yet, so the moyen subjects are used as a starting
+ * point. The headteacher can edit names and maxima per level.
+ */
+const DEGREE: Record<number, Def[]> = { 1: ELEMENTAIRE, 2: ELEMENTAIRE, 3: MOYEN, 4: MOYEN };
+
+/** The DRC default subjects for a level, named in the given language. Codes are stable across languages. */
 export function defaultSubjects(lvl: number, locale: "en" | "fr" = "fr"): Subject[] {
-  return DEFAULT_SUBJECTS.map((s, i) => ({ level: lvl, code: s.code, name: s[locale], maxPoints: lvl <= 2 ? s.lower : s.upper, position: i }));
+  const defs = DEGREE[lvl] ?? MOYEN;
+  const taken = new Set<string>();
+  return defs.map((d, i) => {
+    const code = subjectCode(d.branch ? `${d.branch[0].slice(0, 3)} ${d.fr}` : d.fr, taken);
+    taken.add(code);
+    return {
+      level: lvl, code, name: locale === "en" ? d.en : d.fr, maxPoints: d.max, position: i,
+      domain: d.domain, branch: d.branch ? d.branch[locale === "en" ? 1 : 0] : "", optional: !!d.optional,
+    };
+  });
 }
+
+/** The report card's degree for a level: élémentaire (1-2), moyen (3-4), terminal (5-6), CTEB (7-8). */
+export function degreeOf(lvl: number): "elementaire" | "moyen" | "terminal" | "cteb" {
+  return lvl <= 2 ? "elementaire" : lvl <= 4 ? "moyen" : lvl <= 6 ? "terminal" : "cteb";
+}
+
+/** A scheme's report card domains; schemes made before domains existed use the DRC ones. */
+export const domainsOf = (s: Partial<Pick<GradingScheme, "domains">>): ReportDomain[] => (s.domains?.length ? s.domains : DRC_SCHEME.domains);
+/** A scheme's letter grades for Application and Conduite. */
+export const lettersOf = (s: Partial<Pick<GradingScheme, "letters">>): string[] => (s.letters?.length ? s.letters : DEFAULT_LETTERS);
 
 // ---- Periods ----
 
@@ -202,7 +303,15 @@ export function mentionFor(percent: number | null, bands: readonly MentionBand[]
 
 // ---- Entering marks ----
 
-export type ScoreInput = { kind: "empty" } | { kind: "absent" } | { kind: "score"; value: number } | { kind: "error"; error: "format" | "step" | "range" };
+export type ScoreInput = { kind: "empty" } | { kind: "absent" } | { kind: "score"; value: number } | { kind: "letter"; value: string } | { kind: "error"; error: "format" | "step" | "range" | "letter" };
+
+/** Reads a letter grade (Application, Conduite): blank, or one of the scheme's letters, any case. */
+export function readLetter(raw: string, letters: readonly string[]): ScoreInput {
+  const s = raw.trim().toUpperCase();
+  if (s === "") return { kind: "empty" };
+  const hit = letters.find((l) => l.toUpperCase() === s);
+  return hit ? { kind: "letter", value: hit } : { kind: "error", error: "letter" };
+}
 
 /**
  * Reads what was typed in a mark cell: blank, "a"/"abs" (absent), or points such as "12",
@@ -242,7 +351,7 @@ export const markKey = cellKey;
 
 export type MarkOp =
   | { op: "create"; fields: Mark }
-  | { op: "update"; id: string; fields: Partial<Pick<Mark, "score" | "absent">> }
+  | { op: "update"; id: string; fields: Partial<Pick<Mark, "score" | "absent" | "letter">> }
   | { op: "void"; id: string };
 
 /**
@@ -263,8 +372,16 @@ export function planMarks(
     }
     const score = c.input.kind === "score" ? c.input.value : null;
     const absent = c.input.kind === "absent";
-    if (!prev) ops.push({ op: "create", fields: { studentId: c.studentId, classId, subject: c.subject, period: c.period, score, absent } });
-    else if (prev.score !== score || prev.absent !== absent) ops.push({ op: "update", id: prev.id, fields: { score, absent } });
+    const letter = c.input.kind === "letter" ? c.input.value : null;
+    if (!prev) ops.push({ op: "create", fields: { studentId: c.studentId, classId, subject: c.subject, period: c.period, score, absent, letter } });
+    else if (prev.score !== score || prev.absent !== absent || (prev.letter ?? null) !== letter) {
+      // Only send what changed: a partial update must not touch the other fields.
+      const fields: Partial<Pick<Mark, "score" | "absent" | "letter">> = {};
+      if (prev.score !== score) fields.score = score;
+      if (prev.absent !== absent) fields.absent = absent;
+      if ((prev.letter ?? null) !== letter) fields.letter = letter;
+      ops.push({ op: "update", id: prev.id, fields });
+    }
   }
   return ops;
 }
@@ -330,8 +447,10 @@ export function classResults(input: {
       const r: SubjectResult = { obtained: 0, max: 0, fullMax: 0, missing: 0, absent: 0 };
       for (const p of periods) {
         const m = maxFor(s, p, scheme);
-        r.fullMax += m;
         const cell = marks.get(cellKey(studentId, s.code, p.key));
+        // An optional subject (Religion) a pupil does not take has no marks: it is not part of their maximum.
+        if (s.optional && !cell) continue;
+        r.fullMax += m;
         if (!cell) r.missing++;
         else if (cell.absent) { r.absent++; r.max += m; }
         else if (cell.score != null) { r.obtained += cell.score; r.max += m; }
@@ -369,7 +488,7 @@ export function subjectCode(name: string, taken: ReadonlySet<string>): string {
 
 export type SubjectOp =
   | { op: "create"; fields: Subject }
-  | { op: "update"; id: string; fields: Partial<Pick<Subject, "name" | "maxPoints" | "position">> }
+  | { op: "update"; id: string; fields: Partial<Pick<Subject, "name" | "maxPoints" | "position" | "domain" | "branch" | "optional">> }
   | { op: "void"; id: string };
 
 /**
@@ -389,8 +508,11 @@ export function planSubjects(existing: readonly Rec<Subject>[], scopeId: string,
       ops.push({ op: "create", fields: { ...w, level: lvl } });
       continue;
     }
-    const fields: Partial<Pick<Subject, "name" | "maxPoints" | "position">> = {};
+    const fields: Partial<Pick<Subject, "name" | "maxPoints" | "position" | "domain" | "branch" | "optional">> = {};
     if (prev.name !== w.name) fields.name = w.name;
+    if ((prev.domain ?? "") !== (w.domain ?? "")) fields.domain = w.domain ?? "";
+    if ((prev.branch ?? "") !== (w.branch ?? "")) fields.branch = w.branch ?? "";
+    if (!!prev.optional !== !!w.optional) fields.optional = !!w.optional;
     if (prev.maxPoints !== w.maxPoints) fields.maxPoints = w.maxPoints;
     if (prev.position !== w.position) fields.position = w.position;
     if (Object.keys(fields).length) ops.push({ op: "update", id: prev.id, fields });
@@ -402,8 +524,49 @@ export function planSubjects(existing: readonly Rec<Subject>[], scopeId: string,
 /** Fields of a scheme that differ from `prev` (for an in-place update). */
 export function schemeChanges(prev: GradingScheme, next: GradingScheme): Partial<GradingScheme> {
   const out: Partial<GradingScheme> = {};
-  for (const k of ["name", "levels", "terms", "examFactor", "passPercent", "mentions"] as const) {
+  for (const k of ["name", "levels", "terms", "examFactor", "passPercent", "mentions", "domains", "letters"] as const) {
     if (JSON.stringify(prev[k] ?? []) !== JSON.stringify(next[k] ?? [])) (out as Record<string, unknown>)[k] = next[k];
+  }
+  return out;
+}
+
+// ---- Report card (bulletin) layout ----
+
+export type BulletinLine =
+  | { type: "domain"; key: string; label: string }
+  | { type: "branch"; label: string }
+  | { type: "subject"; subject: Subject }
+  | { type: "subtotal"; codes: string[] };
+
+/**
+ * The rows of a report card, as on the ministry bulletins: each domain's heading, branch headings
+ * ("Français"), the subjects, and sub-totals either after each branch of two or more subjects
+ * (Domaine des langues) or once for the whole domain. Subjects without a known domain come last.
+ */
+export function bulletinLayout(subjects: readonly Subject[], domains: readonly ReportDomain[], locale: "en" | "fr" = "fr"): BulletinLine[] {
+  const out: BulletinLine[] = [];
+  const known = new Set(domains.map((d) => d.key));
+  const groups: { domain: ReportDomain | null; subjects: Subject[] }[] = [
+    ...domains.map((d) => ({ domain: d as ReportDomain | null, subjects: subjects.filter((s) => s.domain === d.key) })),
+    { domain: null, subjects: subjects.filter((s) => !known.has(s.domain ?? "")) },
+  ];
+  for (const g of groups) {
+    if (g.subjects.length === 0) continue;
+    if (g.domain) out.push({ type: "domain", key: g.domain.key, label: g.domain[locale] });
+    // Consecutive subjects with the same branch form one block.
+    const blocks: Subject[][] = [];
+    for (const s of g.subjects) {
+      const last = blocks[blocks.length - 1];
+      if (last && (last[0]!.branch ?? "") === (s.branch ?? "") && (s.branch ?? "") !== "") last.push(s);
+      else blocks.push([s]);
+    }
+    for (const b of blocks) {
+      const branch = b[0]!.branch ?? "";
+      if (branch) out.push({ type: "branch", label: branch });
+      for (const s of b) out.push({ type: "subject", subject: s });
+      if (g.domain?.subtotal === "branch" && branch && b.length >= 2) out.push({ type: "subtotal", codes: b.map((s) => s.code) });
+    }
+    if (g.domain?.subtotal === "domain" && g.subjects.length >= 2) out.push({ type: "subtotal", codes: g.subjects.map((s) => s.code) });
   }
   return out;
 }

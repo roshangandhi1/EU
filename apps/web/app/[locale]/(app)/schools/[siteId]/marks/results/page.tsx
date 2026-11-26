@@ -83,7 +83,7 @@ export default async function Results({ params, searchParams }: { params: Promis
       </div>
 
       <Section className="marks-sec" id="sheet" flush icon="chart" title={title} description={span.kind === "year" ? ctx.year?.label : `${ctx.year?.label ?? ""} · ${periods.map((x) => x.key).join(" + ")}`} count={pupils.length}
-        actions={<><PrintButton label={tr("marks.print")} /><Link className="btn ghost sm no-print" href={`${base}?class=${cls.id}${span.kind === "period" ? `&period=${span.key}` : ""}`}>{tr("marks.toEntry")}</Link></>}>
+        actions={<><Link className="btn secondary sm no-print" href={`${base}/bulletin?class=${cls.id}`}>{tr("marks.bulletins")}</Link><PrintButton label={tr("marks.print")} /><Link className="btn ghost sm no-print" href={`${base}?class=${cls.id}${span.kind === "period" ? `&period=${span.key}` : ""}`}>{tr("marks.toEntry")}</Link></>}>
         {res.missing > 0 && <div className="no-print" style={{ margin: "0 20px 12px" }}><Notice tone="warning">{tr("marks.incomplete", { n: res.missing })}</Notice></div>}
         {pupils.length === 0 ? <EmptyRow icon="users" title={tr("ux.noRoster")} /> : (
           <>

@@ -1,6 +1,6 @@
 "use server";
 import {
-  DRC_SCHEME, LEVELS, defaultSubjects, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
+  DRC_SCHEME, LEVELS, defaultSubjects, domainsOf, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
   type GradingScheme, type MentionBand, type Subject,
 } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
@@ -83,7 +83,11 @@ export async function saveScheme(fd: FormData) {
   }
   mentions.sort((a, b) => b.minPercent - a.minPercent);
   if (new Set(mentions.map((m) => m.minPercent)).size !== mentions.length) back(c.path, { error: "scheme_mentions" });
-  const next = { name: str(fd, "name"), levels: levelsOf(fd), terms, examFactor: decimal(str(fd, "examFactor")), passPercent: Number(str(fd, "passPercent")), mentions };
+  const letters = str(fd, "letters").split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
+  if (letters.length < 2 || new Set(letters).size !== letters.length) back(c.path, { error: "scheme_letters" });
+  // Domains have no editor yet: a scheme keeps its own, a new one starts from the DRC domains.
+  const own = live(c.d.gradingSchemes).find((s) => s.id === c.schemeId);
+  const next = { name: str(fd, "name"), levels: levelsOf(fd), terms, examFactor: decimal(str(fd, "examFactor")), passPercent: Number(str(fd, "passPercent")), mentions, letters, domains: domainsOf(own ?? {}) };
   const parsed = gradingScheme.safeParse(next);
   if (!parsed.success) back(c.path, { error: parsed.error.issues[0]?.path[0] === "mentions" ? "scheme_mentions" : "scheme_invalid" });
   await writeScheme(c, parsed.data!);
@@ -115,22 +119,22 @@ function subjectMutations(c: Awaited<ReturnType<typeof ctx>>, levels: readonly n
 /** Saves the subject list of one level (or of every level), matched by code so marks keep their subject. */
 export async function saveSubjects(fd: FormData) {
   const c = await ctx(fd);
-  const rows: { code: string; name: string; maxPoints: number }[] = [];
+  const rows: { code: string; name: string; maxPoints: number; domain: string; branch: string; optional: boolean }[] = [];
   for (let i = 0; i < 40; i++) {
     if (!fd.has(`name:${i}`)) break;
     const name = str(fd, `name:${i}`), max = str(fd, `max:${i}`), code = str(fd, `code:${i}`);
     if (fd.get(`del:${i}`) === "on" || (!name && !max)) continue;
     if (!name || !/^\d{1,3}$/.test(max) || Number(max) < 1) back(c.path, { error: "subjects_invalid" });
-    rows.push({ code, name, maxPoints: Number(max) });
+    rows.push({ code, name, maxPoints: Number(max), domain: str(fd, `domain:${i}`), branch: str(fd, `branch:${i}`), optional: fd.get(`opt:${i}`) === "on" });
   }
   if (rows.length === 0) back(c.path, { error: "subjects_empty" });
   const taken = new Set(rows.map((r) => r.code).filter(Boolean));
   const list = rows.map((r) => {
     const code = r.code || subjectCode(r.name, taken);
     taken.add(code);
-    return { code, name: r.name, maxPoints: r.maxPoints };
+    return { ...r, code };
   });
-  const wanted = (lvl: number): Subject[] => list.map((r, i) => ({ level: lvl, code: r.code, name: r.name, maxPoints: r.maxPoints, position: i }));
+  const wanted = (lvl: number): Subject[] => list.map((r, i) => ({ level: lvl, code: r.code, name: r.name, maxPoints: r.maxPoints, position: i, domain: r.domain, branch: r.branch, optional: r.optional }));
   if (wanted(c.level).some((s) => !subject.safeParse(s).success)) back(c.path, { error: "subjects_invalid" });
   const levels = fd.get("allLevels") === "on" ? LEVELS : [c.level];
   await apply(c.me, subjectMutations(c, levels, wanted), c.locale, c.siteId, c.path);
