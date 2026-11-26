@@ -1,4 +1,4 @@
-import type { AcademicYear, Classroom, Exemption, FeeItem, ReceiptBook, SchoolClass, Synced, Term } from "@eu/schools";
+import type { AcademicYear, Classroom, Exemption, FeeItem, Payment, ReceiptBook, SchoolClass, Synced, Term } from "@eu/schools";
 
 /**
  * Cross-field checks for Setup forms, run before a record is sent. Each problem names the fields
@@ -6,22 +6,28 @@ import type { AcademicYear, Classroom, Exemption, FeeItem, ReceiptBook, SchoolCl
  */
 export interface Problem { code: string; fields: string[]; vars?: Record<string, string | number> }
 
-const liveRows = <T extends { voidedAt: string | null }>(rows: readonly T[]) => rows.filter((r) => !r.voidedAt);
+/** Live rows, leaving out the record being edited (`self`) so it never clashes with itself. */
+const liveRows = <T extends { voidedAt: string | null; id?: string }>(rows: readonly T[], self?: string) => rows.filter((r) => !r.voidedAt && (!self || r.id !== self));
 const p = (code: string, fields: string[], vars?: Problem["vars"]): Problem => ({ code, fields, ...(vars ? { vars } : {}) });
 
-export function checkYear(f: AcademicYear, years: readonly Synced<AcademicYear>[]): Problem | null {
+export function checkYear(f: AcademicYear, years: readonly Synced<AcademicYear>[], self?: string, terms: readonly Synced<Term>[] = []): Problem | null {
   if (!f.label.trim()) return p("label", ["label"]);
   if (f.endsOn <= f.startsOn) return p("endBeforeStart", ["endsOn"]);
-  const clash = liveRows(years).find((y) => y.startsOn <= f.endsOn && f.startsOn <= y.endsOn);
-  return clash ? p("yearOverlap", ["startsOn", "endsOn"], { label: clash.label }) : null;
+  const clash = liveRows(years, self).find((y) => y.startsOn <= f.endsOn && f.startsOn <= y.endsOn);
+  if (clash) return p("yearOverlap", ["startsOn", "endsOn"], { label: clash.label });
+  // Editing a year: its terms must still fit inside it.
+  const out = self ? liveRows(terms).filter((t) => t.academicYearId === self).find((t) => t.startsOn < f.startsOn || t.endsOn > f.endsOn) : undefined;
+  return out ? p("yearCutsTerm", ["startsOn", "endsOn"], { n: out.number }) : null;
 }
 
-export function checkTerm(f: Term, years: readonly Synced<AcademicYear>[], terms: readonly Synced<Term>[]): Problem | null {
+export function checkTerm(f: Term, years: readonly Synced<AcademicYear>[], terms: readonly Synced<Term>[], self?: string): Problem | null {
   if (f.endsOn <= f.startsOn) return p("endBeforeStart", ["endsOn"]);
   const y = years.find((x) => x.id === f.academicYearId);
   if (y && (f.startsOn < y.startsOn || f.endsOn > y.endsOn)) return p("termOutsideYear", ["startsOn", "endsOn"], { label: y.label });
-  if (liveRows(terms).some((t) => t.academicYearId === f.academicYearId && t.number === f.number)) return p("termTaken", ["number"], { n: f.number });
-  return null;
+  const same = liveRows(terms, self).filter((t) => t.academicYearId === f.academicYearId);
+  if (same.some((t) => t.number === f.number)) return p("termTaken", ["number"], { n: f.number });
+  const overlap = same.find((t) => t.startsOn <= f.endsOn && f.startsOn <= t.endsOn);
+  return overlap ? p("termOverlap", ["startsOn", "endsOn"], { n: overlap.number }) : null;
 }
 
 export function checkRoom(f: Classroom): Problem | null {
@@ -30,9 +36,9 @@ export function checkRoom(f: Classroom): Problem | null {
   return null;
 }
 
-export function checkClass(f: SchoolClass, classes: readonly Synced<SchoolClass>[]): Problem | null {
+export function checkClass(f: SchoolClass, classes: readonly Synced<SchoolClass>[], self?: string): Problem | null {
   if (!/^[A-Z]{1,2}$/.test(f.section)) return p("section", ["section"]);
-  const same = liveRows(classes).some((c) => c.academicYearId === f.academicYearId && c.level === f.level && c.section === f.section && c.shift === f.shift);
+  const same = liveRows(classes, self).some((c) => c.academicYearId === f.academicYearId && c.level === f.level && c.section === f.section && c.shift === f.shift);
   return same ? p("classTaken", ["level", "section", "shift"]) : null;
 }
 
@@ -43,11 +49,15 @@ export function checkFeeItem(f: Pick<FeeItem, "levels" | "name">): Problem | nul
 }
 
 /** A book's range must be in order, of a realistic size, and not overlap another live book. */
-export function checkBook(f: Pick<ReceiptBook, "firstNumber" | "lastNumber">, books: readonly Synced<ReceiptBook>[]): Problem | null {
+export function checkBook(f: Pick<ReceiptBook, "firstNumber" | "lastNumber">, books: readonly Synced<ReceiptBook>[], self?: string, payments: readonly Synced<Payment>[] = []): Problem | null {
   if (f.firstNumber > f.lastNumber) return p("bookOrder", ["lastNumber"]);
   if (f.lastNumber - f.firstNumber + 1 > 10_000) return p("bookSize", ["lastNumber"]);
-  const clash = liveRows(books).find((b) => b.firstNumber <= f.lastNumber && f.firstNumber <= b.lastNumber);
-  return clash ? p("bookOverlap", ["firstNumber", "lastNumber"], { first: clash.firstNumber, last: clash.lastNumber }) : null;
+  const clash = liveRows(books, self).find((b) => b.firstNumber <= f.lastNumber && f.firstNumber <= b.lastNumber);
+  if (clash) return p("bookOverlap", ["firstNumber", "lastNumber"], { first: clash.firstNumber, last: clash.lastNumber });
+  // Editing a book: receipts already used from it must stay inside the new range.
+  const old = self ? books.find((b) => b.id === self) : undefined;
+  const lost = old ? liveRows(payments).filter((x) => x.receiptNumber >= old.firstNumber && x.receiptNumber <= old.lastNumber && (x.receiptNumber < f.firstNumber || x.receiptNumber > f.lastNumber)) : [];
+  return lost.length ? p("bookCutsReceipts", ["firstNumber", "lastNumber"], { n: lost.length }) : null;
 }
 
 export function checkExemption(f: Pick<Exemption, "kind" | "value">): Problem | null {
@@ -65,4 +75,21 @@ export function parseLatLng(latRaw: string, lngRaw: string): { lat: number | nul
   if (lat !== null && (!Number.isFinite(lat) || lat < -14 || lat > 6)) return p("lat", ["lat"]);
   if (lng !== null && (!Number.isFinite(lng) || lng < 11 || lng > 32)) return p("lng", ["lng"]);
   return { lat, lng };
+}
+
+/**
+ * Three trimesters splitting a year into equal, back-to-back parts (whole days). A starting point
+ * for a school that has not entered its calendar yet; each term can be edited afterwards.
+ */
+export function threeTerms(y: Pick<AcademicYear, "startsOn" | "endsOn">): { number: number; startsOn: string; endsOn: string }[] {
+  const day = 86_400_000;
+  const a = Date.parse(`${y.startsOn}T00:00:00Z`);
+  const b = Date.parse(`${y.endsOn}T00:00:00Z`);
+  const days = Math.round((b - a) / day) + 1;
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  return [0, 1, 2].map((i) => {
+    const from = a + Math.floor((days * i) / 3) * day;
+    const to = a + (Math.floor((days * (i + 1)) / 3) - 1) * day;
+    return { number: i + 1, startsOn: iso(from), endsOn: iso(to) };
+  });
 }
