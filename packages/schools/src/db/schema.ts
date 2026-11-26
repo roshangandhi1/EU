@@ -113,6 +113,24 @@ export const schoolFeeItems = pgTable("school_fee_items", {
   levels: jsonb("levels").$type<number[]>().notNull(),
   amount: integer("amount_cdf").notNull(),
   dueOn: date("due_on", { mode: "string" }).notNull(),
+  /** The fee plan (recurring fee) that generated this item. */
+  planId: uuid("plan_id"),
+  /** Last day of the period charged; pupils enrolling after it are not charged. */
+  periodEndsOn: date("period_ends_on", { mode: "string" }),
+});
+
+/** Recurring fees: templates that generate one fee item per month, trimester or year. */
+export const schoolFeePlans = pgTable("school_fee_plans", {
+  ...syncColumns(),
+  academicYearId: uuid("academic_year_id").notNull(),
+  name: text("name").notNull(),
+  levels: jsonb("levels").$type<number[]>().notNull(),
+  amount: integer("amount_cdf").notNull(),
+  frequency: text("frequency").notNull(), // one_time | monthly | per_term | per_year
+  dueDay: integer("due_day"),
+  dueOn: date("due_on", { mode: "string" }),
+  startsOn: date("starts_on", { mode: "string" }).notNull(),
+  endsOn: date("ends_on", { mode: "string" }).notNull(),
 });
 
 export const schoolExemptions = pgTable("school_exemptions", {

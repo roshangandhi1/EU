@@ -38,6 +38,7 @@ export interface SchoolData {
   absences: m.Synced<m.Absence>[];
   registers: m.Synced<m.RegisterTaken>[];
   feeItems: m.Synced<m.FeeItem>[];
+  feePlans: m.Synced<m.FeePlan>[];
   exemptions: m.Synced<m.Exemption>[];
   receiptBooks: m.Synced<m.ReceiptBook>[];
   deviceTags: m.Synced<m.DeviceTag>[];
@@ -81,6 +82,7 @@ export async function loadSchool(db: Db, siteId: string): Promise<SchoolData | n
     absences: await all(t.schoolAbsences),
     registers: await all(t.schoolRegisters),
     feeItems: await all(t.schoolFeeItems),
+    feePlans: await all(t.schoolFeePlans),
     exemptions: await all(t.schoolExemptions),
     receiptBooks: await all(t.schoolReceiptBooks),
     deviceTags: await all(t.schoolDeviceTags),

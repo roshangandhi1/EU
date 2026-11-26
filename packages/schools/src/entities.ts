@@ -28,6 +28,7 @@ export const schoolsEntities = [
   defineEntity({ name: "school.classroom", stream: "schools", table: t.schoolClassrooms, schema: m.classroom, policy: "server_authoritative", actions: config, label: { en: "Classroom", fr: "Salle de classe" } }),
   defineEntity({ name: "school.class", stream: "schools", table: t.schoolClasses, schema: m.schoolClass, policy: "server_authoritative", actions: config, label: { en: "Class", fr: "Classe" } }),
   defineEntity({ name: "school.fee_item", stream: "schools", table: t.schoolFeeItems, schema: m.feeItem, policy: "server_authoritative", actions: config, label: { en: "Fee item", fr: "Frais" } }),
+  defineEntity({ name: "school.fee_plan", stream: "schools", table: t.schoolFeePlans, schema: m.feePlan, policy: "server_authoritative", actions: config, label: { en: "Recurring fee", fr: "Frais récurrent" } }),
   defineEntity({ name: "school.device_tag", stream: "schools", table: t.schoolDeviceTags, schema: m.deviceTag, policy: "server_authoritative", actions: config, label: { en: "Phone letter", fr: "Lettre du téléphone" } }),
   defineEntity({ name: "school.receipt_book", stream: "schools", table: t.schoolReceiptBooks, schema: m.receiptBook, policy: "server_authoritative", actions: config, label: { en: "Receipt book", fr: "Carnet de reçus" } }),
   defineEntity({ name: "school.student", stream: "schools", table: t.schoolStudents, schema: m.student, policy: "field_merge", actions: { read: "school.read", write: "student.write" }, label: { en: "Student", fr: "Élève" } }),

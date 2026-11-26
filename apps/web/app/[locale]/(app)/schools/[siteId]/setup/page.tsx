@@ -18,7 +18,7 @@ import { Flash, param, type SP } from "../../flash";
 import { byLevel, classLabel, levelLabel, studentName } from "../labels";
 import { fmtDate } from "../format";
 import * as A from "./actions";
-import { SetupForm, YearAndTerm } from "./setup-form";
+import { PlanPeriodFields, SetupForm, YearAndTerm } from "./setup-form";
 
 /**
  * School setup: one section per kind of record, each with its list and an "Add …" form in place.
@@ -96,6 +96,8 @@ export default async function Setup({ params, searchParams }: { params: Promise<
   const rooms = live(d.classrooms);
   const classes = live(d.classes).sort(byLevel);
   const items = live(d.feeItems);
+  const singleItems = items.filter((i) => !i.planId);
+  const plans = live(d.feePlans);
   const exemptions = live(d.exemptions);
   const places = d.school ? placesAsAt(d.school, d.classrooms, date) : null;
   const students = new Map(d.students.map((s) => [s.id, s]));
@@ -110,7 +112,8 @@ export default async function Setup({ params, searchParams }: { params: Promise<
     { id: "terms", label: tr("setup.term"), n: terms.length },
     { id: "rooms", label: tr("capacity.title"), n: rooms.length },
     { id: "classes", label: tr("setup.classes"), n: classes.length },
-    { id: "fees", label: tr("setup.feeItems"), n: items.length },
+    { id: "fees", label: tr("setup.feeItems"), n: singleItems.length },
+    { id: "plans", label: tr("plan.title"), n: plans.length },
     { id: "books", label: tr("setup.receiptBooks"), n: books.length },
     { id: "phones", label: tr("setup.devices"), n: tags.length },
     { id: "exemptions", label: tr("setup.exemptions"), n: exemptions.length },
@@ -254,10 +257,10 @@ export default async function Setup({ params, searchParams }: { params: Promise<
           {null}
         </Section>
 
-        <Section id="fees" flush icon="coins" title={tr("setup.feeItems")} description={tr("ux.feesDesc")} count={items.length}
+        <Section id="fees" flush icon="coins" title={tr("setup.feeItems")} description={tr("ux.feesDesc")} count={singleItems.length}
           actions={<Link className="btn secondary sm" href={`/${locale}/schools/${p.siteId}/setup/fees`}><Icon name="coins" size={15} />{tr("feeGrid.open")}</Link>}>
           <Flash sp={sp} tr={tr} section="fees" />
-          <Table flush rows={items} rowKey={(r) => r.id} empty={tr("ux.noneYet")} emptyIcon="coins" columns={[
+          <Table flush rows={singleItems} rowKey={(r) => r.id} empty={tr("ux.noneYet")} emptyIcon="coins" columns={[
             { key: "n", header: tr("setup.feeName"), render: (r) => <strong>{r.name}</strong> },
             { key: "t", header: tr("setup.termNumber"), render: (r) => { const tm = terms.find((x) => x.id === r.termId); return tm ? tr("feeGrid.term", { n: tm.number }) : tr("ux.allYear"); } },
             { key: "l", header: tr("setup.levels"), render: (r) => r.levels.join(", ") },
@@ -279,6 +282,45 @@ export default async function Setup({ params, searchParams }: { params: Promise<
             </>;
             const r = under(items);
             return r ? editForm("fees", r.id, A.editFeeItem, fields(r)) : add("fees", tr("ux.addFee"), false, A.addFeeItem, fields());
+          })()}
+        </Section>
+
+        <Section id="plans" flush icon="calendar" title={tr("plan.title")} description={tr("plan.desc")} count={plans.length}>
+          <Flash sp={sp} tr={tr} section="plans" />
+          <Table flush rows={plans} rowKey={(r) => r.id} empty={tr("ux.noneYet")} emptyIcon="calendar" rowClass={editRow} columns={[
+            { key: "n", header: tr("setup.feeName"), render: (r) => <strong>{r.name}</strong> },
+            { key: "f", header: tr("plan.frequency"), render: (r) => tr(`plan.freq.${r.frequency}`) },
+            { key: "p", header: tr("plan.periods"), render: (r) => {
+              const its = items.filter((i) => i.planId === r.id).sort((a, b) => (a.dueOn < b.dueOn ? -1 : 1));
+              return its.length ? <>{its.length} <span className="muted">· {dt(its[0]!.dueOn)}{its.length > 1 ? ` → ${dt(its[its.length - 1]!.dueOn)}` : ""}</span></> : "—";
+            } },
+            { key: "l", header: tr("setup.levels"), render: (r) => r.levels.join(", ") },
+            { key: "y", header: tr("feeGrid.year"), render: (r) => yearLabel(r.academicYearId) },
+            { key: "a", header: tr("plan.amountEach"), numeric: true, render: (r) => formatCdf(r.amount, locale) },
+            { key: "x", header: "", shrink: true, render: (r) => rowActions("plans", "school.fee_plan", r.id) },
+          ]} />
+          {years.length === 0 ? needYear : (() => {
+            const termsByYear = Object.fromEntries(years.map((y) => [y.id, terms.filter((tm) => tm.academicYearId === y.id).map((tm) => tm.number)]));
+            const planText = {
+              year: tr("feeGrid.year"), frequency: tr("plan.frequency"),
+              frequencies: { one_time: tr("plan.freq.one_time"), monthly: tr("plan.freq.monthly"), per_term: tr("plan.freq.per_term"), per_year: tr("plan.freq.per_year") },
+              dueDay: tr("plan.dueDay"), dueDayHint: tr("plan.dueDayHint"), dueOn: tr("setup.dueOn"), startMonth: tr("plan.startMonth"), endMonth: tr("plan.endMonth"),
+              startTerm: tr("plan.startTerm"), endTerm: tr("plan.endTerm"), noTerms: tr("ux.noTermsForYear"), addTerms: tr("ux.addTermsLink"), termsHref: "#terms",
+            };
+            const fields = (r?: (typeof plans)[number]) => {
+              const tStart = r && r.frequency === "per_term" ? terms.find((tm) => tm.academicYearId === r.academicYearId && tm.startsOn === r.startsOn)?.number : undefined;
+              const tEnd = r && r.frequency === "per_term" ? terms.find((tm) => tm.academicYearId === r.academicYearId && tm.endsOn === r.endsOn)?.number : undefined;
+              return <>
+                <Field span={4} label={tr("setup.feeName")} hint={tr("plan.nameHint")}><input name="name" required maxLength={60} placeholder={tr("ph.fee")} defaultValue={r?.name} /></Field>
+                <Field span={4} label={tr("plan.amountEach")} hint={tr("ux.amountHint")} error={tr("ux.amountError")}><input name="amount" inputMode="numeric" pattern="[0-9 ]+" required className="num-input" defaultValue={r?.amount} /></Field>
+                <Field span={4} label={tr("setup.levels")} hint={tr("setup.levelsHint")}><input name="levels" defaultValue={r ? r.levels.join(",") : "1-6"} required /></Field>
+                <PlanPeriodFields years={years.map((y) => ({ id: y.id, label: y.label, startsOn: y.startsOn, endsOn: y.endsOn }))} termsByYear={termsByYear} fixedYear={r?.academicYearId}
+                  text={{ ...planText, terms: { 1: tr("feeGrid.term", { n: 1 }), 2: tr("feeGrid.term", { n: 2 }), 3: tr("feeGrid.term", { n: 3 }) }, preview: tr("plan.preview", { n: "{n}" }) }}
+                  value={r ? { frequency: r.frequency, dueDay: r.dueDay, dueOn: r.dueOn, startsOn: r.startsOn, endsOn: r.endsOn, terms: tStart && tEnd ? { start: tStart, end: tEnd } : undefined } : undefined} />
+              </>;
+            };
+            const r = under(plans);
+            return r ? editForm("plans", r.id, A.editFeePlan, fields(r)) : add("plans", tr("plan.add"), false, A.addFeePlan, fields());
           })()}
         </Section>
 

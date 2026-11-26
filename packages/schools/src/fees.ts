@@ -56,6 +56,11 @@ export interface BalanceYear {
   academicYearId: string;
   /** The school's years, to place unallocated payments and "all items" exemptions in a year. */
   years?: readonly YearRange[];
+  /**
+   * When the pupil enrolled: items for a period that ended before this day (a past month or
+   * trimester) are not charged. Items with no period end (one-off fees) always are.
+   */
+  enrolledOn?: string;
 }
 
 /**
@@ -87,6 +92,7 @@ export function studentBalance(
   });
   const lines: ItemLine[] = items
     .filter((i) => !i.voidedAt && i.levels.includes(level) && inYear(i.academicYearId))
+    .filter((i) => !(year?.enrolledOn && i.periodEndsOn && i.periodEndsOn < year.enrolledOn))
     .sort((a, b) => (a.dueOn < b.dueOn ? -1 : a.dueOn > b.dueOn ? 1 : 0))
     .map((i) => {
       const charged = chargeFor(i, i.id, mine);
@@ -137,13 +143,14 @@ export function enrolmentBalance(
     exemptions: readonly Synced<Exemption>[];
     payments: readonly Synced<Payment>[];
   },
-  e: Pick<Enrolment, "studentId" | "classId" | "academicYearId">,
+  e: Pick<Enrolment, "studentId" | "classId" | "academicYearId"> & Partial<Pick<Enrolment, "enrolledOn">>,
   asAt: string,
 ): StudentBalance {
   const cls = d.classes.find((c) => c.id === e.classId);
   return studentBalance(e.studentId, cls?.level ?? 0, d.feeItems, d.exemptions, d.payments, asAt, {
     academicYearId: cls?.academicYearId ?? e.academicYearId,
     years: d.years,
+    enrolledOn: e.enrolledOn,
   });
 }
 

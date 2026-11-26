@@ -313,6 +313,9 @@ function parseFields(entity: EntityDef, cols: Record<string, AnyDb>, fields: Row
   }
   const values: Row = {};
   for (const [k, v] of Object.entries(res.data as Row)) {
+    // zod fills defaults even in a partial schema: an update must only touch the fields it sent,
+    // otherwise e.g. a class edit without "section" would reset it to "A" (and a fee item's plan link to null).
+    if (mode === "update" && !(k in fields)) continue;
     const col = cols[k];
     if (!col) return { ok: false, reason: `unknown_column:${k}` };
     values[k] = col.dataType === "date" && typeof v === "string" ? new Date(v) : v;

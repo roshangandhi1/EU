@@ -256,6 +256,25 @@ describe("marks on the sync engine", () => {
     expect(resolveScheme(d!.gradingSchemes, SITE)).toMatchObject({ source: "programme", scheme: { passPercent: 60 } });
     expect(resolveSubjects(d!.subjects, SITE, 1).source).toBe("school");
   });
+
+  it("an update changes only the fields it sends (zod defaults must not reset the others)", async () => {
+    const yearId = uuid(), classId = uuid(), itemId = uuid(), planId = uuid(), schemeId = uuid();
+    const upd = (entity: string, recordId: string, fields: Record<string, unknown>) =>
+      ({ mutationId: uuid(), entity, recordId, op: "update" as const, scopeId: SITE, fields, deviceTime: new Date().toISOString() });
+    const r = await push(manager, [
+      ins("school.academic_year", SITE, { label: "2026-2027", startsOn: "2026-09-01", endsOn: "2027-07-02" }, yearId),
+      ins("school.class", SITE, { academicYearId: yearId, level: 7, section: "B", shift: "morning", classroomId: null }, classId),
+      ins("school.fee_item", SITE, { academicYearId: yearId, termId: null, name: "Minerval · Oct 2026", levels: [1], amount: 1000, dueOn: "2026-10-05", planId, periodEndsOn: "2026-10-31" }, itemId),
+      ins("school.grading_scheme", SITE, { ...DRC_SCHEME, name: "CTEB", levels: [7, 8] }, schemeId),
+    ]);
+    expect(r.results.map((x) => x.status)).toEqual(["applied", "applied", "applied", "applied"]);
+    const r2 = await push(manager, [upd("school.class", classId, { shift: "afternoon" }), upd("school.fee_item", itemId, { amount: 1200 }), upd("school.grading_scheme", schemeId, { passPercent: 60 })]);
+    expect(r2.results.map((x) => x.status)).toEqual(["applied", "applied", "applied"]);
+    const d = await loadSchool(db, SITE);
+    expect(d!.classes[0]).toMatchObject({ section: "B", shift: "afternoon", level: 7 });
+    expect(d!.feeItems[0]).toMatchObject({ amount: 1200, planId, periodEndsOn: "2026-10-31" });
+    expect(d!.gradingSchemes[0]).toMatchObject({ passPercent: 60, levels: [7, 8] });
+  });
 });
 
 describe("levels 7 and 8", () => {

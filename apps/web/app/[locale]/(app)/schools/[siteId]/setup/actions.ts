@@ -1,16 +1,16 @@
 "use server";
 import { sites } from "@eu/db";
-import { insertMutation, schoolsEntities, schoolsTables, updateMutation, voidMutation, type SchoolData } from "@eu/schools";
+import { insertMutation, planFeePlanItems, planPeriods, schoolsEntities, schoolsTables, updateMutation, voidMutation, type SchoolData } from "@eu/schools";
 import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/http";
 import { can, firstRejection, int, newId, orNull, parseLevels, push, schoolFor, signedIn, str, today, tr as trFor } from "@/lib/schools";
 import { errorText } from "../../text";
-import { checkBook, checkClass, checkExemption, checkFeeItem, checkRoom, checkTerm, checkYear, parseLatLng, threeTerms, type Problem } from "./checks";
+import { checkBook, checkClass, checkExemption, checkFeeItem, checkFeePlan, checkRoom, checkTerm, checkYear, parseLatLng, threeTerms, type Problem } from "./checks";
 import { dependants } from "./dependants";
 
-const CONFIG = new Set(["school.academic_year", "school.term", "school.classroom", "school.class", "school.fee_item", "school.receipt_book", "school.exemption", "school.device_tag"]);
+const CONFIG = new Set(["school.academic_year", "school.term", "school.classroom", "school.class", "school.fee_item", "school.fee_plan", "school.receipt_book", "school.exemption", "school.device_tag"]);
 
 /** Result of a Setup form: a sentence to show, the fields to outline, or success. */
 export interface SetupState { n?: number; ok?: boolean; okText?: string; message?: string; fields?: string[] }
@@ -146,14 +146,19 @@ export const addClass = form((c, fd) =>
     classroomId: orNull(str(fd, "classroomId")),
   }, (f) => checkClass(f as never, c.d.classes)));
 
+const termEnd = (c: Ctx, termId: string | null) => (termId ? c.d.terms.find((t) => t.id === termId && !t.voidedAt)?.endsOn ?? null : null);
+
 export const addFeeItem = form((c, fd) => {
+  const termId = orNull(str(fd, "termId"));
   const fields = {
     academicYearId: str(fd, "academicYearId"),
-    termId: orNull(str(fd, "termId")),
+    termId,
     name: str(fd, "name"),
     levels: parseLevels(str(fd, "levels")),
     amount: int(fd, "amount"),
     dueOn: str(fd, "dueOn"),
+    planId: null,
+    periodEndsOn: termEnd(c, termId),
   };
   // A term must belong to the year chosen.
   if (fields.termId && !c.d.terms.some((t) => t.id === fields.termId && t.academicYearId === fields.academicYearId)) return Promise.resolve({ code: "termYear", fields: ["termId"] });
@@ -202,7 +207,10 @@ export async function voidConfig(fd: FormData) {
   const d = await schoolFor(me, siteId);
   const dep = dependants(d, entity, id, today());
   if (dep) go({ error: `dep_${dep.kind}`, count: String(dep.count) });
-  const res = await push(me, [voidMutation(entity, siteId, id, str(fd, "reason") || "Removed in setup", newId())]);
+  const reason = str(fd, "reason") || "Removed in setup";
+  // A recurring fee takes its generated items with it (none is in use: checked above).
+  const withItems = entity === "school.fee_plan" ? d.feeItems.filter((f) => !f.voidedAt && f.planId === id).map((f) => voidMutation("school.fee_item", siteId, f.id, reason, newId())) : [];
+  const res = await push(me, [voidMutation(entity, siteId, id, reason, newId()), ...withItems]);
   revalidatePath(`/${locale}/schools/${siteId}`, "layout");
   const bad = firstRejection(res);
   go(bad ? { error: bad } : { ok: "removed" });
@@ -220,8 +228,13 @@ export const editYear = form((c, fd) => {
 export const editTerm = form((c, fd) => {
   const id = str(fd, "editId");
   const prev = c.d.terms.find((t) => t.id === id);
-  return edited(c, "school.term", c.d.terms, id, { academicYearId: prev?.academicYearId ?? "", number: int(fd, "number"), startsOn: str(fd, "startsOn"), endsOn: str(fd, "endsOn") },
-    (f) => checkTerm(f as never, c.d.years, c.d.terms, id));
+  const fields = { academicYearId: prev?.academicYearId ?? "", number: int(fd, "number"), startsOn: str(fd, "startsOn"), endsOn: str(fd, "endsOn") };
+  return edited(c, "school.term", c.d.terms, id, fields, (f) => checkTerm(f as never, c.d.years, c.d.terms, id)).then(async (r) => {
+    if (r !== null || !prev || prev.endsOn === fields.endsOn) return r;
+    // Fees for this trimester charge up to its new last day.
+    const items = c.d.feeItems.filter((f) => !f.voidedAt && f.termId === id && f.periodEndsOn !== fields.endsOn);
+    return items.length ? firstRejection(await push(c.me, items.map((f) => updateMutation("school.fee_item", c.siteId, f.id, { periodEndsOn: fields.endsOn }, newId())))) : null;
+  });
 });
 
 export const editClassroom = form((c, fd) => {
@@ -253,13 +266,15 @@ export const editClass = form((c, fd) => {
 export const editFeeItem = form((c, fd) => {
   const id = str(fd, "editId");
   const prev = c.d.feeItems.find((x) => x.id === id);
+  const termId = orNull(str(fd, "termId"));
   const fields = {
     academicYearId: prev?.academicYearId ?? "",
-    termId: orNull(str(fd, "termId")),
+    termId,
     name: str(fd, "name"),
     levels: parseLevels(str(fd, "levels")),
     amount: int(fd, "amount"),
     dueOn: str(fd, "dueOn"),
+    periodEndsOn: termEnd(c, termId),
   };
   if (fields.termId && !c.d.terms.some((t) => t.id === fields.termId && t.academicYearId === fields.academicYearId)) return Promise.resolve({ code: "termYear", fields: ["termId"] });
   return edited(c, "school.fee_item", c.d.feeItems, id, fields, (f) => checkFeeItem(f as never));
@@ -308,3 +323,81 @@ export async function addThreeTerms(fd: FormData) {
   revalidatePath(`/${locale}/schools/${siteId}`, "layout");
   go(bad ? { error: bad } : { ok: "added" });
 }
+
+
+// ---- Recurring fees (fee plans, item 3): one fee item per month, trimester or year. ----
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const monthEnd = (ym: string) => { const [y, m] = ym.split("-").map(Number) as [number, number]; return `${ym}-${pad2(new Date(Date.UTC(y, m, 0)).getUTCDate())}`; };
+
+/** Reads the plan form: the span comes from months (monthly), trimesters (per trimester) or the whole year. */
+function planFields(c: Ctx, fd: FormData, yearId: string): { fields: Record<string, unknown>; problem?: Problem } {
+  const year = c.d.years.find((y) => y.id === yearId && !y.voidedAt);
+  const frequency = str(fd, "frequency");
+  const terms = c.d.terms.filter((t) => !t.voidedAt && t.academicYearId === yearId);
+  let startsOn = year?.startsOn ?? "", endsOn = year?.endsOn ?? "";
+  let problem: Problem | undefined;
+  if (frequency === "monthly") {
+    const a = str(fd, "startMonth"), b = str(fd, "endMonth");
+    if (!/^\d{4}-\d{2}$/.test(a)) problem = { code: "planMonth", fields: ["startMonth"] };
+    else if (!/^\d{4}-\d{2}$/.test(b)) problem = { code: "planMonth", fields: ["endMonth"] };
+    else {
+      startsOn = `${a}-01` < (year?.startsOn ?? "") ? year!.startsOn : `${a}-01`;
+      endsOn = year && monthEnd(b) > year.endsOn ? year.endsOn : monthEnd(b);
+    }
+  } else if (frequency === "per_term") {
+    const a = terms.find((t) => t.number === Number(str(fd, "startTerm"))), b = terms.find((t) => t.number === Number(str(fd, "endTerm")));
+    if (!a || !b) problem = { code: "planNeedsTerms", fields: ["startTerm"] };
+    else { startsOn = a.startsOn; endsOn = b.endsOn; }
+  }
+  const dueDay = str(fd, "dueDay") === "" ? null : int(fd, "dueDay");
+  const fields = {
+    academicYearId: yearId,
+    name: str(fd, "name"),
+    levels: parseLevels(str(fd, "levels")),
+    amount: int(fd, "amount"),
+    frequency,
+    dueDay: frequency === "monthly" || frequency === "per_term" ? dueDay : null,
+    dueOn: frequency === "one_time" || frequency === "per_year" ? orNull(str(fd, "dueOn")) : null,
+    startsOn,
+    endsOn,
+  };
+  return { fields, problem };
+}
+
+/** Saves a plan (new or edited) and brings its fee items in line, all in one push. */
+async function savePlan(c: Ctx, fd: FormData, id: string | null): Promise<Problem | string | null> {
+  const prev = id ? c.d.feePlans.find((p) => p.id === id && !p.voidedAt) : undefined;
+  if (id && !prev) return "not_found";
+  const yearId = prev?.academicYearId ?? str(fd, "academicYearId");
+  const { fields, problem } = planFields(c, fd, yearId);
+  if (problem) return problem;
+  const def = schoolsEntities.find((e) => e.name === "school.fee_plan")!;
+  const parsed = def.schema.safeParse(fields);
+  if (!parsed.success) return `invalid:${String(parsed.error.issues[0]?.path[0] ?? "")}`;
+  const plan = parsed.data as never as import("@eu/schools").FeePlan;
+  const year = c.d.years.find((y) => y.id === yearId && !y.voidedAt);
+  const bad = checkFeePlan(plan, year);
+  if (bad) return bad;
+  const planId = id ?? newId();
+  const periods = planPeriods(plan, year!, c.d.terms.filter((t) => t.academicYearId === yearId), c.locale);
+  if (periods.length === 0) return { code: "planEmpty", fields: [] };
+  const inUse = (itemId: string) => c.d.payments.some((p) => !p.voidedAt && p.feeItemIds.includes(itemId)) || c.d.exemptions.some((x) => !x.voidedAt && x.feeItemId === itemId);
+  const { ops } = planFeePlanItems(c.d.feeItems, planId, plan, periods, inUse);
+  const muts = [];
+  if (!prev) muts.push(insertMutation("school.fee_plan", c.siteId, fields, { mutationId: newId(), recordId: planId }));
+  else {
+    const changes = changedFields(prev as never, fields);
+    if (Object.keys(changes).length) muts.push(updateMutation("school.fee_plan", c.siteId, planId, changes, newId()));
+  }
+  for (const o of ops) {
+    muts.push(o.op === "create" ? insertMutation("school.fee_item", c.siteId, { ...o.fields }, { mutationId: newId(), recordId: newId() })
+      : o.op === "update" ? updateMutation("school.fee_item", c.siteId, o.id, o.fields, newId())
+      : voidMutation("school.fee_item", c.siteId, o.id, "Period removed from the recurring fee", newId()));
+  }
+  if (muts.length === 0) return null;
+  return firstRejection(await push(c.me, muts));
+}
+
+export const addFeePlan = form((c, fd) => savePlan(c, fd, null));
+export const editFeePlan = form((c, fd) => savePlan(c, fd, str(fd, "editId")));

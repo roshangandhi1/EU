@@ -55,11 +55,13 @@ export async function saveFeeSchedule(fd: FormData) {
     if (any && !/^\d{4}-\d{2}-\d{2}$/.test(due)) back(out, { error: "fee_due" });
     if (due) grid.dues.set(c, due);
   }
-  const ops = planFeeSchedule(d.feeItems, year.id, name, columns, grid);
+  // Trimester fees charge for their trimester (a pupil enrolling after it is not charged).
+  const termEnd = (termId: string | null) => live(d.terms).find((t) => t.id === termId)?.endsOn ?? null;
+  const ops = planFeeSchedule(d.feeItems.filter((i) => !i.planId), year.id, name, columns, grid);
   if (ops.length === 0) back(out, { fee_nothing: "1" });
   const muts: Mutation[] = ops.map((o) =>
     o.op === "create"
-      ? insertMutation("school.fee_item", siteId, { ...o.fields }, { mutationId: newId(), recordId: newId() })
+      ? insertMutation("school.fee_item", siteId, { ...o.fields, planId: null, periodEndsOn: termEnd(o.fields.termId) }, { mutationId: newId(), recordId: newId() })
       : o.op === "update"
         ? updateMutation("school.fee_item", siteId, o.id, o.fields, newId())
         : voidMutation("school.fee_item", siteId, o.id, "Removed in the fee schedule", newId()),
@@ -79,7 +81,8 @@ export async function copyFees(fd: FormData) {
   const src = srcSite === siteId ? d : await schoolFor(me, srcSite!);
   const sy = live(src.years).find((y) => y.id === srcYear);
   if (!sy) back(path, { error: "invalid" });
-  const source = { items: src.feeItems, terms: src.terms, yearId: sy!.id, yearStart: sy!.startsOn };
+  // Recurring fees are not copied item by item (their items belong to the plan).
+  const source = { items: src.feeItems.filter((i) => !i.planId), terms: src.terms, yearId: sy!.id, yearStart: sy!.startsOn };
   // Terms the fees need but this year lacks are created first, with dates moved to this year.
   const newTerms = missingTermsForCopy(source, { terms: d.terms, yearId: year.id, yearStart: year.startsOn }).map((t) => ({
     id: newId(), ...t, scopeId: siteId, deviceTime: new Date().toISOString(), serverTime: null, voidedAt: null,
@@ -90,7 +93,9 @@ export async function copyFees(fd: FormData) {
   const muts = [
     ...addedTerms.map(({ id, academicYearId, number, startsOn, endsOn }) =>
       insertMutation("school.term", siteId, { academicYearId, number, startsOn, endsOn }, { mutationId: newId(), recordId: id })),
-    ...plan.creates.map((f) => insertMutation("school.fee_item", siteId, { ...f }, { mutationId: newId(), recordId: newId() })),
+    ...plan.creates.map((f) => insertMutation("school.fee_item", siteId, {
+      ...f, planId: null, periodEndsOn: [...d.terms, ...newTerms].find((t) => t.id === f.termId)?.endsOn ?? null,
+    }, { mutationId: newId(), recordId: newId() })),
   ];
   const bad = await apply(me, muts, locale, siteId);
   if (bad) back(path, { error: bad });

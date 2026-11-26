@@ -41,6 +41,12 @@ export const schools = {
     prevDay: "Previous day", nextDay: "Next day", tapAbsent: "Tap a pupil to mark them absent. Tap the reason to change it.", savedOffline: "Saved on this phone. It will sync when there is a network.",
     pickStudent: "Choose a pupil", noClasses: "No classes for this year yet. The headteacher adds them in Setup, on the web.", needYear: "No academic year covers today. The headteacher adds it in Setup, on the web.",
     newStudent: "Enrol a new pupil", balanceNow: "Balance today: {amount}", pending: "Not yet synced", notTaken: "{count} class(es) without a register today", noTag: "This phone has no letter for student numbers yet. Ask the headteacher (or the programme team) to assign one in Setup, then sync." },
+  plan: {
+    title: "Recurring fees", desc: "A fee charged every month, every trimester or every year. Each period becomes its own fee item, so payments and balances are tracked per period. Pupils who enrol later are not charged for periods already over.",
+    add: "Add a recurring fee", frequency: "How often", periods: "Periods", amountEach: "Amount per period (FC)", nameHint: "The month or trimester is added to the name, e.g. Minerval · Oct 2026.",
+    freq: { one_time: "Once", monthly: "Every month", per_term: "Every trimester", per_year: "Once a year" },
+    dueDay: "Due on day", dueDayHint: "Day of the month, 1 to 28.", startMonth: "From month", endMonth: "To month", startTerm: "From trimester", endTerm: "To trimester", preview: "{n} monthly fees",
+  },
   feeGrid: { title: "Fee schedule", open: "Open the fee schedule", intro: "One row per level, one column per term. Type the amount in FC for each cell and leave a cell empty for no fee. Saving updates the existing fee items, so payments and exemptions already recorded stay linked.",
     noTerms: "{year} has no trimesters yet, so only whole-year fees can be set.", year: "Academic year", fee: "Fee", newFee: "New fee name", newFeeHint: "e.g. Minerval, Frais d'examen", show: "Show", wholeYear: "Whole year", term: "Term {n}", due: "Due date", yearTotal: "Total for the year",
     save: "Save fee schedule", saved: "Fee schedule saved: {created} new, {updated} changed, {voided} removed.", nothing: "No changes to save.", needDue: "Give a due date for every column that has an amount.", badAmount: "Amounts must be whole francs.",
@@ -88,6 +94,7 @@ export const schools = {
       room: "Classes using this room: {n}. Give them another room first.",
     },
     setup: {
+      planDueDay: "Give the day of the month the fee is due (1 to 28).", planDueOn: "Give the due date.", planOrder: "The end must not be before the start.", planOutsideYear: "The months must be inside the academic year.", planMonth: "Choose a month.", planNeedsTerms: "This year has no trimesters yet. Add them under Terms first.", planEmpty: "No period falls inside these dates.", 
       yearCutsTerm: "Term {n} would fall outside these dates. Change the term first.", termOverlap: "These dates overlap term {n}.", bookCutsReceipts: "{n} receipts already used from this book would fall outside the new range.", 
       label: "Give a label, e.g. 2026-2027.", endBeforeStart: "The end date must be after the start date.", yearOverlap: "These dates overlap the year {label}.",
       termOutsideYear: "The term must fall inside the year {label}.", termTaken: "This year already has a term {n}.", decomBeforeCom: "Out of use must be after in use.",

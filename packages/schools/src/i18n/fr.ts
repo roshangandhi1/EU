@@ -45,6 +45,12 @@ export const schools: Shape<typeof en> = {
     prevDay: "Jour précédent", nextDay: "Jour suivant", tapAbsent: "Touchez un élève pour le marquer absent. Touchez le motif pour le changer.", savedOffline: "Enregistré sur ce téléphone. La synchronisation se fera dès qu'il y aura du réseau.",
     pickStudent: "Choisissez un élève", noClasses: "Aucune classe pour cette année. Le directeur les ajoute dans Paramètres, sur le web.", needYear: "Aucune année scolaire ne couvre aujourd'hui. Le directeur l'ajoute dans Paramètres, sur le web.",
     newStudent: "Inscrire un nouvel élève", balanceNow: "Solde aujourd'hui : {amount}", pending: "Pas encore synchronisé", notTaken: "Classes sans appel aujourd'hui : {count}", noTag: "Ce téléphone n'a pas encore de lettre pour les matricules. Demandez au directeur (ou à l'équipe du programme) d'en attribuer une dans Paramètres, puis synchronisez." },
+  plan: {
+    title: "Frais récurrents", desc: "Des frais à payer chaque mois, chaque trimestre ou chaque année. Chaque période devient une rubrique à part : paiements et soldes sont suivis par période. Un élève inscrit en cours d'année ne paie pas les périodes déjà écoulées.",
+    add: "Ajouter des frais récurrents", frequency: "Fréquence", periods: "Périodes", amountEach: "Montant par période (FC)", nameHint: "Le mois ou le trimestre est ajouté au nom, ex. Minerval · oct. 2026.",
+    freq: { one_time: "Une fois", monthly: "Chaque mois", per_term: "Chaque trimestre", per_year: "Une fois par an" },
+    dueDay: "Échéance le", dueDayHint: "Jour du mois, de 1 à 28.", startMonth: "Du mois", endMonth: "Au mois", startTerm: "Du trimestre", endTerm: "Au trimestre", preview: "{n} échéances mensuelles",
+  },
   feeGrid: { title: "Grille des frais", open: "Ouvrir la grille des frais", intro: "Une ligne par niveau, une colonne par trimestre. Saisissez le montant en FC dans chaque case et laissez vide s'il n'y a pas de frais. L'enregistrement modifie les frais existants : les paiements et exonérations déjà saisis restent liés.",
     noTerms: "{year} n'a pas encore de trimestres : seuls des frais pour toute l'année sont possibles.", year: "Année scolaire", fee: "Frais", newFee: "Nouveau nom de frais", newFeeHint: "ex. Minerval, Frais d'examen", show: "Afficher", wholeYear: "Toute l'année", term: "Trimestre {n}", due: "Échéance", yearTotal: "Total de l'année",
     save: "Enregistrer la grille", saved: "Grille enregistrée. Nouveaux montants : {created} · modifiés : {updated} · supprimés : {voided}.", nothing: "Aucun changement à enregistrer.", needDue: "Indiquez une échéance pour chaque colonne qui a un montant.", badAmount: "Les montants doivent être des francs entiers.",
@@ -92,6 +98,7 @@ export const schools: Shape<typeof en> = {
       room: "Classes qui utilisent cette salle : {n}. Changez-leur de salle d'abord.",
     },
     setup: {
+      planDueDay: "Indiquez le jour d'échéance dans le mois (1 à 28).", planDueOn: "Indiquez la date d'échéance.", planOrder: "La fin ne peut pas précéder le début.", planOutsideYear: "Les mois doivent être dans l'année scolaire.", planMonth: "Choisissez un mois.", planNeedsTerms: "Cette année n'a pas encore de trimestres. Ajoutez-les d'abord sous Trimestres.", planEmpty: "Aucune période ne tombe entre ces dates.", 
       yearCutsTerm: "Le trimestre {n} sortirait de ces dates. Modifiez d'abord le trimestre.", termOverlap: "Ces dates chevauchent le trimestre {n}.", bookCutsReceipts: "{n} reçus déjà utilisés de ce carnet sortiraient de la nouvelle plage.", 
       label: "Indiquez un libellé, ex. 2026-2027.", endBeforeStart: "La date de fin doit être après la date de début.", yearOverlap: "Ces dates chevauchent l'année {label}.",
       termOutsideYear: "Le trimestre doit être compris dans l'année {label}.", termTaken: "Cette année a déjà un trimestre {n}.", decomBeforeCom: "La mise hors service doit être après la mise en service.",

@@ -145,8 +145,40 @@ export const feeItem = z.object({
   levels: z.array(level).min(1),
   amount: cdf,
   dueOn: isoDate,
+  /** The recurring fee (fee plan) that generated this item, if any. */
+  planId: id.nullable().default(null),
+  /**
+   * Last day of the period the item charges for (a month, a trimester, the year). A pupil who
+   * enrols after that day is not charged for it. Null = always charged (e.g. a one-off fee).
+   */
+  periodEndsOn: isoDate.nullable().default(null),
 });
-export type FeeItem = z.infer<typeof feeItem>;
+/** Older records and callers may leave out planId and periodEndsOn (both default to null). */
+export type FeeItem = z.input<typeof feeItem>;
+
+export const feeFrequency = z.enum(["one_time", "monthly", "per_term", "per_year"]);
+export type FeeFrequency = z.infer<typeof feeFrequency>;
+
+/**
+ * A recurring fee ("fee plan"): a template that generates one ordinary fee item per period
+ * (month, trimester or year), so balances and payments are tracked per period with the same rules
+ * as any fee item. Editing the plan updates its items in place.
+ */
+export const feePlan = z.object({
+  academicYearId: id,
+  name: z.string().min(1).max(60),
+  levels: z.array(level).min(1),
+  amount: cdf.refine((n) => n > 0),
+  frequency: feeFrequency,
+  /** Monthly and per trimester: day of the period's first month the fee is due (1-28). */
+  dueDay: z.number().int().min(1).max(28).nullable(),
+  /** One-time and per year: the due date. */
+  dueOn: isoDate.nullable(),
+  /** First and last day of the span the plan covers (periods starting inside it are charged). */
+  startsOn: isoDate,
+  endsOn: isoDate,
+});
+export type FeePlan = z.infer<typeof feePlan>;
 
 export const exemption = z.object({
   studentId: id,

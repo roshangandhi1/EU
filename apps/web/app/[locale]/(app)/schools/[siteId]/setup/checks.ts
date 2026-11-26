@@ -1,4 +1,4 @@
-import type { AcademicYear, Classroom, Exemption, FeeItem, Payment, ReceiptBook, SchoolClass, Synced, Term } from "@eu/schools";
+import type { AcademicYear, Classroom, Exemption, FeeItem, FeePlan, Payment, ReceiptBook, SchoolClass, Synced, Term } from "@eu/schools";
 
 /**
  * Cross-field checks for Setup forms, run before a record is sent. Each problem names the fields
@@ -92,4 +92,14 @@ export function threeTerms(y: Pick<AcademicYear, "startsOn" | "endsOn">): { numb
     const to = a + (Math.floor((days * (i + 1)) / 3) - 1) * day;
     return { number: i + 1, startsOn: iso(from), endsOn: iso(to) };
   });
+}
+
+/** Cross-field checks for a recurring fee: the due day or date its frequency needs, a span in order and inside the year. */
+export function checkFeePlan(f: Pick<FeePlan, "frequency" | "dueDay" | "dueOn" | "startsOn" | "endsOn" | "name">, year: Pick<AcademicYear, "startsOn" | "endsOn"> | undefined): Problem | null {
+  if (!f.name.trim()) return p("feeName", ["name"]);
+  if ((f.frequency === "monthly" || f.frequency === "per_term") && f.dueDay === null) return p("planDueDay", ["dueDay"]);
+  if ((f.frequency === "one_time" || f.frequency === "per_year") && !f.dueOn) return p("planDueOn", ["dueOn"]);
+  if (f.endsOn < f.startsOn) return p("planOrder", f.frequency === "monthly" ? ["endMonth"] : ["endTerm"]);
+  if (year && (f.startsOn < year.startsOn.slice(0, 7) + "-01" || f.endsOn > year.endsOn)) return p("planOutsideYear", f.frequency === "monthly" ? ["startMonth", "endMonth"] : ["startTerm", "endTerm"]);
+  return null;
 }
