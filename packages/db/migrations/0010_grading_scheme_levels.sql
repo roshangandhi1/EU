@@ -1,0 +1,1 @@
+ALTER TABLE "school_grading_schemes" ADD COLUMN "levels" jsonb DEFAULT '[]'::jsonb NOT NULL;

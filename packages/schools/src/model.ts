@@ -48,8 +48,8 @@ export const school = z.object({
 });
 export type School = z.infer<typeof school>;
 
-/** Primary levels: 1ère to 6ème année. */
-export const level = z.number().int().min(1).max(6);
+/** Levels: primary 1re to 6e année, then 7e and 8e (basic education, CTEB). */
+export const level = z.number().int().min(1).max(8);
 
 export const academicYear = z.object({
   label: z.string(), // e.g. "2026-2027"

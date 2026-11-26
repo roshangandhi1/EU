@@ -71,6 +71,13 @@
       "when": 1795748400000,
       "tag": "0009_password_change",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795748460000,
+      "tag": "0010_grading_scheme_levels",
+      "breakpoints": true
     }
   ]
 }

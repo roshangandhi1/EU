@@ -1,7 +1,7 @@
 import type { FeeItem, Synced, Term } from "./model";
 
-/** The levels a primary school grid shows. */
-export const LEVELS = [1, 2, 3, 4, 5, 6] as const;
+/** Every level a school can have: primary 1-6, then 7-8 (basic education). */
+export const LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 /** Column key: a term id, or "year" for whole-year fees. */
 export const colKey = (termId: string | null) => termId ?? "year";

@@ -77,14 +77,14 @@ export function int(fd: FormData, key: string): number | null {
 
 export const orNull = (s: string) => (s === "" ? null : s);
 
-/** Parses "1-6" or "1,2,3" into levels 1..6. */
+/** Parses "1-6" or "1,2,3" into levels 1..8. */
 export function parseLevels(s: string): number[] {
   const out = new Set<number>();
   for (const part of s.split(",").map((p) => p.trim()).filter(Boolean)) {
     const [a, b] = part.split("-").map((x) => Number(x.trim()));
     if (a === undefined || !Number.isInteger(a)) continue;
     const end = b !== undefined && Number.isInteger(b) ? b : a;
-    for (let i = Math.min(a, end); i <= Math.max(a, end); i++) if (i >= 1 && i <= 6) out.add(i);
+    for (let i = Math.min(a, end); i <= Math.max(a, end); i++) if (i >= 1 && i <= 8) out.add(i);
   }
   return [...out].sort();
 }

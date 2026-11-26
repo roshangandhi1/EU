@@ -161,6 +161,8 @@ export const schoolDeviceTags = pgTable("school_device_tags", {
 export const schoolGradingSchemes = pgTable("school_grading_schemes", {
   ...syncColumns(),
   name: text("name").notNull(),
+  /** Class levels this scheme grades; empty = the scope's fallback for every other level. */
+  levels: jsonb("levels").$type<number[]>().notNull().default([]),
   /** One entry per trimester: how many periods, and whether it ends with an exam. */
   terms: jsonb("terms").$type<{ periods: number; exam: boolean }[]>().notNull(),
   /** Exam maximum = period maximum × this factor. */
