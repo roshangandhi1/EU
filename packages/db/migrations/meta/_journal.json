@@ -85,6 +85,13 @@
       "when": 1795748520000,
       "tag": "0011_fee_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795748580000,
+      "tag": "0012_receipt_codes",
+      "breakpoints": true
     }
   ]
 }

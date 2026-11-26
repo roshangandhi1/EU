@@ -56,7 +56,7 @@ export function checkBook(f: Pick<ReceiptBook, "firstNumber" | "lastNumber">, bo
   if (clash) return p("bookOverlap", ["firstNumber", "lastNumber"], { first: clash.firstNumber, last: clash.lastNumber });
   // Editing a book: receipts already used from it must stay inside the new range.
   const old = self ? books.find((b) => b.id === self) : undefined;
-  const lost = old ? liveRows(payments).filter((x) => x.receiptNumber >= old.firstNumber && x.receiptNumber <= old.lastNumber && (x.receiptNumber < f.firstNumber || x.receiptNumber > f.lastNumber)) : [];
+  const lost = old ? liveRows(payments).filter((x) => x.receiptNumber !== null && x.receiptNumber >= old.firstNumber && x.receiptNumber <= old.lastNumber && (x.receiptNumber < f.firstNumber || x.receiptNumber > f.lastNumber)) : [];
   return lost.length ? p("bookCutsReceipts", ["firstNumber", "lastNumber"], { n: lost.length }) : null;
 }
 

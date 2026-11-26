@@ -45,6 +45,8 @@ export const school = z.object({
   locale,
   /** Shifts this school actually runs. Places are only counted for shifts listed here. */
   shiftsRunning: z.array(shift).min(1),
+  /** Every payment must carry a paper receipt number from the school's books (default yes). */
+  paperReceiptRequired: z.boolean().optional(),
 });
 export type School = z.infer<typeof school>;
 
@@ -215,7 +217,14 @@ export const payment = z.object({
   studentId: id,
   paidOn: isoDate,
   amount: cdf.positive(),
-  receiptNumber: z.number().int().positive().max(MAX_INT),
+  /** Number printed on the paper receipt. Optional where the school does not require paper receipts. */
+  receiptNumber: z.number().int().positive().max(MAX_INT).nullable(),
+  /**
+   * System receipt number, generated on every payment: school code, the letter of the phone (W on
+   * the web), a running count, e.g. KIA-W-0042. Unique per school even when phones are offline.
+   * Absent only on payments from older phone apps.
+   */
+  receiptCode: z.string().min(3).max(40).nullable().optional(),
   /** Fee items this payment is allocated to, in order; any remainder is credit. */
   feeItemIds: z.array(id),
 });

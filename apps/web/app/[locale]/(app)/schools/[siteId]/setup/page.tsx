@@ -147,6 +147,9 @@ export default async function Setup({ params, searchParams }: { params: Promise<
                 <Chip name="shiftsRunning" value="morning" label={tr("shift.morning")} defaultChecked={d.school?.shiftsRunning.includes("morning")} />
                 <Chip name="shiftsRunning" value="afternoon" label={tr("shift.afternoon")} defaultChecked={d.school?.shiftsRunning.includes("afternoon")} />
               </ChoiceGroup>
+              <ChoiceGroup span={6} legend={tr("fees.paperNumber")} hint={tr("fees.paperRequiredHint")}>
+                <Chip name="paperReceiptRequired" value="1" label={tr("fees.paperRequiredSetting")} defaultChecked={d.school?.paperReceiptRequired !== false} />
+              </ChoiceGroup>
             </Fields>
           </SetupForm>
         </Section>

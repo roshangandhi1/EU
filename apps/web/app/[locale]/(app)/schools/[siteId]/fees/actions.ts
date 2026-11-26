@@ -1,5 +1,5 @@
 "use server";
-import { checkReceiptNumber, insertMutation, payment as paymentSchema, voidMutation } from "@eu/schools";
+import { checkReceiptNumber, insertMutation, nextReceiptCode, payment as paymentSchema, receiptLabel, voidMutation } from "@eu/schools";
 import { revalidatePath } from "next/cache";
 import { back, can, firstRejection, int, newId, push, schoolFor, signedIn, str, today } from "@/lib/schools";
 
@@ -8,24 +8,37 @@ export async function recordPayment(fd: FormData) {
   const siteId = str(fd, "siteId");
   const path = `/${locale}/schools/${siteId}/fees`;
   const d = await schoolFor(me, siteId);
+  const paperRequired = d.school?.paperReceiptRequired !== false;
   const fields = {
     studentId: str(fd, "studentId"),
     paidOn: str(fd, "paidOn") || today(),
     amount: int(fd, "amount"),
-    receiptNumber: int(fd, "receiptNumber"),
+    receiptNumber: str(fd, "receiptNumber") ? int(fd, "receiptNumber") : null,
+    receiptCode: d.school ? nextReceiptCode(d.school.code, "W", d.payments) : null,
     feeItemIds: fd.getAll("feeItemIds").map(String).filter(Boolean),
   };
   // A refused payment comes back with what was typed (as query values the form reads back).
   const typed = { studentId: str(fd, "studentId"), amount: str(fd, "amount"), receiptNumber: str(fd, "receiptNumber"), paidOn: str(fd, "paidOn") };
   if (!paymentSchema.safeParse(fields).success || !d.students.some((s) => s.id === fields.studentId && !s.voidedAt)) back(path, { error: "invalid", ...typed });
-  const problem = checkReceiptNumber(fields.receiptNumber!, me.user.id, d.receiptBooks, d.payments);
-  // Programme staff entering on behalf of a school are not tied to a receipt book; duplicates are still refused.
-  if (problem === "already_used" || (problem === "not_in_assigned_book" && !can(me, "payment.any_receipt", siteId))) back(path, { error: problem!, ...typed });
-  const res = await push(me, [insertMutation("school.payment", siteId, fields, { mutationId: newId(), recordId: newId() })]);
+  if (fields.receiptNumber === null && paperRequired) back(path, { error: "paper_receipt_required", ...typed });
+  if (fields.receiptNumber !== null) {
+    const problem = checkReceiptNumber(fields.receiptNumber!, me.user.id, d.receiptBooks, d.payments);
+    // Programme staff entering on behalf of a school are not tied to a receipt book; duplicates are still refused.
+    if (problem === "already_used" || (problem === "not_in_assigned_book" && !can(me, "payment.any_receipt", siteId))) back(path, { error: problem!, ...typed });
+  }
+  const send = (f: typeof fields) => push(me, [insertMutation("school.payment", siteId, f, { mutationId: newId(), recordId: newId() })]);
+  let res = await send(fields);
+  let bad = firstRejection(res);
+  // Another web user took the same system number a moment ago: take the next one.
+  if (bad === "receipt_code_taken" && d.school) {
+    const fresh = await schoolFor(me, siteId);
+    fields.receiptCode = nextReceiptCode(d.school.code, "W", fresh.payments);
+    res = await send(fields);
+    bad = firstRejection(res);
+  }
   revalidatePath(`/${locale}/schools/${siteId}`, "layout");
-  const bad = firstRejection(res);
   // After a save the date stays (a day's receipts are usually typed in one go); the receipt number moves on.
-  back(path, bad ? { error: bad, ...typed } : { ok: "paid", num: String(fields.receiptNumber), paidOn: fields.paidOn });
+  back(path, bad ? { error: bad, ...typed } : { ok: "paid", num: fields.receiptCode ?? String(fields.receiptNumber), paidOn: fields.paidOn });
 }
 
 export async function voidPayment(fd: FormData) {
@@ -58,7 +71,7 @@ export async function correctPayment(fd: FormData) {
   const bad = firstRejection(res);
   if (bad) back(path, { error: bad });
   back(path, {
-    ok: "corrected", num: String(pay!.receiptNumber), studentId: pay!.studentId, amount: String(pay!.amount),
-    receiptNumber: String(pay!.receiptNumber), paidOn: pay!.paidOn, items: pay!.feeItemIds.join(","),
+    ok: "corrected", num: receiptLabel(pay!), studentId: pay!.studentId, amount: String(pay!.amount),
+    receiptNumber: pay!.receiptNumber === null ? "" : String(pay!.receiptNumber), paidOn: pay!.paidOn, items: pay!.feeItemIds.join(","),
   });
 }

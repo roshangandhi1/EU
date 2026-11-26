@@ -111,6 +111,8 @@ export const saveSchool = form(async (c, fd) => {
   const changes: Record<string, unknown> = {};
   if (code !== c.d.school.code) changes.code = code;
   if (shiftsRunning.join() !== c.d.school.shiftsRunning.join()) changes.shiftsRunning = shiftsRunning;
+  const paperReceiptRequired = fd.get("paperReceiptRequired") === "1";
+  if (paperReceiptRequired !== (c.d.school.paperReceiptRequired !== false)) changes.paperReceiptRequired = paperReceiptRequired;
   if (Object.keys(changes).length) {
     const bad = firstRejection(await push(c.me, [updateMutation("school.school", c.siteId, c.d.school.id, changes, newId())]));
     if (bad) return bad;

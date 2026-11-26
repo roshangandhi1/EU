@@ -227,8 +227,8 @@ describe("fees", () => {
     const ps = [pay(1000, 110), pay(2000, 110), pay(3000, 111, { paidOn: "2026-11-16" })];
     expect([...duplicateReceipts(ps).keys()]).toEqual([110]);
     expect(dailyCollections(ps, "2026-11-01", "2026-11-30")).toEqual([
-      { date: "2026-11-15", count: 2, total: 3000, firstReceipt: 110, lastReceipt: 110 },
-      { date: "2026-11-16", count: 1, total: 3000, firstReceipt: 111, lastReceipt: 111 },
+      { date: "2026-11-15", count: 2, total: 3000, firstReceipt: 110, lastReceipt: 110, firstCode: null, lastCode: null },
+      { date: "2026-11-16", count: 1, total: 3000, firstReceipt: 111, lastReceipt: 111, firstCode: null, lastCode: null },
     ]);
   });
 

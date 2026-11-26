@@ -27,7 +27,7 @@ export function dependants(d: SchoolData, entity: string, id: string, date: stri
     }
     case "school.receipt_book": {
       const b = d.receiptBooks.find((x) => x.id === id);
-      return b ? hit("book", live(d.payments).filter((p) => p.receiptNumber >= b.firstNumber && p.receiptNumber <= b.lastNumber).length) : null;
+      return b ? hit("book", live(d.payments).filter((p) => p.receiptNumber !== null && p.receiptNumber >= b.firstNumber && p.receiptNumber <= b.lastNumber).length) : null;
     }
     case "school.classroom":
       return hit("room", live(d.classes).filter((c) => c.classroomId === id).length);

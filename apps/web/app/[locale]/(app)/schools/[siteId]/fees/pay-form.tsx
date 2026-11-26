@@ -62,8 +62,8 @@ export function PayForm({ locale, siteId, pupils, items, d, l }: {
             </span>
           )}
         </Field>
-        <Field span={3} label={l.receipt!} hint={l.receiptHint} error={l.numberError}>
-          <input name="receiptNumber" inputMode="numeric" required pattern="[0-9]+" className="num-input" defaultValue={d.receiptNumber} />
+        <Field span={3} label={l.receipt!} hint={l.receiptHint} error={l.numberError} optional={l.paperRequired ? undefined : l.optional}>
+          <input name="receiptNumber" inputMode="numeric" required={!!l.paperRequired} pattern="[0-9]+" className="num-input" defaultValue={d.receiptNumber} />
         </Field>
         <Field span={3} label={l.paidOn!}><input name="paidOn" type="date" defaultValue={d.paidOn || d.today} max={d.today} required /></Field>
         {picked && (
@@ -81,7 +81,7 @@ export function PayForm({ locale, siteId, pupils, items, d, l }: {
           </ChoiceGroup>
         )}
       </Fields>
-      <FormFooter><SubmitButton icon="check" pending={l.saving}>{l.save}</SubmitButton></FormFooter>
+      <FormFooter><span className="muted small">{l.systemHint}</span><SubmitButton icon="check" pending={l.saving}>{l.save}</SubmitButton></FormFooter>
     </form>
   );
 }

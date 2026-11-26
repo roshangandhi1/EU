@@ -1,4 +1,4 @@
-import { activeOn, currentYear, dailyCollections, duplicateReceipts, formatCdf, live, enrolmentBalance } from "@eu/schools";
+import { activeOn, currentYear, dailyCollections, duplicateReceipts, formatCdf, live, enrolmentBalance, matchesReceipt, newestFirst, receiptLabel } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Field, Fields, FormFooter, Notice, RowMenu, Section, SubmitButton, Table } from "@/components/ui";
@@ -36,9 +36,10 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
   const dupes = [...duplicateReceipts(d.payments).keys()];
   const pq = param(sp, "pq").toLowerCase();
   const recent = [...d.payments]
-    .filter((r) => { if (!pq) return true; const s = students.get(r.studentId); return String(r.receiptNumber) === pq || (!!s && (studentName(s).toLowerCase().includes(pq) || s.studentNumber.toLowerCase().includes(pq))); })
-    .sort((a, b) => (a.paidOn < b.paidOn ? 1 : a.paidOn > b.paidOn ? -1 : b.receiptNumber - a.receiptNumber))
+    .filter((r) => { if (!pq) return true; const s = students.get(r.studentId); return matchesReceipt(r, pq) || (!!s && (studentName(s).toLowerCase().includes(pq) || s.studentNumber.toLowerCase().includes(pq))); })
+    .sort(newestFirst)
     .slice(0, pq ? 200 : 50);
+  const paperRequired = d.school?.paperReceiptRequired !== false;
   const canPay = can(me, "payment.write", p.siteId);
   const canVoid = can(me, "payment.void", p.siteId);
   const canConfigure = can(me, "school.configure", p.siteId);
@@ -56,7 +57,8 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
   const payKey = `${param(sp, "ok")}-${param(sp, "num")}-${param(sp, "error")}-${param(sp, "studentId")}`;
   const pl = {
     student: tr("fees.student"), pickHint: tr("pay.pickHint"), change: tr("pay.change"), searchPupil: tr("pay.search"), noMatch: tr("pay.noMatch"),
-    receipt: tr("fees.receiptNumber"), receiptHint: ranges ? tr("pay.yourBooks", { ranges }) : tr("ux.receiptHint"), numberError: tr("ux.numberError"),
+    receipt: tr("fees.paperNumber"), receiptHint: paperRequired ? (ranges ? tr("pay.yourBooks", { ranges }) : tr("ux.receiptHint")) : tr("fees.paperOptional"), paperRequired: paperRequired ? "1" : "",
+    systemHint: tr("fees.systemReceiptHint"), numberError: tr("ux.numberError"),
     colon: C, paidOn: tr("fees.paidOn"), balanceNow: tr("pay.balance"), overdue: tr("fees.overdue"), amount: tr("fees.amount"), amountHint: tr("ux.amountHint"),
     amountError: tr("ux.amountError"), items: tr("setup.feeItems"), optional: tr("common.optional"), itemsHint: tr("ux.feeItemsHint"), saving, save: tr("fees.payment"),
   };
@@ -79,12 +81,12 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
       <Flash sp={sp} tr={tr} />
       {dupes.length > 0 && <Notice tone="warning">{tr("fees.duplicates", { numbers: dupes.join(", ") })}</Notice>}
       {!year && <NotSetUp me={me} siteId={p.siteId} locale={locale} what="fees" />}
-      {canPay && myBooks.length === 0 && !anyReceipt && (
+      {canPay && paperRequired && myBooks.length === 0 && !anyReceipt && (
         <Notice tone="warning">
           {canConfigure ? <>{tr("pay.noBookCan")} <Link href={`${base}/setup#books`}>{tr("pay.noBookLink")}</Link></> : tr("pay.noBookAsk")}
         </Notice>
       )}
-      {canPay && myBooks.length > 0 && suggested === null && <Notice tone="warning">{tr("pay.booksFull", { ranges })}</Notice>}
+      {canPay && paperRequired && myBooks.length > 0 && suggested === null && <Notice tone="warning">{tr("pay.booksFull", { ranges })}</Notice>}
       {canPay && (
         <Section id="pay" icon="receipt" title={tr("fees.payment")} description={tr("ux.payIntro")}>
           <PayForm key={payKey} locale={locale} siteId={p.siteId} l={pl}
@@ -138,7 +140,7 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
             emptyIcon="coins"
             columns={[
               { key: "date", header: tr("common.date"), render: (r) => fmtDate(r.date, locale) },
-              { key: "count", header: tr("fees.receipts"), numeric: true, render: (r) => <>{r.count} <span className="muted">({r.firstReceipt}–{r.lastReceipt})</span></> },
+              { key: "count", header: tr("fees.receipts"), numeric: true, render: (r) => <>{r.count} <span className="muted">({r.firstCode ? `${r.firstCode} – ${r.lastCode}` : `${r.firstReceipt}–${r.lastReceipt}`})</span></> },
               { key: "total", header: tr("common.total"), numeric: true, render: (r) => <strong>{fc(r.total)}</strong> },
             ]}
           />
@@ -161,7 +163,8 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
           columns={[
             { key: "name", header: tr("fees.student"), render: (r) => { const s = students.get(r.studentId); return s ? <Link className="row-link" href={`${base}/students/${s.id}#fees`}><strong>{studentName(s)}</strong></Link> : tr("pupil.removed"); } },
             { key: "date", header: tr("common.date"), render: (r) => fmtDate(r.paidOn, locale) },
-            { key: "receipt", header: tr("fees.receiptNumber"), numeric: true, render: (r) => r.receiptNumber },
+            { key: "receipt", header: tr("fees.receiptCode"), render: (r) => <span className="mono">{receiptLabel(r)}</span> },
+            { key: "paper", header: tr("fees.paperNumber"), numeric: true, render: (r) => (r.receiptCode && r.receiptNumber !== null ? r.receiptNumber : <span className="muted">—</span>) },
             { key: "amount", header: tr("fees.amount"), numeric: true, render: (r) => (r.voidedAt ? <s>{fc(r.amount)}</s> : <strong>{fc(r.amount)}</strong>) },
             {
               key: "void",
@@ -172,11 +175,11 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
                   <span className="pay-row-actions">
                     {canPay && (
                       <RowMenu label={tr("pay.correct")} icon="wrench">
-                        {voidForm(r, correctPayment, tr("pay.correctTitle", { n: r.receiptNumber }), tr("pay.correctHint"), tr("pay.correctGo"))}
+                        {voidForm(r, correctPayment, tr("pay.correctTitle", { n: receiptLabel(r) }), tr("pay.correctHint"), tr("pay.correctGo"))}
                       </RowMenu>
                     )}
                     <RowMenu label={tr("fees.void")} icon="x" tone="danger">
-                      {voidForm(r, voidPayment, tr("ux.voidTitle", { n: r.receiptNumber }), tr("ux.voidHint"), tr("fees.void"))}
+                      {voidForm(r, voidPayment, tr("ux.voidTitle", { n: receiptLabel(r) }), tr("ux.voidHint"), tr("fees.void"))}
                     </RowMenu>
                   </span>
                 ) : null,

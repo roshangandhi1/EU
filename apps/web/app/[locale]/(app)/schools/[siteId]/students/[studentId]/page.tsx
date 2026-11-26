@@ -1,4 +1,4 @@
-import { activeOn, formatCdf, live, enrolmentBalance } from "@eu/schools";
+import { activeOn, formatCdf, live, enrolmentBalance, newestFirst, receiptLabel } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -47,7 +47,7 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
   // Fee statement for the enrolment's year: what is charged, what was paid with which receipt, exemptions.
   const items = e ? d.feeItems.filter((i) => i.academicYearId === e.academicYearId) : [];
   const bal = cls && e ? enrolmentBalance(d, e, date) : null;
-  const payments = d.payments.filter((x) => x.studentId === s.id).sort((a, b) => (a.paidOn < b.paidOn ? 1 : a.paidOn > b.paidOn ? -1 : b.receiptNumber - a.receiptNumber));
+  const payments = d.payments.filter((x) => x.studentId === s.id).sort(newestFirst);
   const exemptions = live(d.exemptions).filter((x) => x.studentId === s.id);
 
   // Attendance this enrolment: registers taken for the class since enrolment, and this pupil's absences.
@@ -166,7 +166,7 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
           <h3 className="fgroup pupil-sub">{tr("pupil.payments")}</h3>
           <Table flush rows={payments} rowKey={(r) => r.id} empty={tr("ux.noPayments")} emptyIcon="receipt" rowClass={(r) => (r.voidedAt ? "voided" : undefined)} columns={[
             { key: "d", header: tr("common.date"), render: (r) => fmtDate(r.paidOn, locale) },
-            { key: "r", header: tr("fees.receiptNumber"), numeric: true, render: (r) => r.receiptNumber },
+            { key: "r", header: tr("fees.receiptCode"), render: (r) => <span className="mono">{receiptLabel(r)}</span> },
             { key: "a", header: tr("fees.amount"), numeric: true, render: (r) => (r.voidedAt ? <s>{fc(r.amount)}</s> : <strong>{fc(r.amount)}</strong>) },
             { key: "v", header: "", render: (r) => (r.voidedAt ? <span className="pill bad">{tr("fees.voided")}{r.voidReason ? `${C}${r.voidReason}` : ""}</span> : null) },
           ]} />

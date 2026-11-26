@@ -178,7 +178,7 @@ export async function loadDemo(userCtx: SyncContext): Promise<DemoResult> {
     const bookFirst = 1001;
     const paid: Mutation[] = [ins("school.receipt_book", schoolId, { firstNumber: bookFirst, lastNumber: bookFirst + 99, assignedTo: ctx.user.id })];
     pupilRows.slice(0, 18).forEach((pr, i) => paid.push(ins("school.payment", schoolId, {
-      studentId: pr.studentId, paidOn: days[i % days.length], amount: i % 3 === 0 ? 7_500 : 15_000, receiptNumber: bookFirst + i, feeItemIds: [feeId],
+      studentId: pr.studentId, paidOn: days[i % days.length], amount: i % 3 === 0 ? 7_500 : 15_000, receiptNumber: bookFirst + i, receiptCode: `${run === 1 ? "DEMO" : `DEMO${run}`}-W-${String(i + 1).padStart(4, "0")}`, feeItemIds: [feeId],
     })));
     await softPush(paid);
     created.push(`school ${schoolId}`);

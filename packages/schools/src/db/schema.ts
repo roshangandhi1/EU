@@ -14,6 +14,8 @@ export const schoolSchools = pgTable("school_schools", {
   code: text("code").notNull(),
   locale: text("locale").notNull().default("fr"),
   shiftsRunning: jsonb("shifts_running").$type<string[]>().notNull(),
+  /** Whether every payment must carry the number of a paper receipt from the school's books. */
+  paperReceiptRequired: boolean("paper_receipt_required").notNull().default(true),
 });
 
 export const schoolAcademicYears = pgTable("school_academic_years", {
@@ -156,10 +158,13 @@ export const schoolPayments = pgTable(
     studentId: uuid("student_id").notNull(),
     paidOn: date("paid_on", { mode: "string" }).notNull(),
     amount: integer("amount_cdf").notNull(),
-    receiptNumber: integer("receipt_number").notNull(),
+    /** Paper receipt number (optional where the school does not require paper receipts). */
+    receiptNumber: integer("receipt_number"),
+    /** System receipt number, e.g. KIA-W-0042: school code, the device's letter, a running count. */
+    receiptCode: text("receipt_code"),
     feeItemIds: jsonb("fee_item_ids").$type<string[]>().notNull().default([]),
   },
-  (t) => [index("school_payments_student").on(t.studentId), index("school_payments_receipt").on(t.scopeId, t.receiptNumber)],
+  (t) => [index("school_payments_student").on(t.studentId), index("school_payments_receipt").on(t.scopeId, t.receiptNumber), index("school_payments_code").on(t.scopeId, t.receiptCode)],
 );
 
 /** Per-school letter for each phone's offline student numbers. */

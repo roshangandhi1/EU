@@ -182,7 +182,7 @@ describe("a month at École Luniemu", () => {
 
     // An assessor's cut-off of 31 October excludes the payment that only reached the server on 3 November.
     const ev = splitAsAt(d.payments, "2026-10-31", "evidence");
-    expect(ev.counted.map((p) => p.receiptNumber).sort((x, y) => x - y)).toEqual([1, 51, 52]);
+    expect(ev.counted.map((p) => p.receiptNumber).sort((x, y) => x! - y!)).toEqual([1, 51, 52]);
     expect(ev.lateSynced.map((p) => p.receiptNumber)).toEqual([2]);
     expect(splitAsAt(d.payments, "2026-10-31", "operational").counted).toHaveLength(4);
   });
