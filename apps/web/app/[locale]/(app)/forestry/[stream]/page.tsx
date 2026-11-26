@@ -17,7 +17,8 @@ import { plotExtras } from "@/lib/plot-detail";
 import { publishLabels } from "@/lib/publish-labels";
 import { fmtEur, fmtNum, tn } from "@/lib/format";
 import { titled } from "@/lib/meta";
-import { INDICATORS, milestone } from "@/lib/indicator-defs";
+import { INDICATORS } from "@/lib/indicator-defs";
+import { loadPeriods, milestone, pickPeriods } from "@/lib/periods";
 
 export const dynamic = "force-dynamic";
 export const generateMetadata = titled((l, p) => t(l, p.stream === "miombo" ? "ui.nav.miombo" : "ui.nav.bamboo"));
@@ -44,6 +45,8 @@ export default async function ForestryStreamPage({ params, searchParams }: {
   const [{ plots, inputs }, settings] = await Promise.all([loadStream(db(), s), loadSettings(db(), s)]);
   const result = computeIndicator(inputs, asAt, mode, { ...rulesFrom(s, settings), photoUploadedAt: await photoUploads(db(), inputs) });
   const target = TARGETS[s];
+  const periods = await loadPeriods(db());
+  const { next } = pickPeriods(periods);
   const unit = UNIT_EUR[target.code as keyof typeof UNIT_EUR];
   const late = result.plots.reduce((n, p) => n + p.lateSynced.length, 0);
   const canImport = permissions.can(me.user, fa(s, "import.run"), { stream: s });
@@ -80,7 +83,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
         <dl>
           <div><dt>{t(locale, "forestry.ha_counted")}</dt><dd className="big">{fmt(result.hectaresCounted)}</dd></div>
           <div><dt>{t(locale, "forestry.value_eur")}</dt><dd>{fmtEur(result.hectaresCounted * unit, locale)}</dd></div>
-          <div><dt>{t(locale, "forestry.milestone_2027")}</dt><dd>{fmt(milestone(target), 0)}</dd></div>
+          <div><dt>{t(locale, "forestry.milestone_2027")}</dt><dd>{next ? fmt(milestone(periods, next.n, target.code), 0) : "–"}</dd></div>
           <div><dt>{t(locale, "forestry.target_2030")}</dt><dd>{fmt(target.finalTarget, 0)}</dd></div>
           <div><dt>{t(locale, "forestry.ha_pipeline")}</dt><dd>{fmt(result.hectaresPipeline)}</dd></div>
           {s === "miombo" && <div><dt>{t(locale, "forestry.regenerating_ha")}</dt><dd>{fmt(miomboRegeneratingHa(result))}</dd></div>}
