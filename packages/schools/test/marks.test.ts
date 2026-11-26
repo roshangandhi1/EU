@@ -6,7 +6,7 @@ import { handlePush } from "@eu/sync/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   DRC_SCHEME, classResults, createSchoolSite, defaultSubjects, formatScore, loadSchool, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
-  planMarks, planSubjects, readScore, resolveScheme, resolveSubjects, schemeChanges, schoolsActions, schoolsEntities, subjectCode,
+  planMarks, planSubjects, readScore, resolveScheme, resolveSubjects, schemeChanges, schemeLevelClash, schoolsActions, schoolsEntities, subjectCode,
   type GradingScheme, type Mark, type Subject, type Synced,
 } from "../src";
 
@@ -36,6 +36,35 @@ describe("grading scheme", () => {
     expect(resolveScheme([prog, own], "s1")).toMatchObject({ source: "school", scheme: { name: "School" } });
     expect(resolveScheme([prog, { ...own, voidedAt: "2026-10-02T00:00:00Z" }], "s1").source).toBe("programme");
     expect(resolveScheme([prog, own], "s2").source).toBe("programme");
+  });
+
+  it("several schemes per school: each level uses the scheme that lists it, else the fallback (item 4)", () => {
+    const primary = { ...DRC_SCHEME, name: "Primary", levels: [1, 2, 3, 4, 5, 6], ...meta("a", "s1") } as Synced<GradingScheme>;
+    const cteb = { ...DRC_SCHEME, name: "CTEB", levels: [7, 8], passPercent: 60, ...meta("b", "s1") } as Synced<GradingScheme>;
+    const rest = { ...DRC_SCHEME, name: "Rest", levels: [], ...meta("c", "s1") } as Synced<GradingScheme>;
+    const prog = { ...DRC_SCHEME, name: "Programme 7-8", levels: [7, 8], ...meta("p", "schools") } as Synced<GradingScheme>;
+    expect(resolveScheme([primary, cteb], "s1", 3).scheme.name).toBe("Primary");
+    expect(resolveScheme([primary, cteb], "s1", 8)).toMatchObject({ source: "school", scheme: { name: "CTEB", passPercent: 60 } });
+    // A level no school scheme lists: the school's fallback, then the programme, then DRC.
+    expect(resolveScheme([cteb, rest], "s1", 2).scheme.name).toBe("Rest");
+    expect(resolveScheme([primary, prog], "s1", 7)).toMatchObject({ source: "programme", scheme: { name: "Programme 7-8" } });
+    expect(resolveScheme([primary], "s1", 7).source).toBe("default");
+    // Old records without levels still act as the school-wide scheme.
+    const legacy = { ...DRC_SCHEME, name: "Old", ...meta("o", "s1") } as Synced<GradingScheme>;
+    delete (legacy as Partial<GradingScheme>).levels;
+    expect(resolveScheme([legacy], "s1", 5).scheme.name).toBe("Old");
+  });
+
+  it("a level cannot be in two schemes, and only one scheme can be the fallback", () => {
+    const primary = { ...DRC_SCHEME, name: "Primary", levels: [1, 2, 3, 4, 5, 6], ...meta("a", "s1") } as Synced<GradingScheme>;
+    const rest = { ...DRC_SCHEME, name: "Rest", levels: [], ...meta("c", "s1") } as Synced<GradingScheme>;
+    expect(schemeLevelClash([primary], "s1", [6, 7])).toEqual({ taken: [6], fallbackTaken: false });
+    expect(schemeLevelClash([primary], "s1", [1, 2], "a")).toEqual({ taken: [], fallbackTaken: false });
+    expect(schemeLevelClash([primary], "s2", [1])).toEqual({ taken: [], fallbackTaken: false });
+    expect(schemeLevelClash([primary, rest], "s1", []).fallbackTaken).toBe(true);
+    expect(schemeLevelClash([primary, rest], "s1", [], "c").fallbackTaken).toBe(false);
+    expect(schemeLevelClash([{ ...primary, voidedAt: "2026-10-02T00:00:00Z" }], "s1", [1]).taken).toEqual([]);
+    expect(schemeChanges(primary, { ...primary, levels: [1, 2, 3] })).toEqual({ levels: [1, 2, 3] });
   });
 
   it("resolves subjects per level with the default list as the last resort", () => {
@@ -226,5 +255,35 @@ describe("marks on the sync engine", () => {
     const d = await loadSchool(db, SITE);
     expect(resolveScheme(d!.gradingSchemes, SITE)).toMatchObject({ source: "programme", scheme: { passPercent: 60 } });
     expect(resolveSubjects(d!.subjects, SITE, 1).source).toBe("school");
+  });
+
+  it("an update changes only the fields it sends (zod defaults must not reset the others)", async () => {
+    const yearId = uuid(), classId = uuid(), itemId = uuid(), planId = uuid(), schemeId = uuid();
+    const upd = (entity: string, recordId: string, fields: Record<string, unknown>) =>
+      ({ mutationId: uuid(), entity, recordId, op: "update" as const, scopeId: SITE, fields, deviceTime: new Date().toISOString() });
+    const r = await push(manager, [
+      ins("school.academic_year", SITE, { label: "2026-2027", startsOn: "2026-09-01", endsOn: "2027-07-02" }, yearId),
+      ins("school.class", SITE, { academicYearId: yearId, level: 7, section: "B", shift: "morning", classroomId: null }, classId),
+      ins("school.fee_item", SITE, { academicYearId: yearId, termId: null, name: "Minerval · Oct 2026", levels: [1], amount: 1000, dueOn: "2026-10-05", planId, periodEndsOn: "2026-10-31" }, itemId),
+      ins("school.grading_scheme", SITE, { ...DRC_SCHEME, name: "CTEB", levels: [7, 8] }, schemeId),
+    ]);
+    expect(r.results.map((x) => x.status)).toEqual(["applied", "applied", "applied", "applied"]);
+    const r2 = await push(manager, [upd("school.class", classId, { shift: "afternoon" }), upd("school.fee_item", itemId, { amount: 1200 }), upd("school.grading_scheme", schemeId, { passPercent: 60 })]);
+    expect(r2.results.map((x) => x.status)).toEqual(["applied", "applied", "applied"]);
+    const d = await loadSchool(db, SITE);
+    expect(d!.classes[0]).toMatchObject({ section: "B", shift: "afternoon", level: 7 });
+    expect(d!.feeItems[0]).toMatchObject({ amount: 1200, planId, periodEndsOn: "2026-10-31" });
+    expect(d!.gradingSchemes[0]).toMatchObject({ passPercent: 60, levels: [7, 8] });
+  });
+});
+
+describe("levels 7 and 8", () => {
+  it("classes, fee items and subjects accept levels 1 to 8 and nothing beyond", async () => {
+    const { level, LEVELS, schoolClass } = await import("../src");
+    expect(LEVELS).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(level.safeParse(8).success).toBe(true);
+    expect(level.safeParse(9).success).toBe(false);
+    expect(schoolClass.safeParse({ academicYearId: "00000000-0000-4000-8000-000000000001", level: 7, section: "A", shift: "morning", classroomId: null }).success).toBe(true);
+    expect(defaultSubjects(8).length).toBeGreaterThan(0);
   });
 });

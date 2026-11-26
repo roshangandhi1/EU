@@ -1,7 +1,7 @@
 import type { FeeItem, Synced, Term } from "./model";
 
-/** The levels a primary school grid shows. */
-export const LEVELS = [1, 2, 3, 4, 5, 6] as const;
+/** Every level a school can have: primary 1-6, then 7-8 (basic education). */
+export const LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 /** Column key: a term id, or "year" for whole-year fees. */
 export const colKey = (termId: string | null) => termId ?? "year";
@@ -20,7 +20,7 @@ export function feeGrid(items: readonly Item[], academicYearId: string, name: st
   const amounts = new Map<string, number>();
   const dues = new Map<string, string>();
   for (const i of items) {
-    if (i.voidedAt || i.academicYearId !== academicYearId || i.name !== name) continue;
+    if (i.voidedAt || i.planId || i.academicYearId !== academicYearId || i.name !== name) continue;
     const c = colKey(i.termId);
     if (!dues.has(c)) dues.set(c, i.dueOn);
     for (const l of i.levels) if (!amounts.has(`${c}:${l}`)) amounts.set(`${c}:${l}`, i.amount);
@@ -30,7 +30,7 @@ export function feeGrid(items: readonly Item[], academicYearId: string, name: st
 
 /** Fee names used in a year, in a stable order. */
 export function feeNames(items: readonly Item[], academicYearId: string): string[] {
-  return [...new Set(items.filter((i) => !i.voidedAt && i.academicYearId === academicYearId).map((i) => i.name))].sort((a, b) => a.localeCompare(b));
+  return [...new Set(items.filter((i) => !i.voidedAt && !i.planId && i.academicYearId === academicYearId).map((i) => i.name))].sort((a, b) => a.localeCompare(b));
 }
 
 export type FeeOp =
@@ -52,7 +52,7 @@ export function planFeeSchedule(
   wanted: FeeGrid,
 ): FeeOp[] {
   const ops: FeeOp[] = [];
-  const mine = existing.filter((i) => !i.voidedAt && i.academicYearId === academicYearId && i.name === name);
+  const mine = existing.filter((i) => !i.voidedAt && !i.planId && i.academicYearId === academicYearId && i.name === name);
   // Items in columns not passed in (e.g. a voided term) are left alone.
   for (const termId of columns) {
     const c = colKey(termId);

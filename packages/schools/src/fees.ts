@@ -56,6 +56,11 @@ export interface BalanceYear {
   academicYearId: string;
   /** The school's years, to place unallocated payments and "all items" exemptions in a year. */
   years?: readonly YearRange[];
+  /**
+   * When the pupil enrolled: items for a period that ended before this day (a past month or
+   * trimester) are not charged. Items with no period end (one-off fees) always are.
+   */
+  enrolledOn?: string;
 }
 
 /**
@@ -87,6 +92,7 @@ export function studentBalance(
   });
   const lines: ItemLine[] = items
     .filter((i) => !i.voidedAt && i.levels.includes(level) && inYear(i.academicYearId))
+    .filter((i) => !(year?.enrolledOn && i.periodEndsOn && i.periodEndsOn < year.enrolledOn))
     .sort((a, b) => (a.dueOn < b.dueOn ? -1 : a.dueOn > b.dueOn ? 1 : 0))
     .map((i) => {
       const charged = chargeFor(i, i.id, mine);
@@ -101,7 +107,7 @@ export function studentBalance(
   const paidTotal = { n: 0 };
   const pays = payments
     .filter((p) => !p.voidedAt && p.studentId === studentId && p.paidOn <= asAt && inYear(paymentYear(p)))
-    .sort((a, b) => (a.paidOn < b.paidOn ? -1 : a.paidOn > b.paidOn ? 1 : a.receiptNumber - b.receiptNumber));
+    .sort((a, b) => (a.paidOn < b.paidOn ? -1 : a.paidOn > b.paidOn ? 1 : (a.receiptCode ?? "").localeCompare(b.receiptCode ?? "") || (a.receiptNumber ?? 0) - (b.receiptNumber ?? 0)));
   for (const p of pays) {
     paidTotal.n += p.amount;
     let left = p.amount;
@@ -137,13 +143,14 @@ export function enrolmentBalance(
     exemptions: readonly Synced<Exemption>[];
     payments: readonly Synced<Payment>[];
   },
-  e: Pick<Enrolment, "studentId" | "classId" | "academicYearId">,
+  e: Pick<Enrolment, "studentId" | "classId" | "academicYearId"> & Partial<Pick<Enrolment, "enrolledOn">>,
   asAt: string,
 ): StudentBalance {
   const cls = d.classes.find((c) => c.id === e.classId);
   return studentBalance(e.studentId, cls?.level ?? 0, d.feeItems, d.exemptions, d.payments, asAt, {
     academicYearId: cls?.academicYearId ?? e.academicYearId,
     years: d.years,
+    enrolledOn: e.enrolledOn,
   });
 }
 
@@ -167,11 +174,11 @@ export function checkReceiptNumber(
   return null;
 }
 
-/** Same receipt number on two non-voided payments: possible after two devices sync. */
+/** Same paper receipt number on two non-voided payments: possible after two devices sync. */
 export function duplicateReceipts(payments: readonly Synced<Payment>[]): Map<number, string[]> {
   const seen = new Map<number, string[]>();
   for (const p of payments) {
-    if (p.voidedAt) continue;
+    if (p.voidedAt || p.receiptNumber === null) continue;
     seen.set(p.receiptNumber, [...(seen.get(p.receiptNumber) ?? []), p.id]);
   }
   return new Map([...seen].filter(([, ids]) => ids.length > 1));
@@ -182,7 +189,7 @@ export function dailyCollections(
   payments: readonly Synced<Payment>[],
   from: string,
   to: string,
-): Array<{ date: string; count: number; total: number; firstReceipt: number; lastReceipt: number }> {
+): Array<{ date: string; count: number; total: number; firstReceipt: number | null; lastReceipt: number | null; firstCode: string | null; lastCode: string | null }> {
   const days = new Map<string, Synced<Payment>[]>();
   for (const p of payments) {
     if (p.voidedAt || p.paidOn < from || p.paidOn > to) continue;
@@ -191,15 +198,52 @@ export function dailyCollections(
   return [...days]
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([date, ps]) => {
-      const nums = ps.map((p) => p.receiptNumber);
+      const nums = ps.map((p) => p.receiptNumber).filter((n): n is number => n !== null);
+      const codes = ps.map((p) => p.receiptCode).filter((c): c is string => !!c).sort();
       return {
         date,
         count: ps.length,
         total: ps.reduce((n, p) => n + p.amount, 0),
-        firstReceipt: Math.min(...nums),
-        lastReceipt: Math.max(...nums),
+        firstReceipt: nums.length ? Math.min(...nums) : null,
+        lastReceipt: nums.length ? Math.max(...nums) : null,
+        firstCode: codes[0] ?? null,
+        lastCode: codes.at(-1) ?? null,
       };
     });
+}
+
+/**
+ * The next system receipt number for a device at a school: school code, the device's letter (W for
+ * the web), and one more than the highest count that letter has used, voided payments included
+ * (a number is never reused). E.g. KIA-W-0042.
+ */
+export function nextReceiptCode(schoolCode: string, letter: string, payments: readonly Pick<Payment, "receiptCode">[]): string {
+  const prefix = `${schoolCode.toUpperCase()}-${letter.toUpperCase()}-`;
+  let max = 0;
+  for (const p of payments) {
+    if (!p.receiptCode?.startsWith(prefix)) continue;
+    const n = Number(p.receiptCode.slice(prefix.length));
+    if (Number.isInteger(n) && n > max) max = n;
+  }
+  return `${prefix}${String(max + 1).padStart(4, "0")}`;
+}
+
+/** How a payment's receipt is shown: the system number, else (older payments) the paper number. */
+export const receiptLabel = (p: Pick<Payment, "receiptCode" | "receiptNumber">) => p.receiptCode ?? (p.receiptNumber !== null ? `#${p.receiptNumber}` : "—");
+
+/** Matches a search text against a payment's system or paper receipt number. */
+export function matchesReceipt(p: Pick<Payment, "receiptCode" | "receiptNumber">, q: string): boolean {
+  const s = q.trim().toUpperCase().replace(/^#/, "");
+  if (!s) return false;
+  return (!!p.receiptCode && p.receiptCode.includes(s)) || (p.receiptNumber !== null && String(p.receiptNumber) === s);
+}
+
+/** Payments newest first: by date paid, then by receipt number. */
+export function newestFirst(a: Pick<Payment, "paidOn" | "receiptCode" | "receiptNumber">, b: Pick<Payment, "paidOn" | "receiptCode" | "receiptNumber">): number {
+  if (a.paidOn !== b.paidOn) return a.paidOn < b.paidOn ? 1 : -1;
+  const ac = a.receiptCode ?? "", bc = b.receiptCode ?? "";
+  if (ac !== bc) return ac < bc ? 1 : -1;
+  return (b.receiptNumber ?? 0) - (a.receiptNumber ?? 0);
 }
 
 /** Format CDF for display: "125 000 FC" (fr) or "125,000 FC" (en). */

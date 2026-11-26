@@ -1,7 +1,8 @@
-import { activeOn, checkReceiptNumber, enrolmentBalance, formatCdf, normaliseName, type Student } from "@eu/schools/mobile";
+import { activeOn, checkReceiptNumber, enrolmentBalance, formatCdf, newestFirst, nextReceiptCode, normaliseName, receiptLabel, tagForDevice, type Student } from "@eu/schools/mobile";
 import { useContext, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { saveErrorKey } from "../../errors";
+import { deviceId } from "../../secure";
 import { LocaleContext, useT } from "../../i18n";
 import type { Session } from "../../session";
 import { addDays } from "../../time";
@@ -28,6 +29,11 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
   const [msg, setMsg] = useState<{ field: "amount" | "receipt" | "form"; text: string } | null>(null);
   const [toast, setToast] = useState<{ msg: string; tone: "good" | "critical" } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [myDevice, setMyDevice] = useState<string | null>(null);
+  useEffect(() => void deviceId().then(setMyDevice), []);
+  // The school may not use paper receipt books; every payment still gets a receipt number from this phone.
+  const paperRequired = data.school.paperReceiptRequired !== false;
+  const tag = myDevice ? tagForDevice(data.deviceTags, myDevice) : null;
 
   const enrolled = activeOn(data.enrolments, date, data.years);
   const classes = new Map(data.classes.map((c) => [c.id, c]));
@@ -43,7 +49,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
     return e ? enrolmentBalance(data, e, date) : null;
   };
   const bal = student ? balOf(student.id) : null;
-  const mine = student ? data.payments.filter((p) => p.studentId === student.id).sort((a, b) => (a.paidOn < b.paidOn ? 1 : -1)) : [];
+  const mine = student ? data.payments.filter((p) => p.studentId === student.id).sort(newestFirst) : [];
   const next = session.user ? nextReceipt(session.user.id, data.receiptBooks, data.payments) : null;
 
   // Offer the next unused number from the person's receipt book: it is almost always the one in hand.
@@ -53,10 +59,13 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
 
   const save = async () => {
     if (!student || !session.user || busy) return;
-    const a = Number(amount), r = Number(receipt);
+    const a = Number(amount), r = receipt ? Number(receipt) : null;
     if (!Number.isInteger(a) || a <= 0) return setMsg({ field: "amount", text: t("ux.amountNeeded") });
-    if (!Number.isInteger(r) || r <= 0) return setMsg({ field: "receipt", text: t("ux.receiptNeeded") });
-    const problem = checkReceiptNumber(r, session.user.id, data.receiptBooks, data.payments);
+    if (r === null ? paperRequired : !Number.isInteger(r) || r <= 0) return setMsg({ field: "receipt", text: t("ux.receiptNeeded") });
+    const problem = r === null ? null : checkReceiptNumber(r, session.user.id, data.receiptBooks, data.payments);
+    // System receipt number: school code, this phone's letter, next count. A phone without a letter
+    // leaves it to the paper number (the school's setup gives each phone a letter).
+    const code = tag ? nextReceiptCode(data.school.code, tag, data.payments) : null;
     if (problem) return setMsg({ field: "receipt", text: t(problem === "already_used" ? "schools.fees.alreadyUsed" : "schools.fees.notInBook") });
     // Read it back before it goes in the books: an extra zero is easy to type and hard to undo.
     const over = bal && a > bal.balance;
@@ -66,7 +75,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
         <View style={{ gap: 6 }}>
           <Txt variant="display">{fmt(a)}</Txt>
           <Txt weight={700}>{studentName(student)}</Txt>
-          <Txt>{t("ux.receiptNo", { n: r })} · {dateLabel(paidOn, true)}</Txt>
+          <Txt>{t("ux.receiptNo", { n: code ?? r ?? "" })}{code && r !== null ? ` · ${t("schools.fees.paperNumber")} ${r}` : ""} · {dateLabel(paidOn, true)}</Txt>
           {over ? <Notice tone="warning">{t("ux.overBalance", { balance: fmt(bal.balance) })}</Notice> : null}
         </View>
       ),
@@ -78,13 +87,13 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
     if (!ok) return;
     setBusy(true);
     try {
-      await session.client.create("school.payment", data.school.siteId, { studentId: student.id, paidOn, amount: a, receiptNumber: r, feeItemIds: [] });
+      await session.client.create("school.payment", data.school.siteId, { studentId: student.id, paidOn, amount: a, receiptNumber: r, receiptCode: code, feeItemIds: [] });
       await session.localSaved();
       void session.syncNow();
       setAmount("");
       setReceipt("");
       setMsg(null);
-      setToast({ msg: t("ux.paymentSaved", { amount: fmt(a), receipt: r }), tone: "good" });
+      setToast({ msg: t("ux.paymentSaved", { amount: fmt(a), receipt: code ?? r ?? "" }), tone: "good" });
     } catch (e) {
       setToast({ msg: t(saveErrorKey(e)), tone: "critical" });
     } finally {
@@ -104,7 +113,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
   return (
     <Page
       header={<Header title={t("schools.fees.payment")} subtitle={schoolName(data.school)} onBack={back} backLabel={t("schools.mobile.back")} accent={ACCENT} />}
-      footer={student ? <Button icon="check" label={t("ux.savePayment")} onPress={() => void save()} disabled={!amount || !receipt} busy={busy} flex={1} /> : undefined}
+      footer={student ? <Button icon="check" label={t("ux.savePayment")} onPress={() => void save()} disabled={!amount || (paperRequired && !receipt)} busy={busy} flex={1} /> : undefined}
       toast={<Toast message={toast?.msg ?? null} tone={toast?.tone} onHide={() => setToast(null)} />}
     >
       {!student ? (
@@ -157,8 +166,8 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
               <Txt weight={700} color={colors.gcGreen}>{t("ux.payAll", { amount: fmt(bal.balance) })}</Txt>
             </Pressable>
           )}
-          <Field label={t("schools.fees.receiptNumber")} icon="receipt" value={receipt} onChangeText={(v) => { setReceipt(v.replace(/\D/g, "")); setMsg(null); }} keyboardType="number-pad"
-            hint={next && String(next) === receipt ? t("ux.nextReceipt") : undefined} error={msg?.field === "receipt" ? msg.text : null} />
+          <Field label={paperRequired ? t("schools.fees.paperNumber") : `${t("schools.fees.paperNumber")} (${t("schools.common.optional")})`} icon="receipt" value={receipt} onChangeText={(v) => { setReceipt(v.replace(/\D/g, "")); setMsg(null); }} keyboardType="number-pad"
+            hint={next && String(next) === receipt ? t("ux.nextReceipt") : t("schools.fees.systemReceiptHint")} error={msg?.field === "receipt" ? msg.text : null} />
           {mine.length > 0 && (
             <>
               <Txt variant="label" tone="muted">{t("schools.fees.recent")}</Txt>
@@ -167,7 +176,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
                   <ListRow
                     key={p.id}
                     title={fmt(p.amount)}
-                    detail={`${dateLabel(p.paidOn)} · ${t("ux.receiptNo", { n: p.receiptNumber })}`}
+                    detail={`${dateLabel(p.paidOn)} · ${t("ux.receiptNo", { n: receiptLabel(p) })}`}
                     leading={<IconBadge icon="receipt" color={p.voidedAt ? colors.textMuted : colors.gcGreen} />}
                     trailing={p.voidedAt ? <StatusChip label={t("schools.fees.voided")} tone="critical" /> : p.pending ? <StatusChip label={t("ux.notSynced")} tone="warning" /> : undefined}
                   />

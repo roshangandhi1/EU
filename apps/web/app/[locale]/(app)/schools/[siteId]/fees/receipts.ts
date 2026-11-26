@@ -10,7 +10,7 @@ export function booksOf(userId: string, books: readonly Synced<ReceiptBook>[]): 
  * current book, or the first number of the next book once a book is full. Null when every book is used up.
  */
 export function suggestReceipt(userId: string, books: readonly Synced<ReceiptBook>[], payments: readonly Synced<Payment>[]): number | null {
-  const used = payments.filter((p) => !p.voidedAt).map((p) => p.receiptNumber);
+  const used = payments.filter((p) => !p.voidedAt).map((p) => p.receiptNumber).filter((n): n is number => n !== null);
   const taken = new Set(used);
   for (const b of booksOf(userId, books)) {
     const inBook = used.filter((n) => n >= b.firstNumber && n <= b.lastNumber);

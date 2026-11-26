@@ -112,6 +112,9 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
           <button className="btn secondary" type="submit">{tr("feeGrid.show")}</button>
         </form>
 
+        {terms.length === 0 && (
+          <div className="notice-tight"><Notice>{tr("feeGrid.noTerms", { year: year.label })} <Link href={`${base}#terms`}>{tr("ux.addTermsLink")}</Link></Notice></div>
+        )}
         <form action={saveFeeSchedule} id="fee-grid-form">
           <FormGuard formId="fee-grid-form" message={tr("att.leave")} />
           {hidden}

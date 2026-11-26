@@ -14,6 +14,8 @@ export const schoolSchools = pgTable("school_schools", {
   code: text("code").notNull(),
   locale: text("locale").notNull().default("fr"),
   shiftsRunning: jsonb("shifts_running").$type<string[]>().notNull(),
+  /** Whether every payment must carry the number of a paper receipt from the school's books. */
+  paperReceiptRequired: boolean("paper_receipt_required").notNull().default(true),
 });
 
 export const schoolAcademicYears = pgTable("school_academic_years", {
@@ -113,6 +115,24 @@ export const schoolFeeItems = pgTable("school_fee_items", {
   levels: jsonb("levels").$type<number[]>().notNull(),
   amount: integer("amount_cdf").notNull(),
   dueOn: date("due_on", { mode: "string" }).notNull(),
+  /** The fee plan (recurring fee) that generated this item. */
+  planId: uuid("plan_id"),
+  /** Last day of the period charged; pupils enrolling after it are not charged. */
+  periodEndsOn: date("period_ends_on", { mode: "string" }),
+});
+
+/** Recurring fees: templates that generate one fee item per month, trimester or year. */
+export const schoolFeePlans = pgTable("school_fee_plans", {
+  ...syncColumns(),
+  academicYearId: uuid("academic_year_id").notNull(),
+  name: text("name").notNull(),
+  levels: jsonb("levels").$type<number[]>().notNull(),
+  amount: integer("amount_cdf").notNull(),
+  frequency: text("frequency").notNull(), // one_time | monthly | per_term | per_year
+  dueDay: integer("due_day"),
+  dueOn: date("due_on", { mode: "string" }),
+  startsOn: date("starts_on", { mode: "string" }).notNull(),
+  endsOn: date("ends_on", { mode: "string" }).notNull(),
 });
 
 export const schoolExemptions = pgTable("school_exemptions", {
@@ -138,10 +158,13 @@ export const schoolPayments = pgTable(
     studentId: uuid("student_id").notNull(),
     paidOn: date("paid_on", { mode: "string" }).notNull(),
     amount: integer("amount_cdf").notNull(),
-    receiptNumber: integer("receipt_number").notNull(),
+    /** Paper receipt number (optional where the school does not require paper receipts). */
+    receiptNumber: integer("receipt_number"),
+    /** System receipt number, e.g. KIA-W-0042: school code, the device's letter, a running count. */
+    receiptCode: text("receipt_code"),
     feeItemIds: jsonb("fee_item_ids").$type<string[]>().notNull().default([]),
   },
-  (t) => [index("school_payments_student").on(t.studentId), index("school_payments_receipt").on(t.scopeId, t.receiptNumber)],
+  (t) => [index("school_payments_student").on(t.studentId), index("school_payments_receipt").on(t.scopeId, t.receiptNumber), index("school_payments_code").on(t.scopeId, t.receiptCode)],
 );
 
 /** Per-school letter for each phone's offline student numbers. */
@@ -161,6 +184,8 @@ export const schoolDeviceTags = pgTable("school_device_tags", {
 export const schoolGradingSchemes = pgTable("school_grading_schemes", {
   ...syncColumns(),
   name: text("name").notNull(),
+  /** Class levels this scheme grades; empty = the scope's fallback for every other level. */
+  levels: jsonb("levels").$type<number[]>().notNull().default([]),
   /** One entry per trimester: how many periods, and whether it ends with an exam. */
   terms: jsonb("terms").$type<{ periods: number; exam: boolean }[]>().notNull(),
   /** Exam maximum = period maximum × this factor. */

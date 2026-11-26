@@ -32,7 +32,7 @@ export function marksContext(d: SchoolData, siteId: string, date: string, classI
   const year = years.find((y) => y.startsOn <= date && y.endsOn >= date) ?? years[0];
   const classes = live(d.classes).filter((c) => c.academicYearId === year?.id).sort(byLevel);
   const cls = classes.find((c) => c.id === classId);
-  const { scheme, source } = resolveScheme(d.gradingSchemes, siteId);
+  const { scheme, source } = resolveScheme(d.gradingSchemes, siteId, cls?.level);
   const periods = periodsOf(scheme);
   const students = new Map(d.students.map((s) => [s.id, s]));
   const pupilsOf = (id: string) => {

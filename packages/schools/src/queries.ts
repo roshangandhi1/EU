@@ -38,6 +38,7 @@ export interface SchoolData {
   absences: m.Synced<m.Absence>[];
   registers: m.Synced<m.RegisterTaken>[];
   feeItems: m.Synced<m.FeeItem>[];
+  feePlans: m.Synced<m.FeePlan>[];
   exemptions: m.Synced<m.Exemption>[];
   receiptBooks: m.Synced<m.ReceiptBook>[];
   deviceTags: m.Synced<m.DeviceTag>[];
@@ -81,6 +82,7 @@ export async function loadSchool(db: Db, siteId: string): Promise<SchoolData | n
     absences: await all(t.schoolAbsences),
     registers: await all(t.schoolRegisters),
     feeItems: await all(t.schoolFeeItems),
+    feePlans: await all(t.schoolFeePlans),
     exemptions: await all(t.schoolExemptions),
     receiptBooks: await all(t.schoolReceiptBooks),
     deviceTags: await all(t.schoolDeviceTags),
@@ -139,7 +141,7 @@ export function updateMutation(
 // ---- Server-side payment rules (SEC-6/DATA-16), run by the sync engine for phone and web alike. ----
 
 /** Reason codes a refused payment comes back with (the fees screens translate them). */
-export const PAYMENT_REJECT_REASONS = ["student_not_in_school", "fee_item_not_in_school", "not_in_assigned_book", "already_used"] as const;
+export const PAYMENT_REJECT_REASONS = ["receipt_code_school", "receipt_code_taken", "paper_receipt_required", "student_not_in_school", "fee_item_not_in_school", "not_in_assigned_book", "already_used"] as const;
 export type PaymentRejectReason = (typeof PAYMENT_REJECT_REASONS)[number];
 
 /**
@@ -155,7 +157,7 @@ export async function validatePayment(
 ): Promise<PaymentRejectReason | undefined> {
   if (change.op !== "insert") return undefined;
   const tx = ctx.tx as AnyDb;
-  const f = change.fields as { studentId: string; receiptNumber: number; feeItemIds: string[] };
+  const f = change.fields as { studentId: string; receiptNumber: number | null; receiptCode?: string | null; feeItemIds: string[] };
   const [st] = await tx
     .select({ id: t.schoolStudents.id })
     .from(t.schoolStudents)
@@ -167,6 +169,19 @@ export async function validatePayment(
       .from(t.schoolFeeItems)
       .where(and(inArray(t.schoolFeeItems.id, f.feeItemIds), eq(t.schoolFeeItems.scopeId, change.scopeId)));
     if (new Set(found.map((r: { id: string }) => r.id)).size !== new Set(f.feeItemIds).size) return "fee_item_not_in_school";
+  }
+  // System receipt number: this school's code, never used before (voided payments included).
+  if (f.receiptCode) {
+    const [sc] = await tx.select({ code: t.schoolSchools.code }).from(t.schoolSchools).where(eq(t.schoolSchools.siteId, change.scopeId));
+    if (!sc || !f.receiptCode.startsWith(`${sc.code.toUpperCase()}-`)) return "receipt_code_school";
+    const [taken] = await tx.select({ id: t.schoolPayments.id }).from(t.schoolPayments)
+      .where(and(eq(t.schoolPayments.scopeId, change.scopeId), eq(t.schoolPayments.receiptCode, f.receiptCode))).limit(1);
+    if (taken) return "receipt_code_taken";
+  }
+  // Paper receipt: required unless the school has switched it off; checked against the books when given.
+  if (f.receiptNumber === null || f.receiptNumber === undefined) {
+    const [sc] = await tx.select({ req: t.schoolSchools.paperReceiptRequired }).from(t.schoolSchools).where(eq(t.schoolSchools.siteId, change.scopeId));
+    return sc && sc.req === false ? undefined : "paper_receipt_required";
   }
   if (!ctx.can("payment.any_receipt")) {
     const books = await tx

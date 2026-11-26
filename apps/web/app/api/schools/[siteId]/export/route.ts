@@ -10,8 +10,8 @@ type What = (typeof WHAT)[number];
 
 const HEADERS: Record<What, Record<CsvLocale, string[]>> = {
   payments: {
-    en: ["paid_on", "receipt_number", "student_number", "student", "amount_cdf", "voided", "void_reason", "device_time", "server_time"],
-    fr: ["date_paiement", "num_recu", "matricule", "eleve", "montant_fc", "annule", "motif_annulation", "heure_telephone", "heure_serveur"],
+    en: ["paid_on", "receipt_number", "paper_receipt_number", "student_number", "student", "amount_cdf", "voided", "void_reason", "device_time", "server_time"],
+    fr: ["date_paiement", "num_recu", "num_recu_papier", "matricule", "eleve", "montant_fc", "annule", "motif_annulation", "heure_telephone", "heure_serveur"],
   },
   attendance: {
     en: ["date", "class_level", "section", "shift", "student_number", "student", "reason", "server_time"],
@@ -62,7 +62,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ siteId: 
     const { counted } = splitAsAt(d.payments, date, mode);
     rows = counted.filter((p) => p.paidOn <= date).map((p) => {
       const s = students.get(p.studentId);
-      return [p.paidOn, p.receiptNumber, s?.studentNumber, name(s), p.amount, yes(p.voidedAt, locale), p.voidReason ?? "", p.deviceTime, p.serverTime];
+      return [p.paidOn, p.receiptCode ?? "", p.receiptNumber ?? "", s?.studentNumber, name(s), p.amount, yes(p.voidedAt, locale), p.voidReason ?? "", p.deviceTime, p.serverTime];
     });
   } else if (what === "attendance") {
     const { counted } = splitAsAt(d.absences, date, mode);

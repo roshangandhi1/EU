@@ -1,4 +1,4 @@
-import { activeOn, attendanceRate, classDay, clockAnomalies, enrolmentBreakdown, live, placesAsAt, splitAsAt, type ClassDay } from "@eu/schools";
+import { activeOn, LEVELS, attendanceRate, classDay, clockAnomalies, enrolmentBreakdown, live, placesAsAt, splitAsAt, type ClassDay } from "@eu/schools";
 import Link from "next/link";
 import { ButtonLink, Notice, Section, Stat, Stats, Table } from "@/components/ui";
 import { can, schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
@@ -61,7 +61,7 @@ export default async function Reports({ params, searchParams }: { params: Promis
           <Stat label={tr("shift.afternoon")} value={b.byShift.afternoon} />
         </Stats>
         <Section flush icon="users" title={tr("reports.byLevel")}>
-          <Table flush rows={[1, 2, 3, 4, 5, 6]} rowKey={(n) => String(n)} empty="" columns={[
+          <Table flush rows={LEVELS.filter((n) => n <= 6 || live(d.classes).some((c) => c.level === n))} rowKey={(n) => String(n)} empty="" columns={[
             { key: "l", header: tr("common.level"), render: (n) => levelLabel(n, tr) },
             { key: "c", header: tr("overview.enrolled"), numeric: true, render: (n) => b.byLevel[n] ?? 0 },
           ]} />

@@ -45,11 +45,13 @@ export const school = z.object({
   locale,
   /** Shifts this school actually runs. Places are only counted for shifts listed here. */
   shiftsRunning: z.array(shift).min(1),
+  /** Every payment must carry a paper receipt number from the school's books (default yes). */
+  paperReceiptRequired: z.boolean().optional(),
 });
 export type School = z.infer<typeof school>;
 
-/** Primary levels: 1ère to 6ème année. */
-export const level = z.number().int().min(1).max(6);
+/** Levels: primary 1re to 6e année, then 7e and 8e (basic education, CTEB). */
+export const level = z.number().int().min(1).max(8);
 
 export const academicYear = z.object({
   label: z.string(), // e.g. "2026-2027"
@@ -145,8 +147,40 @@ export const feeItem = z.object({
   levels: z.array(level).min(1),
   amount: cdf,
   dueOn: isoDate,
+  /** The recurring fee (fee plan) that generated this item, if any. */
+  planId: id.nullable().default(null),
+  /**
+   * Last day of the period the item charges for (a month, a trimester, the year). A pupil who
+   * enrols after that day is not charged for it. Null = always charged (e.g. a one-off fee).
+   */
+  periodEndsOn: isoDate.nullable().default(null),
 });
-export type FeeItem = z.infer<typeof feeItem>;
+/** Older records and callers may leave out planId and periodEndsOn (both default to null). */
+export type FeeItem = z.input<typeof feeItem>;
+
+export const feeFrequency = z.enum(["one_time", "monthly", "per_term", "per_year"]);
+export type FeeFrequency = z.infer<typeof feeFrequency>;
+
+/**
+ * A recurring fee ("fee plan"): a template that generates one ordinary fee item per period
+ * (month, trimester or year), so balances and payments are tracked per period with the same rules
+ * as any fee item. Editing the plan updates its items in place.
+ */
+export const feePlan = z.object({
+  academicYearId: id,
+  name: z.string().min(1).max(60),
+  levels: z.array(level).min(1),
+  amount: cdf.refine((n) => n > 0),
+  frequency: feeFrequency,
+  /** Monthly and per trimester: day of the period's first month the fee is due (1-28). */
+  dueDay: z.number().int().min(1).max(28).nullable(),
+  /** One-time and per year: the due date. */
+  dueOn: isoDate.nullable(),
+  /** First and last day of the span the plan covers (periods starting inside it are charged). */
+  startsOn: isoDate,
+  endsOn: isoDate,
+});
+export type FeePlan = z.infer<typeof feePlan>;
 
 export const exemption = z.object({
   studentId: id,
@@ -183,7 +217,14 @@ export const payment = z.object({
   studentId: id,
   paidOn: isoDate,
   amount: cdf.positive(),
-  receiptNumber: z.number().int().positive().max(MAX_INT),
+  /** Number printed on the paper receipt. Optional where the school does not require paper receipts. */
+  receiptNumber: z.number().int().positive().max(MAX_INT).nullable(),
+  /**
+   * System receipt number, generated on every payment: school code, the letter of the phone (W on
+   * the web), a running count, e.g. KIA-W-0042. Unique per school even when phones are offline.
+   * Absent only on payments from older phone apps.
+   */
+  receiptCode: z.string().min(3).max(40).nullable().optional(),
   /** Fee items this payment is allocated to, in order; any remainder is credit. */
   feeItemIds: z.array(id),
 });

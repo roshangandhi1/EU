@@ -1,6 +1,6 @@
 "use server";
 import {
-  DRC_SCHEME, LEVELS, defaultSubjects, gradingScheme, insertMutation, live, planSubjects, schemeChanges, subject, subjectCode, updateMutation, voidMutation,
+  DRC_SCHEME, LEVELS, defaultSubjects, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
   type GradingScheme, type MentionBand, type Subject,
 } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
@@ -12,11 +12,12 @@ async function ctx(fd: FormData) {
   const siteId = str(fd, "siteId");
   const programme = str(fd, "scope") === "programme";
   const level = Number(str(fd, "level")) || 1;
-  const path = `/${locale}/schools/${siteId}/setup/grading?${new URLSearchParams({ ...(programme ? { scope: "programme" } : {}), level: String(level) })}`;
+  const schemeId = str(fd, "schemeId");
+  const path = `/${locale}/schools/${siteId}/setup/grading?${new URLSearchParams({ ...(programme ? { scope: "programme" } : {}), level: String(level), ...(schemeId ? { scheme: schemeId } : {}) })}`;
   // The programme-wide default is held by the stream; changing it needs the right across all schools.
   if (!can(me, "school.configure", siteId) || (programme && !can(me, "school.configure", null))) back(path, { error: "forbidden" });
   const d = await schoolFor(me, siteId);
-  return { me, locale, siteId, scopeId: programme ? "schools" : siteId, level, d, path };
+  return { me, locale, siteId, scopeId: programme ? "schools" : siteId, level, schemeId, d, path };
 }
 
 async function apply(me: Parameters<typeof push>[0], muts: Mutation[], locale: string, siteId: string, path: string) {
@@ -28,16 +29,39 @@ async function apply(me: Parameters<typeof push>[0], muts: Mutation[], locale: s
   back(path, { grading_saved: "1" });
 }
 
-/** Inserts the scope's scheme, or updates the one it already has in place. */
+/**
+ * Saves the scheme being edited (schemeId) in place, or adds a new one. A level can be in one
+ * scheme only, and only one scheme per school can be the fallback (no levels ticked).
+ */
 async function writeScheme(c: Awaited<ReturnType<typeof ctx>>, next: GradingScheme) {
-  const own = live(c.d.gradingSchemes).filter((s) => s.scopeId === c.scopeId).sort((a, b) => (a.deviceTime < b.deviceTime ? 1 : -1))[0];
+  const own = c.schemeId ? live(c.d.gradingSchemes).find((s) => s.id === c.schemeId && s.scopeId === c.scopeId) : undefined;
+  if (c.schemeId && !own) back(c.path, { error: "not_found" });
+  const clash = schemeLevelClash(c.d.gradingSchemes, c.scopeId, next.levels, own?.id);
+  if (clash.taken.length) back(c.path, { error: "scheme_levels", levels: clash.taken.join(", ") });
+  if (clash.fallbackTaken) back(c.path, { error: "scheme_fallback" });
   const muts: Mutation[] = [];
-  if (!own) muts.push(insertMutation("school.grading_scheme", c.scopeId, { ...next }, { mutationId: newId(), recordId: newId() }));
-  else {
+  let id = own?.id;
+  if (!own) {
+    id = newId();
+    muts.push(insertMutation("school.grading_scheme", c.scopeId, { ...next }, { mutationId: newId(), recordId: id }));
+  } else {
     const changes = schemeChanges(own, next);
     if (Object.keys(changes).length) muts.push(updateMutation("school.grading_scheme", c.scopeId, own.id, changes, newId()));
   }
-  await apply(c.me, muts, c.locale, c.siteId, c.path);
+  // After adding, stay on the new scheme.
+  await apply(c.me, muts, c.locale, c.siteId, c.schemeId ? c.path : `${c.path}&scheme=${id}`);
+}
+
+/** The levels ticked on the scheme form (1-8). */
+const levelsOf = (fd: FormData) => [...new Set(fd.getAll("levels").map(Number).filter((n) => (LEVELS as readonly number[]).includes(n)))].sort((a, b) => a - b);
+
+/** Removes a scheme. Its levels fall back to the school's fallback scheme (or the programme's, or DRC). Marks are kept. */
+export async function deleteScheme(fd: FormData) {
+  const c = await ctx(fd);
+  const own = live(c.d.gradingSchemes).find((s) => s.id === c.schemeId && s.scopeId === c.scopeId);
+  if (!own) back(c.path, { error: "not_found" });
+  const base = c.path.replace(/&scheme=[^&]*/, "");
+  await apply(c.me, [voidMutation("school.grading_scheme", c.scopeId, own!.id, "Removed in grading setup", newId())], c.locale, c.siteId, base);
 }
 
 const decimal = (s: string) => Number(s.replace(",", "."));
@@ -59,15 +83,17 @@ export async function saveScheme(fd: FormData) {
   }
   mentions.sort((a, b) => b.minPercent - a.minPercent);
   if (new Set(mentions.map((m) => m.minPercent)).size !== mentions.length) back(c.path, { error: "scheme_mentions" });
-  const next = { name: str(fd, "name"), terms, examFactor: decimal(str(fd, "examFactor")), passPercent: Number(str(fd, "passPercent")), mentions };
+  const next = { name: str(fd, "name"), levels: levelsOf(fd), terms, examFactor: decimal(str(fd, "examFactor")), passPercent: Number(str(fd, "passPercent")), mentions };
   const parsed = gradingScheme.safeParse(next);
   if (!parsed.success) back(c.path, { error: parsed.error.issues[0]?.path[0] === "mentions" ? "scheme_mentions" : "scheme_invalid" });
   await writeScheme(c, parsed.data!);
 }
 
+/** Puts the DRC standard periods, pass mark and mentions back into this scheme, keeping its name and levels. */
 export async function restoreScheme(fd: FormData) {
   const c = await ctx(fd);
-  await writeScheme(c, DRC_SCHEME);
+  const own = live(c.d.gradingSchemes).find((s) => s.id === c.schemeId);
+  await writeScheme(c, { ...DRC_SCHEME, name: own?.name ?? DRC_SCHEME.name, levels: own?.levels ?? [] });
 }
 
 function subjectMutations(c: Awaited<ReturnType<typeof ctx>>, levels: readonly number[], wanted: (lvl: number) => Subject[]): Mutation[] {

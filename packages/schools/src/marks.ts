@@ -21,6 +21,11 @@ export type MentionBand = z.infer<typeof mentionBand>;
 
 export const gradingScheme = z.object({
   name: z.string().min(1).max(80),
+  /**
+   * The class levels this scheme grades. A level belongs to at most one scheme of a school. An
+   * empty list means "every level no other scheme takes" (the school's fallback scheme).
+   */
+  levels: z.array(level).max(8).default([]),
   /** One entry per trimester: number of periods (1-4) and whether it ends with an exam. */
   terms: z.array(z.object({ periods: z.number().int().min(1).max(4), exam: z.boolean() })).min(1).max(4),
   examFactor: z.number().min(0.5).max(10).multipleOf(0.5),
@@ -63,6 +68,7 @@ export const DRC_MENTIONS: MentionBand[] = [
 /** 3 trimesters, each with 2 periods and an exam (P1 P2 Ex1, P3 P4 Ex2, P5 P6 Ex3). */
 export const DRC_SCHEME: GradingScheme = {
   name: "RDC primaire (standard)",
+  levels: [],
   terms: [{ periods: 2, exam: true }, { periods: 2, exam: true }, { periods: 2, exam: true }],
   examFactor: 2,
   passPercent: 50,
@@ -148,14 +154,33 @@ const latest = <T extends { deviceTime: string }>(rows: readonly T[]) => [...row
 
 export type SchemeSource = "school" | "programme" | "default";
 
-/** The scheme in force at a school. `rows` may mix school and programme ("schools") records. */
-export function resolveScheme(rows: readonly Rec<GradingScheme>[], siteId: string): { scheme: GradingScheme; source: SchemeSource; record?: Rec<GradingScheme> } {
+/**
+ * The scheme in force at a school for a class level. In each scope (the school, then the
+ * programme) the scheme that lists the level wins, then the scope's fallback scheme (no levels).
+ * `rows` may mix school and programme ("schools") records. Without a level, only fallbacks count.
+ */
+export function resolveScheme(rows: readonly Rec<GradingScheme>[], siteId: string, lvl?: number): { scheme: GradingScheme; source: SchemeSource; record?: Rec<GradingScheme> } {
   const live = rows.filter((r) => !r.voidedAt);
-  const own = latest(live.filter((r) => r.scopeId === siteId));
+  const pick = (scopeId: string) => {
+    const mine = live.filter((r) => r.scopeId === scopeId);
+    return (lvl !== undefined ? latest(mine.filter((r) => (r.levels ?? []).includes(lvl))) : undefined) ?? latest(mine.filter((r) => (r.levels ?? []).length === 0));
+  };
+  const own = pick(siteId);
   if (own) return { scheme: own, source: "school", record: own };
-  const prog = latest(live.filter((r) => r.scopeId === "schools"));
+  const prog = pick("schools");
   if (prog) return { scheme: prog, source: "programme", record: prog };
   return { scheme: DRC_SCHEME, source: "default" };
+}
+
+/**
+ * Checks a scheme's levels against the other live schemes of the same scope: a level can be in one
+ * scheme only, and only one scheme may be the fallback (no levels). Returns the clashing levels.
+ */
+export function schemeLevelClash(rows: readonly Rec<GradingScheme>[], scopeId: string, levels: readonly number[], self?: string): { taken: number[]; fallbackTaken: boolean } {
+  const others = rows.filter((r) => !r.voidedAt && r.scopeId === scopeId && r.id !== self);
+  const taken = levels.filter((l) => others.some((o) => (o.levels ?? []).includes(l)));
+  const fallbackTaken = levels.length === 0 && others.some((o) => (o.levels ?? []).length === 0);
+  return { taken, fallbackTaken };
 }
 
 /** The subjects for one level at a school, in order, and where they come from. */
@@ -377,8 +402,8 @@ export function planSubjects(existing: readonly Rec<Subject>[], scopeId: string,
 /** Fields of a scheme that differ from `prev` (for an in-place update). */
 export function schemeChanges(prev: GradingScheme, next: GradingScheme): Partial<GradingScheme> {
   const out: Partial<GradingScheme> = {};
-  for (const k of ["name", "terms", "examFactor", "passPercent", "mentions"] as const) {
-    if (JSON.stringify(prev[k]) !== JSON.stringify(next[k])) (out as Record<string, unknown>)[k] = next[k];
+  for (const k of ["name", "levels", "terms", "examFactor", "passPercent", "mentions"] as const) {
+    if (JSON.stringify(prev[k] ?? []) !== JSON.stringify(next[k] ?? [])) (out as Record<string, unknown>)[k] = next[k];
   }
   return out;
 }

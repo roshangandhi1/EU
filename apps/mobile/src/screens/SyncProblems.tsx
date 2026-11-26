@@ -44,7 +44,8 @@ export function SyncProblems({ session, onBack }: { session: Session; onBack: ()
     if (typeof f.code === "string") parts.push(f.code);
     if (name) parts.push(name);
     else if (typeof f.studentNumber === "string") parts.push(f.studentNumber);
-    if (typeof f.receiptNumber === "number") parts.push(t("ux.receiptNo", { n: f.receiptNumber }));
+    if (typeof f.receiptCode === "string") parts.push(t("ux.receiptNo", { n: f.receiptCode }));
+    else if (typeof f.receiptNumber === "number") parts.push(t("ux.receiptNo", { n: f.receiptNumber }));
     if (typeof f.amount === "number") parts.push(`${f.amount.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} FC`);
     const d = DATE_FIELDS.map((k) => f[k]).find((v): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v));
     if (d) parts.push(dateLabel(d, true));
