@@ -57,6 +57,13 @@
       "when": 1795635292315,
       "tag": "0007_schools_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795668847204,
+      "tag": "0008_programme_periods",
+      "breakpoints": true
     }
   ]
 }

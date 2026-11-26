@@ -44,6 +44,7 @@ export default async function AppLayout({ children, params }: { children: React.
       items: [
         ...(a.users ? [{ href: `${b}/admin/users`, label: u("nav.users"), icon: "users" }] : []),
         ...(a.phones ? [{ href: `${b}/admin/phones`, label: u("nav.phones"), icon: "phone" }] : []),
+        ...(a.periods ? [{ href: `${b}/admin/periods`, label: u("nav.periods"), icon: "coins" }] : []),
         ...(a.cutoffs ? [{ href: `${b}/admin/evidence`, label: u("nav.cutoffs"), icon: "clock" }] : []),
         ...(a.templates ? [{ href: `${b}/boreholes/templates`, label: u("nav.templates"), icon: "wrench" }] : []),
         ...(a.demo ? [{ href: `${b}/admin/demo`, label: u("nav.demo"), icon: "database" }] : []),

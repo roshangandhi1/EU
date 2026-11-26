@@ -17,6 +17,7 @@ export interface NavAccess {
   users: boolean;
   phones: boolean;
   cutoffs: boolean;
+  periods: boolean;
   templates: boolean;
   demo: boolean;
 }
@@ -47,6 +48,7 @@ export function navAccess(me: Principal): NavAccess {
     users: permissions.can(me.user, "users.manage", P),
     phones: permissions.can(me.user, "devices.manage", P),
     cutoffs: permissions.can(me.user, "evidence.manage", P),
+    periods: permissions.can(me.user, "periods.manage", P),
     templates: permissions.can(me.user, "boreholes.template.write", { stream: "boreholes" }),
     demo: permissions.can(me.user, "sites.manage", P),
   };

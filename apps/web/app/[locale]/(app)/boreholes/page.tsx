@@ -18,7 +18,8 @@ import { boreholeExtras } from "@/lib/borehole-detail";
 import { publishLabels } from "@/lib/publish-labels";
 import { fmtEur, fmtNum } from "@/lib/format";
 import { titled } from "@/lib/meta";
-import { INDICATORS, milestone } from "@/lib/indicator-defs";
+import { INDICATORS } from "@/lib/indicator-defs";
+import { loadPeriods, milestone, pickPeriods } from "@/lib/periods";
 
 const BH = INDICATORS.find((i) => i.code === "1.1.1")!;
 
@@ -43,6 +44,8 @@ export default async function BoreholesPage({ params, searchParams }: {
   const asAt = isIsoDate(sp.asAt) ? sp.asAt : today;
   const mode = sp.mode === "evidence" ? "evidence" : "captured";
   const [{ rows, counted }, extras] = await Promise.all([loadBoreholes(db(), asAt, mode, today), boreholeExtras()]);
+  const periods = await loadPeriods(db());
+  const { next } = pickPeriods(periods);
   const canWrite = permissions.can(me.user, "boreholes.write", { stream: "boreholes" });
   const canTemplates = permissions.can(me.user, "boreholes.template.write", { stream: "boreholes" });
   const pub = canPublish(me.user, "boreholes") ? await publishLabels(locale, "boreholes") : null;
@@ -74,7 +77,7 @@ export default async function BoreholesPage({ params, searchParams }: {
         <dl>
           <div><dt>{t(locale, "boreholes.counted")}</dt><dd className="big">{counted}</dd></div>
           <div><dt>{t(locale, "boreholes.value_eur")}</dt><dd>{fmtEur(counted * UNIT_EUR_111, locale)}</dd></div>
-          <div><dt>{t(locale, "boreholes.milestone_2027")}</dt><dd>{fmtNum(milestone(BH), locale)}</dd></div>
+          <div><dt>{t(locale, "boreholes.milestone_2027")}</dt><dd>{next ? fmtNum(milestone(periods, next.n, BH.code), locale) : "–"}</dd></div>
           <div><dt>{t(locale, "boreholes.target_2030")}</dt><dd>{fmtNum(BH.finalTarget, locale)}</dd></div>
         </dl>
       </div>

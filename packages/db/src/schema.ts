@@ -2,11 +2,14 @@ import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
+  date,
   doublePrecision,
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -231,3 +234,50 @@ export const evidenceDecisions = pgTable(
   },
   (t) => [uniqueIndex("evidence_decisions_record").on(t.cutoffId, t.entity, t.recordId)],
 );
+
+/**
+ * EU contract reporting periods. Each ends with a third-party assessment (TPA) that validates the
+ * indicator values and sets the payment. Budgets are derived from the per-indicator targets.
+ */
+export const programmePeriods = pgTable("programme_periods", {
+  n: integer("n").primaryKey(),
+  startsOn: date("starts_on", { mode: "string" }).notNull(),
+  endsOn: date("ends_on", { mode: "string" }).notNull(),
+  /** open: targets are milestones still to reach; validated: the TPA has reported. */
+  status: text("status").notNull().default("open"),
+  tpaFrom: date("tpa_from", { mode: "string" }),
+  tpaTo: date("tpa_to", { mode: "string" }),
+  noteEn: text("note_en"),
+  noteFr: text("note_fr"),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Units due per indicator in a period (not cumulative), what the TPA validated, and what it will check. */
+export const programmePeriodIndicators = pgTable(
+  "programme_period_indicators",
+  {
+    periodN: integer("period_n")
+      .notNull()
+      .references(() => programmePeriods.n),
+    code: text("code").notNull(),
+    target: numeric("target", { mode: "number" }).notNull().default(0),
+    validated: numeric("validated", { mode: "number" }),
+    noteEn: text("note_en"),
+    noteFr: text("note_fr"),
+  },
+  (t) => [primaryKey({ columns: [t.periodN, t.code] })],
+);
+
+/** Logframe outcome indicators: free text, since most targets await the baseline survey. */
+export const programmeOutcomes = pgTable("programme_outcomes", {
+  code: text("code").primaryKey(),
+  sort: integer("sort").notNull(),
+  targetEn: text("target_en").notNull(),
+  targetFr: text("target_fr").notNull(),
+  reportedEn: text("reported_en"),
+  reportedFr: text("reported_fr"),
+  reportedOn: date("reported_on", { mode: "string" }),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

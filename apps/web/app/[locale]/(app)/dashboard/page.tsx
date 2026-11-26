@@ -7,7 +7,9 @@ import type { CountingMode } from "@eu/forestry";
 import { currentPrincipal } from "@/lib/session";
 import { permissions } from "@/lib/registry";
 import { isIsoDate, todayDrc } from "@/lib/dates";
-import { loadDashboard, milestone, PERIODS, totals, type IndicatorRow } from "@/lib/dashboard";
+import { loadDashboard, totals, type IndicatorRow } from "@/lib/dashboard";
+import { budgetEur, loadOutcomes, loadPeriods, milestone, note, pickPeriods, validatedEur, validatedToDate, type Period } from "@/lib/periods";
+import { db } from "@/lib/http";
 import { NoAccess } from "@/components/no-access";
 import { CsvButton } from "@/components/csv-button";
 import { fmtDate, fmtEur, tn } from "@/lib/format";
@@ -33,20 +35,23 @@ export default async function Dashboard({ params, searchParams }: {
   const today = todayDrc();
   const asAt = isIsoDate(sp.asAt) ? sp.asAt : today;
   const mode: CountingMode = sp.mode === "evidence" ? "evidence" : "captured";
-  const rows = await loadDashboard(asAt, mode, today);
+  const [rows, periods, outcomes] = await Promise.all([loadDashboard(asAt, mode, today), loadPeriods(db()), loadOutcomes(db())]);
+  const { last, next } = pickPeriods(periods);
+  const canManage = permissions.can(me.user, "periods.manage", { stream: "platform" });
   const sum = totals(rows);
   const nf = new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-GB", { maximumFractionDigits: 2 });
   const eur = { format: (v: number) => fmtEur(v, locale) };
   const canReview = permissions.can(me.user, "evidence.manage", { stream: "platform" });
   const name = (r: IndicatorRow) => t(locale, `dashboard.name.i${r.code.replaceAll(".", "")}`);
   const c = (k: string) => t(locale, `dashboard.col.${k}`);
-  const csvRows: (string | number | null)[][] = [
-    [c("code"), c("name"), c("value"), c("p1"), c("p2"), c("p2units"), c("final"), c("finalYear"), c("eur"), c("cap"), t(locale, "dashboard.csvCols.status"), t(locale, "dashboard.csvCols.source"), t(locale, "dashboard.csvCols.asAt"), t(locale, "dashboard.csvCols.mode")],
-    ...rows.map((r) => [r.code, name(r), r.value, r.p1.validated, milestone(r), r.p2.units, r.finalTarget, r.finalYear, r.valueEur, r.capEur, t(locale, `dashboard.status.${r.status}`), t(locale, `dashboard.source.${r.source}`), asAt, t(locale, `forestry.mode.${mode}`)]),
-  ];
   const d = (iso: string) => fmtDate(iso, locale);
-  const [p1, p2] = PERIODS;
-  const daysLeft = Math.round((Date.parse(`${p2.to}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  const goalOf = (code: string) => (next ? milestone(periods, next.n, code) : null);
+  const colP2 = next ? c("p2").replace("{date}", d(next.endsOn)) : c("p2").replace("{date}", "");
+  const csvRows: (string | number | null)[][] = [
+    [c("code"), c("name"), c("value"), c("p1"), colP2, next ? c("p2units").replace("{p}", String(next.n)) : "", c("final"), c("finalYear"), c("eur"), c("cap"), t(locale, "dashboard.csvCols.status"), t(locale, "dashboard.csvCols.source"), t(locale, "dashboard.csvCols.asAt"), t(locale, "dashboard.csvCols.mode")],
+    ...rows.map((r) => [r.code, name(r), r.value, validatedToDate(periods, r.code), goalOf(r.code), next?.indicators[r.code]?.target ?? null, r.finalTarget, r.finalYear, r.valueEur, r.capEur, t(locale, `dashboard.status.${r.status}`), t(locale, `dashboard.source.${r.source}`), asAt, t(locale, `forestry.mode.${mode}`)]),
+  ];
+  const daysLeft = (p: Period) => Math.round((Date.parse(`${p.endsOn}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
   const n = (v: number | null) => (v === null ? "–" : nf.format(v));
 
   return (
@@ -65,33 +70,46 @@ export default async function Dashboard({ params, searchParams }: {
         <button className="btn" type="submit">{t(locale, "forestry.update")}</button>
       </form>
 
-      <h2>{t(locale, "dashboard.periods.title")}</h2>
-      <div className="periods">
-        <article className="card period" data-period="1">
-          <header>
-            <h3>{t(locale, "dashboard.periods.name", { n: 1 })}</h3>
-            <span className="pill good">{t(locale, "dashboard.periods.validated")}</span>
-          </header>
-          <p className="muted small">{d(p1.from)} – {d(p1.to)}</p>
-          <dl>
-            <div><dt>{t(locale, "dashboard.periods.validatedEur")}</dt><dd className="big">{eur.format(p1.validatedEur ?? 0)}</dd></div>
-            <div><dt>{t(locale, "dashboard.periods.budget")}</dt><dd>{eur.format(p1.budgetEur)}</dd></div>
-          </dl>
-          <p className="small">{t(locale, "dashboard.periods.p1note", { from: d(p1.tpaVisit!.from), to: d(p1.tpaVisit!.to) })}</p>
-        </article>
-        <article className="card period" data-period="2">
-          <header>
-            <h3>{t(locale, "dashboard.periods.name", { n: 2 })}</h3>
-            <span className="pill info">{daysLeft > 0 ? tn(locale, "dashboard.periods.daysLeft", daysLeft) : t(locale, "dashboard.periods.ended")}</span>
-          </header>
-          <p className="muted small">{d(p2.from)} – {d(p2.to)}</p>
-          <dl>
-            <div><dt>{t(locale, "dashboard.periods.forecastEur")}</dt><dd className="big">{eur.format(p2.budgetEur)}</dd></div>
-            <div><dt>{t(locale, "dashboard.periods.nextTpa")}</dt><dd>{t(locale, "dashboard.periods.after", { date: d(p2.to) })}</dd></div>
-          </dl>
-          <p className="small">{t(locale, "dashboard.periods.p2note")}</p>
-        </article>
-      </div>
+      {(last || next) && (
+        <>
+          <div className="h2-row">
+            <h2>{t(locale, "dashboard.periods.title")}</h2>
+            {canManage && <Link className="btn ghost sm" href={`/${locale}/admin/periods`}><Icon name="pencil" size={16} />{t(locale, "dashboard.manage")}</Link>}
+          </div>
+          <div className="periods">
+            {last && (
+              <article className="card period" data-state="validated">
+                <header>
+                  <h3>{t(locale, "dashboard.periods.name", { n: last.n })}</h3>
+                  <span className="pill good">{t(locale, "dashboard.periods.validated")}</span>
+                </header>
+                <p className="muted small">{d(last.startsOn)} – {d(last.endsOn)}</p>
+                <dl>
+                  <div><dt>{t(locale, "dashboard.periods.validatedEur")}</dt><dd className="big">{eur.format(validatedEur(last) ?? 0)}</dd></div>
+                  <div><dt>{t(locale, "dashboard.periods.budget")}</dt><dd>{eur.format(budgetEur(last))}</dd></div>
+                </dl>
+                {last.tpaFrom && last.tpaTo && <p className="small">{t(locale, "dashboard.periods.visit", { from: d(last.tpaFrom), to: d(last.tpaTo) })}</p>}
+                {note(last, locale) && <p className="small muted">{note(last, locale)}</p>}
+              </article>
+            )}
+            {next && (
+              <article className="card period" data-state="open">
+                <header>
+                  <h3>{t(locale, "dashboard.periods.name", { n: next.n })}</h3>
+                  <span className="pill info">{daysLeft(next) > 0 ? tn(locale, "dashboard.periods.daysLeft", daysLeft(next)) : t(locale, "dashboard.periods.ended")}</span>
+                </header>
+                <p className="muted small">{d(next.startsOn)} – {d(next.endsOn)}</p>
+                <dl>
+                  <div><dt>{t(locale, "dashboard.periods.forecastEur")}</dt><dd className="big">{eur.format(budgetEur(next))}</dd></div>
+                  <div><dt>{t(locale, "dashboard.periods.nextTpa")}</dt><dd>{t(locale, "dashboard.periods.after", { date: d(next.endsOn) })}</dd></div>
+                </dl>
+                {note(next, locale) && <p className="small muted">{note(next, locale)}</p>}
+                <p className="small">{t(locale, "dashboard.periods.p2note")}</p>
+              </article>
+            )}
+          </div>
+        </>
+      )}
 
       <h2>{t(locale, "dashboard.inApp")}</h2>
       <div className="indicator">
@@ -110,7 +128,7 @@ export default async function Dashboard({ params, searchParams }: {
               <th>{t(locale, "dashboard.col.name")}</th>
               <th className="num">{t(locale, "dashboard.col.value")}</th>
               <th className="num">{t(locale, "dashboard.col.p1")}</th>
-              <th className="num">{t(locale, "dashboard.col.p2")}</th>
+              <th className="num">{colP2}</th>
               <th className="num">{t(locale, "dashboard.col.final")}</th>
               <th className="num">{t(locale, "dashboard.col.eur")}</th>
               <th className="num">{t(locale, "dashboard.col.cap")}</th>
@@ -119,10 +137,12 @@ export default async function Dashboard({ params, searchParams }: {
           <tbody>
             {rows.map((r) => {
               const href = LINK[r.source];
-              const goal = milestone(r);
+              const goal = goalOf(r.code);
+              const due = next?.indicators[r.code]?.target ?? 0;
+              const check = next ? note(next.indicators[r.code] ?? { noteEn: null, noteFr: null }, locale) : null;
               const pct = r.value === null ? null : Math.min(100, Math.round((r.value / r.finalTarget) * 100));
-              const mark = Math.min(100, Math.round((goal / r.finalTarget) * 100));
-              const toGo = r.value === null ? null : Math.max(0, goal - r.value);
+              const mark = goal === null ? 100 : Math.min(100, Math.round((goal / r.finalTarget) * 100));
+              const toGo = r.value === null || goal === null ? null : Math.max(0, goal - r.value);
               return (
                 <tr key={r.code} data-status={r.status}>
                   <td className="code">{r.code}</td>
@@ -131,18 +151,19 @@ export default async function Dashboard({ params, searchParams }: {
                     <div className="muted small">{t(locale, `dashboard.source.${r.source}`)} · {t(locale, `dashboard.status.${r.status}`)}</div>
                     {r.secondary && <div className="muted small">{t(locale, `dashboard.${r.secondary.key}`, { n: nf.format(r.secondary.value) })}</div>}
                     {!!r.late && <div className="warn small">{tn(locale, "dashboard.late", r.late)}{canReview && <> · <Link href={`/${locale}/admin/evidence`}>{t(locale, "dashboard.lateLink")}</Link></>}</div>}
+                    {check && <p className="assessor small"><Icon name="info" size={14} /><span><b>{t(locale, "dashboard.assessor")}:</b> {check}</span></p>}
                     {pct !== null && (
                       <div className="bar" role="img" aria-label={t(locale, "dashboard.pct", { n: pct, m: mark })}>
                         <span style={{ width: `${pct}%` }} />
-                        {mark < 100 && <i style={{ left: `${mark}%` }} title={t(locale, "dashboard.col.p2")} />}
+                        {mark < 100 && <i style={{ left: `${mark}%` }} title={colP2} />}
                       </div>
                     )}
                   </td>
                   <td className="num big" data-label={c("value")}>{n(r.value)}</td>
-                  <td className="num" data-label={c("p1")}>{nf.format(r.p1.validated)}</td>
-                  <td className="num milestone" data-label={c("p2")}>
-                    <b>{nf.format(goal)}</b>
-                    <div className="muted small">{r.p2.units > 0 ? t(locale, "dashboard.inPeriod", { n: nf.format(r.p2.units) }) : t(locale, "dashboard.noneInPeriod")}</div>
+                  <td className="num" data-label={c("p1")}>{nf.format(validatedToDate(periods, r.code))}</td>
+                  <td className="num milestone" data-label={colP2}>
+                    <b>{n(goal)}</b>
+                    {next && <div className="muted small">{due > 0 ? t(locale, "dashboard.inPeriod", { n: nf.format(due), p: next.n }) : t(locale, "dashboard.noneInPeriod")}</div>}
                     {toGo !== null && <div className={`small ${toGo === 0 ? "good" : ""}`}>{toGo === 0 ? t(locale, "dashboard.reached") : t(locale, "dashboard.toGo", { n: nf.format(toGo) })}</div>}
                   </td>
                   <td className="num" data-label={c("final")}>{nf.format(r.finalTarget)}<div className="muted small">{t(locale, "dashboard.by", { y: r.finalYear })}</div></td>
@@ -154,6 +175,41 @@ export default async function Dashboard({ params, searchParams }: {
           </tbody>
         </table>
       </div>
+
+      {outcomes.length > 0 && (
+        <>
+          <div className="h2-row">
+            <h2>{t(locale, "dashboard.outcomes.title")}</h2>
+            {canManage && <Link className="btn ghost sm" href={`/${locale}/admin/periods/outcomes`}><Icon name="pencil" size={16} />{t(locale, "dashboard.admin.editOutcomes")}</Link>}
+          </div>
+          <p className="muted">{t(locale, "dashboard.outcomes.intro")}</p>
+          <div className="table-wrap">
+            <table className="dash outcomes">
+              <thead>
+                <tr>
+                  <th>{c("code")}</th>
+                  <th>{c("name")}</th>
+                  <th>{t(locale, "dashboard.outcomes.target")}</th>
+                  <th>{t(locale, "dashboard.outcomes.reported")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {outcomes.map((o) => (
+                  <tr key={o.code} data-status="live">
+                    <td className="code">{o.code}</td>
+                    <td className="ind">{t(locale, `dashboard.outcomes.name.o${o.code.replace(".", "")}`)}</td>
+                    <td className="num" data-label={t(locale, "dashboard.outcomes.target")}>{locale === "fr" ? o.targetFr : o.targetEn}</td>
+                    <td className="num" data-label={t(locale, "dashboard.outcomes.reported")}>
+                      {(locale === "fr" ? o.reportedFr || o.reportedEn : o.reportedEn || o.reportedFr) ?? "–"}
+                      {o.reportedOn && <div className="muted small">{t(locale, "dashboard.outcomes.asOf", { date: d(o.reportedOn) })}</div>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </section>
   );
 }

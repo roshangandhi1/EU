@@ -345,8 +345,13 @@ table.dash tr:not([data-status="live"]) td.big { color: var(--muted); font-weigh
 .dashboard .period dt { font-size: 12.5px; color: var(--muted); }
 .dashboard .period dd { margin: 2px 0 0; font-weight: 650; font-variant-numeric: tabular-nums; }
 .dashboard .period dd.big { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; }
-.dashboard .period[data-period="2"] { border-top: 3px solid var(--eu-blue); }
-.dashboard .period[data-period="1"] { border-top: 3px solid var(--gc-green); }
+.dashboard .period[data-state="open"] { border-top: 3px solid var(--eu-blue); }
+.dashboard .period[data-state="validated"] { border-top: 3px solid var(--gc-green); }
+.dashboard .h2-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dashboard .h2-row .btn { display: inline-flex; align-items: center; gap: 6px; }
+.dashboard .assessor { display: flex; gap: 6px; align-items: flex-start; margin: 8px 0 0; padding: 8px 10px; max-width: 440px; background: var(--eu-blue-tint); color: #1d2b55; border-radius: 8px; line-height: 1.4; }
+.dashboard .assessor svg { flex: none; margin-top: 2px; color: var(--eu-blue); }
+table.dash.outcomes td.num { text-align: left; white-space: normal; max-width: 360px; }
 table.dash td.milestone b { font-size: 16px; }
 table.dash td .good { color: #155c2a; font-weight: 650; }
 @media (max-width: 720px) {
@@ -775,3 +780,29 @@ tr.voided td { color: var(--muted); }
 .form .pw-row > input { flex: 1 1 auto; width: auto; min-width: 0; }
 .form .pw-row > button { flex: none; width: auto; margin: 0; }
 .list-pane table.grid { width: 100%; }
+
+/* Payment periods editor */
+.ptable { display: flex; flex-direction: column; }
+.ptable-head, .ptable-row { display: grid; grid-template-columns: minmax(0, 1fr) 130px 130px 130px; gap: 6px 16px; padding: 12px 20px; align-items: start; }
+.ptable-head { background: var(--surface-alt); font-size: 12.5px; color: var(--muted); font-weight: 650; border-bottom: 1px solid var(--line); }
+.ptable-head span:not(:first-child) { text-align: right; }
+.ptable-row { border-bottom: 1px solid var(--line); }
+.ptable-row:last-child { border-bottom: 0; }
+.ptable-ind b { margin-right: 4px; }
+.ptable-num input { width: 100%; text-align: right; font-variant-numeric: tabular-nums; }
+.ptable-ms { text-align: right; padding-top: 9px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.ptable-lbl { display: none; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+.ptable-note { grid-column: 1 / -1; font-size: 14px; }
+.ptable-note summary { cursor: pointer; color: var(--eu-blue); font-weight: 600; font-size: 13.5px; width: fit-content; }
+.ptable-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+.ptable-notes label { display: flex; flex-direction: column; }
+.ptable-notes .ptable-lbl { display: block; }
+.ptable-notes textarea { width: 100%; }
+@media (max-width: 720px) {
+  .ptable-head { display: none; }
+  .ptable-row { grid-template-columns: 1fr 1fr 1fr; padding: 14px 16px; }
+  .ptable-ind { grid-column: 1 / -1; }
+  .ptable-lbl { display: block; }
+  .ptable-ms { text-align: left; padding-top: 0; }
+  .ptable-notes { grid-template-columns: 1fr; }
+}

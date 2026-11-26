@@ -70,7 +70,7 @@ export const fr: Record<ForestryKey, string> = {
   "forestry.ha_counted": "Hectares comptés",
   "forestry.ha_pipeline": "Plantés, pas encore comptés",
   "forestry.value_eur": "Valeur (EUR)",
-  "forestry.milestone_2027": "Jalon oct. 2027",
+  "forestry.milestone_2027": "Prochain jalon",
   "forestry.target_2030": "Cible 2030",
   "forestry.planted_per_ha": "Plantés par ha",
   "forestry.outcome_label": "Statut pour l'indicateur",
