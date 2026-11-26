@@ -51,7 +51,16 @@ async function call<T>(method: "GET" | "POST", path: string, body: unknown, bear
 
 export interface SignedIn {
   token: string;
-  user: { id: string; name: string; email: string; locale: string; assignments?: RoleAssignment[] };
+  user: { id: string; name: string; email: string; locale: string; assignments?: RoleAssignment[]; mustChangePassword?: boolean };
+}
+
+/**
+ * Changes the signed-in person's password. This phone stays signed in; other phones and web
+ * sessions are signed out (they keep their unsent work). 400 wrong_password | weak_password |
+ * same_password, 429 locked, offline when there is no connection.
+ */
+export function changePassword(token: string, current: string, next: string): Promise<{ ok: true }> {
+  return post("/api/auth/password", { current, next }, token);
 }
 
 /** Who this phone's token belongs to now, with current roles (they can change on the web). */

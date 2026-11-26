@@ -10,5 +10,5 @@ EU_PREVIEW=1 npx expo export --platform web --output-dir .expo/preview
 npx serve .expo/preview   # or any static server
 ```
 
-Open `/?s=home&lang=fr` (s = signin | pin | unlock | home | empty | revoked; sync = ok | pending | offline | failed | never).
+Open `/?s=home&lang=fr` (s = signin | pin | unlock | home | empty | revoked | password, with &forced=1 for the forced change; sync = ok | pending | offline | failed | never).
 Unlock PIN in the preview is 1234. Screenshots: Playwright at 360×720, deviceScaleFactor 2.

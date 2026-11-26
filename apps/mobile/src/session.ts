@@ -5,14 +5,14 @@ import type { SqlDriver, SqlStore } from "@eu/sync/sql-store";
 import * as Crypto from "expo-crypto";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { AppState } from "react-native";
-import { ApiError, getMe, httpTransport, loadDemo, registerDevice, reportStatus, serverClock, SessionEndedError } from "./api";
+import { ApiError, changePassword, getMe, httpTransport, loadDemo, registerDevice, reportStatus, serverClock, SessionEndedError } from "./api";
 import { PIN_MAX_FAILURES, SYNC_INTERVAL_MS } from "./config";
 import { deleteDb, openStore } from "./db";
 import { Drafts } from "./drafts";
 import { EvidenceFiles } from "./files";
 import * as secure from "./secure";
 
-export type Phase = "loading" | "signIn" | "setPin" | "unlock" | "home" | "revoked";
+export type Phase = "loading" | "signIn" | "changePassword" | "setPin" | "unlock" | "home" | "revoked";
 
 export interface SyncStatus {
   running: boolean;
@@ -63,6 +63,10 @@ export class Session {
   /** Role assignments from the server, saved for offline use; undefined until first known. */
   roles: RoleAssignment[] | undefined = undefined;
   notice: string | null = null; // an i18n key to show on the next screen
+  /** On the change-password screen: true when an admin set the password and it must be replaced. */
+  passwordForced = false;
+  /** The password just typed at sign-in, kept in memory only, so the forced change does not ask for it again. */
+  private signInPassword: string | null = null;
   /** Set when sign-in is refused because the previous person still has unsent work. */
   otherUser: OtherUserBlock | null = null;
   status: SyncStatus = {
@@ -122,11 +126,12 @@ export class Session {
     this.user = saved ? { id: saved.id, name: saved.name } : null;
     this.roles = await secure.savedRoles.get();
     await this.checkClockOffline();
-    const [tok, hasPin, notice] = await Promise.all([secure.token.get(), secure.pin.isSet(), secure.pendingNotice.get()]);
+    const [tok, hasPin, notice, mustChange] = await Promise.all([secure.token.get(), secure.pin.isSet(), secure.pendingNotice.get(), secure.mustChangePassword.get()]);
     await this.refreshCounts();
     await this.files.recoverPending();
     this.watchAppState();
-    this.go(!tok ? "signIn" : hasPin ? "unlock" : "setPin", !tok ? notice : null);
+    this.passwordForced = !!tok && mustChange;
+    this.go(!tok ? "signIn" : this.passwordForced ? "changePassword" : hasPin ? "unlock" : "setPin", !tok ? notice : null);
   }
 
   /** After a boot error the person chose to reset: delete the unreadable database and start again. */
@@ -189,7 +194,15 @@ export class Session {
         this.roles = res.user.assignments;
         await secure.savedRoles.set(this.roles);
       }
-      this.go("setPin");
+      if (res.user.mustChangePassword) {
+        await secure.mustChangePassword.set();
+        this.passwordForced = true;
+        this.signInPassword = password;
+        this.go("changePassword");
+      } else {
+        await secure.mustChangePassword.clear();
+        this.go("setPin");
+      }
       return null;
     } catch (e) {
       if (e instanceof ApiError) {
@@ -199,6 +212,67 @@ export class Session {
       }
       return "sync.failed";
     }
+  }
+
+  /** Whether the change-password screen must ask for the current password (not kept from sign-in). */
+  needsCurrentPassword(): boolean {
+    return this.signInPassword === null;
+  }
+
+  /** From home: open the change-password screen (the person can go back). */
+  openChangePassword(): void {
+    this.stopLoop?.();
+    this.stopLoop = null;
+    this.passwordForced = false;
+    this.signInPassword = null;
+    this.go("changePassword");
+  }
+
+  /** Back from a voluntary change. A forced change has no way back except signing in again. */
+  cancelChangePassword(): void {
+    if (this.passwordForced) return;
+    this.enterHome();
+  }
+
+  /**
+   * Changes the password on the server. Nothing on the phone is touched: unsent work stays in the
+   * outbox and syncs as soon as home opens. Returns an i18n key for an error, or null when done.
+   */
+  async changePassword(current: string | null, next: string): Promise<string | null> {
+    const tok = await secure.token.get();
+    if (!tok) {
+      this.go("signIn", "app.sessionEnded");
+      return null;
+    }
+    try {
+      await changePassword(tok, current ?? this.signInPassword ?? "", next);
+    } catch (e) {
+      if (e instanceof DeviceRevokedError) {
+        await this.wipeRevoked();
+        return null;
+      }
+      if (e instanceof ApiError) {
+        if (e.code === "offline") return "auth.offline";
+        if (e.status === 401) {
+          // This phone's session ended meanwhile: sign in again, keeping all data.
+          this.signInPassword = null;
+          await this.endSession();
+          return null;
+        }
+        if (["wrong_password", "weak_password", "same_password", "locked"].includes(e.code)) return `app.pw_${e.code}`;
+      }
+      return "app.pw_failed";
+    }
+    const forced = this.passwordForced;
+    this.signInPassword = null;
+    this.passwordForced = false;
+    await secure.mustChangePassword.clear();
+    if (forced && !(await secure.pin.isSet())) this.go("setPin", "app.pwChanged");
+    else {
+      this.go("home", "app.pwChanged");
+      this.startLoop();
+    }
+    return null;
   }
 
   /** Records and photos the previous person has not sent: blocks a different person's sign-in. */

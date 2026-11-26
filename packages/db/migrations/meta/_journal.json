@@ -64,6 +64,13 @@
       "when": 1795668847204,
       "tag": "0008_programme_periods",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795748400000,
+      "tag": "0009_password_change",
+      "breakpoints": true
     }
   ]
 }

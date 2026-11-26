@@ -29,8 +29,9 @@ export function LoginForm({ locale, labels }: { locale: string; labels: Labels }
             setBusy(false);
             return setError(res.status === 429 ? labels.locked : labels.invalid);
           }
-          const me = (await fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { locale?: string } | null;
-          window.location.href = `/${me?.locale === "en" || me?.locale === "fr" ? me.locale : locale}`;
+          const me = (await fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { locale?: string; mustChangePassword?: boolean } | null;
+          const home = `/${me?.locale === "en" || me?.locale === "fr" ? me.locale : locale}`;
+          window.location.href = me?.mustChangePassword ? `${home}/password` : home;
         } catch {
           setBusy(false);
           setError(labels.network);

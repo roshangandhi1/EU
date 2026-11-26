@@ -15,6 +15,7 @@ import { LocaleContext } from "../src/i18n";
 import type { Session } from "../src/session";
 import { Home, Revoked } from "../src/screens/Home";
 import { SetPin, Unlock } from "../src/screens/Pin";
+import { ChangePassword } from "../src/screens/ChangePassword";
 import { SignIn } from "../src/screens/SignIn";
 
 type Row = Record<string, unknown> & { id: string; scopeId: string };
@@ -102,6 +103,8 @@ function demoStore(): Map<string, Row[]> {
 }
 
 type SyncMode = "ok" | "pending" | "offline" | "nonet" | "failed" | "clock" | "never";
+
+const q = () => new URLSearchParams(globalThis.location?.search ?? "");
 
 function makeSession(phase: Session["phase"], empty: boolean, sync: SyncMode, notice: string | null, other: boolean): Session {
   const db = empty ? new Map<string, Row[]>() : demoStore();
@@ -242,6 +245,28 @@ function makeSession(phase: Session["phase"], empty: boolean, sync: SyncMode, no
       s.phase = "home";
       emit();
     },
+    passwordForced: q().get("forced") === "1",
+    needsCurrentPassword() {
+      return q().get("forced") !== "1";
+    },
+    openChangePassword() {
+      s.passwordForced = false;
+      s.phase = "changePassword";
+      emit();
+    },
+    cancelChangePassword() {
+      s.phase = "home";
+      emit();
+    },
+    async changePassword(current: string | null) {
+      await new Promise((r) => setTimeout(r, 400));
+      if (current !== null && current !== "old-password-1") return "app.pw_wrong_password";
+      s.notice = "app.pwChanged";
+      s.phase = s.passwordForced ? "setPin" : "home";
+      s.passwordForced = false;
+      emit();
+      return null;
+    },
     async unlock(v: string) {
       if (v !== "1234") return { ok: false as const, remaining: 4 };
       s.phase = "home";
@@ -255,7 +280,7 @@ function makeSession(phase: Session["phase"], empty: boolean, sync: SyncMode, no
 export default function PreviewApp() {
   const q = new URLSearchParams(globalThis.location?.search ?? "");
   const which = q.get("s") ?? "home";
-  const phase = ({ signin: "signIn", pin: "setPin", unlock: "unlock", revoked: "revoked" } as Record<string, Session["phase"]>)[which] ?? "home";
+  const phase = ({ signin: "signIn", pin: "setPin", unlock: "unlock", revoked: "revoked", password: "changePassword" } as Record<string, Session["phase"]>)[which] ?? "home";
   const session = useMemo(() => makeSession(phase, which === "empty", (q.get("sync") as SyncMode) ?? "ok", q.get("notice"), q.get("other") === "1"), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [locale, setLocale] = useState<Locale>((q.get("lang") as Locale) ?? "fr");
   const [, rerender] = useReducer((n: number) => n + 1, 0);
@@ -270,6 +295,7 @@ export default function PreviewApp() {
 
   let screen;
   if (session.phase === "signIn") screen = <SignIn session={session} />;
+  else if (session.phase === "changePassword") screen = <ChangePassword session={session} />;
   else if (session.phase === "setPin") screen = <SetPin session={session} />;
   else if (session.phase === "unlock") screen = <Unlock session={session} />;
   else if (session.phase === "revoked") screen = <Revoked session={session} />;

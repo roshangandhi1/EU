@@ -25,6 +25,6 @@ export async function POST(req: Request) {
   const [u] = await (db() as any).select().from(users).where(eq(users.id, cred.userId));
   return json({
     token: reg.token,
-    user: { id: u.id, name: u.name, email: u.email, locale: u.locale, assignments: await loadAssignments(db(), u.id) },
+    user: { id: u.id, name: u.name, email: u.email, locale: u.locale, assignments: await loadAssignments(db(), u.id), mustChangePassword: u.mustChangePassword === true },
   });
 }
