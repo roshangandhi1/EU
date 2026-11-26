@@ -54,7 +54,7 @@ export function PasswordForm({ locale, forced, labels, errors }: { locale: strin
       <label>
         {labels.next}
         <input name="next" type="password" autoComplete="new-password" minLength={10} required aria-describedby="pw-hint" />
-        <span id="pw-hint" className="muted small">{labels.nextHint}</span>
+        <span id="pw-hint" className="muted small" style={{ fontWeight: 400 }}>{labels.nextHint}</span>
       </label>
       <label>
         {labels.confirm}
