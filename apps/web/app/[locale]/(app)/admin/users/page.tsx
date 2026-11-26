@@ -87,7 +87,10 @@ export default async function UsersPage({ params, searchParams }: { params: Prom
                       ))}
                     </ul>
                   </td>
-                  <td>{r.active ? <span className="pill good">{u("users.active")}</span> : <span className="pill bad">{u("users.inactive")}</span>}</td>
+                  <td>
+                    {r.active ? <span className="pill good">{u("users.active")}</span> : <span className="pill bad">{u("users.inactive")}</span>}
+                    {r.active && r.mustChangePassword && <> <span className="pill warn">{u("users.mustChange")}</span></>}
+                  </td>
                   <td>
                     <RowMenu label={f("more")} wide>
                       <form action={addRoleAction(locale, r.id)}>

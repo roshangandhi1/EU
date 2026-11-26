@@ -9,7 +9,7 @@ let db: Db;
 let close: () => Promise<void>;
 let admin: Principal;
 const principal = (id: string, role: "system_admin" | "programme_manager"): Principal => ({
-  user: { id, assignments: [{ role, scope: { type: "global" } }] }, name: "x", email: "x@example.org", locale: "en", kind: "web", deviceId: null,
+  user: { id, assignments: [{ role, scope: { type: "global" } }] }, name: "x", email: "x@example.org", locale: "en", kind: "web", deviceId: null, mustChangePassword: false, tokenHash: "t",
 });
 
 beforeEach(async () => {

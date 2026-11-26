@@ -27,6 +27,9 @@ export const users = pgTable(
     active: boolean("active").notNull().default(true),
     failedLogins: integer("failed_logins").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    /** Set when an admin chose the password (new account or reset): the person must pick their own at next sign-in. */
+    mustChangePassword: boolean("must_change_password").notNull().default(false),
+    passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_unique").on(sql`lower(${t.email})`)],

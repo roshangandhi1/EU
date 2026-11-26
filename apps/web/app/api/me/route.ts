@@ -1,8 +1,8 @@
 import { authenticate, json } from "@/lib/http";
 
 export async function GET(req: Request) {
-  const auth = await authenticate(req);
+  const auth = await authenticate(req, { allowPasswordChange: true });
   if (!auth.ok) return auth.res;
   const p = auth.principal;
-  return json({ id: p.user.id, name: p.name, email: p.email, locale: p.locale, assignments: p.user.assignments });
+  return json({ id: p.user.id, name: p.name, email: p.email, locale: p.locale, assignments: p.user.assignments, mustChangePassword: p.mustChangePassword });
 }

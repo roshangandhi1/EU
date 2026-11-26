@@ -15,6 +15,7 @@ const K = {
   roles: "eu.roles", // JSON role assignments, to choose which home tiles to show offline
   userEmail: "eu.userEmail",
   notice: "eu.notice", // an i18n key to show on the sign-in screen after a restart (session ended)
+  mustChangePassword: "eu.mustChangePassword", // "1" while an admin-set password has not been replaced
   clock: "eu.clock", // JSON { serverMs, deviceMs, suspect }: last server time seen, to check the clock offline
 } as const;
 
@@ -68,6 +69,13 @@ export const savedRoles = {
   },
   set: (r: RoleAssignment[]) => set(K.roles, JSON.stringify(r)),
   clear: () => del(K.roles),
+};
+
+/** An admin set this person's password: they choose their own before using the app (survives a restart). */
+export const mustChangePassword = {
+  get: async () => (await get(K.mustChangePassword)) === "1",
+  set: () => set(K.mustChangePassword, "1"),
+  clear: () => del(K.mustChangePassword),
 };
 
 /** A notice for the sign-in screen that must survive a restart. */

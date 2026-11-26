@@ -1,5 +1,5 @@
 import { ROLES, type Role, type RoleAssignment, type Stream, type UserContext } from "@eu/core";
-import { devices, loginAttempts, roleAssignments, sessions, sites, users, type Db } from "@eu/db";
+import { auditLog, devices, loginAttempts, roleAssignments, sessions, sites, users, type Db } from "@eu/db";
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
@@ -149,6 +149,10 @@ export interface Principal {
   locale: string;
   kind: "web" | "device";
   deviceId: string | null;
+  /** An admin set this password (new account or reset): the person must choose their own. */
+  mustChangePassword: boolean;
+  /** SHA-256 of the token this request came with, so a password change can keep this session. */
+  tokenHash: string;
 }
 
 /**
@@ -188,6 +192,8 @@ export async function resolveToken(db: Db, token: string | null | undefined, now
       locale: u.locale,
       kind: s.kind,
       deviceId: s.deviceId,
+      mustChangePassword: u.mustChangePassword === true,
+      tokenHash: s.tokenHash,
     },
   };
 }
@@ -281,4 +287,45 @@ export async function createFirstAdmin(
     await tx.insert(roleAssignments).values({ userId: u.id, role: "system_admin", scopeType: "global", scopeValue: null });
     return { ok: true as const };
   });
+}
+
+export type ChangePasswordResult =
+  | { ok: true }
+  | { ok: false; reason: "wrong_password" | "locked" | "weak_password" | "same_password" };
+
+/**
+ * The signed-in person changes their own password (also the forced change after an admin set it).
+ * - The current password is checked like a sign-in, so wrong guesses count towards the lockout.
+ * - The session making the change stays signed in; every other session ends. Other phones then get
+ *   "session_ended", ask for an online sign-in and keep all their unsent work (never a wipe).
+ */
+export async function changeOwnPassword(
+  db: Db,
+  me: Principal,
+  current: string,
+  next: string,
+  ip: string | null = null,
+  now = new Date(),
+): Promise<ChangePasswordResult> {
+  if (!validPassword(next)) return { ok: false, reason: "weak_password" };
+  if (next === current) return { ok: false, reason: "same_password" };
+  const cred = await checkCredentials(db, me.email, current, now, ip);
+  if (!cred.ok) return { ok: false, reason: cred.reason === "locked" ? "locked" : "wrong_password" };
+  if (cred.userId !== me.user.id) return { ok: false, reason: "wrong_password" };
+  const hash = await hashPassword(next);
+  await (db as AnyDb).transaction(async (tx: AnyDb) => {
+    await tx
+      .update(users)
+      .set({ passwordHash: hash, mustChangePassword: false, passwordChangedAt: now, failedLogins: 0, lockedUntil: null })
+      .where(eq(users.id, me.user.id));
+    await tx
+      .update(sessions)
+      .set({ revokedAt: now })
+      .where(and(eq(sessions.userId, me.user.id), isNull(sessions.revokedAt), sql`${sessions.tokenHash} <> ${me.tokenHash}`));
+    await tx.insert(auditLog).values({
+      entity: "platform.user", recordId: me.user.id, scopeId: "platform", op: "password_changed", userId: me.user.id,
+      oldValues: null, newValues: { forced: me.mustChangePassword, otherSessionsRevoked: true, via: me.kind },
+    });
+  });
+  return { ok: true };
 }

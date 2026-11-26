@@ -13,7 +13,7 @@ export function AppShell({ locale, groups, user, labels, children }: {
   locale: string;
   groups: NavGroup[];
   user: { name: string; role: string };
-  labels: { brandSub: string; funded: string; signOut: string; menu: string; close: string; nav: string };
+  labels: { brandSub: string; funded: string; signOut: string; password: string; menu: string; close: string; nav: string };
   children: ReactNode;
 }) {
   const path = usePathname() ?? "";
@@ -63,6 +63,7 @@ export function AppShell({ locale, groups, user, labels, children }: {
             <div style={{ minWidth: 0 }}>
               <div className="who-name">{user.name}</div>
               <div className="who-role">{user.role}</div>
+              <Link className="who-link" href={`/${locale}/password`}><Icon name="lock" size={12} /> {labels.password}</Link>
             </div>
           </div>
           <div className="foot-row">

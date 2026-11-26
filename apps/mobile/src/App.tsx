@@ -12,6 +12,7 @@ import { BootError, Session } from "./session";
 import { Home, Revoked } from "./screens/Home";
 import { SetPin, Unlock } from "./screens/Pin";
 import { SignIn } from "./screens/SignIn";
+import { ChangePassword } from "./screens/ChangePassword";
 
 export default function App() {
   const session = useMemo(() => new Session(), []);
@@ -63,6 +64,7 @@ export default function App() {
       </Screen>
     );
   else if (session.phase === "signIn") screen = <SignIn key="signIn" session={session} />;
+  else if (session.phase === "changePassword") screen = <ChangePassword key="pw" session={session} />;
   else if (session.phase === "setPin") screen = <SetPin session={session} />;
   else if (session.phase === "unlock") screen = <Unlock session={session} />;
   else if (session.phase === "home") screen = <Home session={session} />;
@@ -72,7 +74,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <LocaleContext.Provider value={{ locale, setLocale }}>
-        <StatusBar style={session.phase === "home" || session.phase === "signIn" || session.phase === "setPin" || session.phase === "unlock" ? "light" : "dark"} />
+        <StatusBar style={session.phase === "home" || session.phase === "signIn" || session.phase === "changePassword" || session.phase === "setPin" || session.phase === "unlock" ? "light" : "dark"} />
         {screen}
       </LocaleContext.Provider>
     </SafeAreaProvider>

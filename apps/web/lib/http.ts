@@ -11,13 +11,23 @@ export function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
 }
 
-/** Reads a Bearer token (phones) or the session cookie (web). */
-export async function authenticate(req: Request): Promise<{ ok: true; principal: Principal } | { ok: false; res: NextResponse }> {
+/**
+ * Reads a Bearer token (phones) or the session cookie (web).
+ * A web session whose password an admin set is refused (403 password_change_required) everywhere
+ * except the password-change endpoint. Phones are never refused for this: their unsent work must
+ * keep syncing, and the app asks for the new password itself.
+ */
+export async function authenticate(
+  req: Request,
+  opts: { allowPasswordChange?: boolean } = {},
+): Promise<{ ok: true; principal: Principal } | { ok: false; res: NextResponse }> {
   const header = req.headers.get("authorization");
   const bearer = header?.startsWith("Bearer ") ? header.slice(7) : null;
   const token = bearer ?? (await cookies()).get(SESSION_COOKIE)?.value ?? null;
   const r = await resolveToken(db(), token);
   if (!r.ok) return { ok: false, res: json({ error: r.reason }, 401) };
+  if (r.principal.mustChangePassword && r.principal.kind === "web" && !opts.allowPasswordChange)
+    return { ok: false, res: json({ error: "password_change_required" }, 403) };
   return { ok: true, principal: r.principal };
 }
 

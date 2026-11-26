@@ -72,6 +72,7 @@ export function Home({ session }: { session: Session }) {
           {role && <Txt tone="muted">{t(role)}</Txt>}
         </View>
 
+        {session.notice === "app.pwChanged" && <Notice tone="good">{t("app.pwChanged")}</Notice>}
         <SyncCard session={session} onProblems={() => setProblems(true)} />
 
         <View style={s.sectionHead}>
@@ -96,6 +97,8 @@ export function Home({ session }: { session: Session }) {
         )}
 
         {total === 0 && canLoadDemo(session.roles) && <DemoCard session={session} />}
+
+        <Button kind="ghost" icon="lock" label={t("app.pwMenu")} onPress={() => session.openChangePassword()} />
 
         <EuBand text={t("common.fundedByEu")} />
       </ScrollView>

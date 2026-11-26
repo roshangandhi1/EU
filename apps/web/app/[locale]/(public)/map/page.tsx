@@ -16,7 +16,7 @@ export const generateMetadata = titled("ui.meta.publicMap");
 export default async function PublicMapPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  const [layers, me] = await Promise.all([latestSnapshots(db()), currentPrincipal().catch(() => null)]);
+  const [layers, me] = await Promise.all([latestSnapshots(db()), currentPrincipal({ allowPasswordChange: true }).catch(() => null)]);
   const fmt = (n: number) => n.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB");
   const date = (iso: string) => fmtDate(new Date(iso), locale);
   const tt = (k: string, v?: Record<string, string | number>) => t(locale, `publicmap.${k}`, v);

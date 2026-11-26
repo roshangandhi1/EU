@@ -31,7 +31,7 @@ export const ROLE_SCOPES: Record<Role, { kinds: ScopeKind[]; siteKinds?: string[
 };
 
 export interface UserRow {
-  id: string; name: string; email: string; active: boolean; locale: string;
+  id: string; name: string; email: string; active: boolean; locale: string; mustChangePassword: boolean;
   roles: { id: string; role: string; scopeType: string; scopeValue: string | null; siteName?: string }[];
 }
 
@@ -48,7 +48,7 @@ export async function listUsers(db: Db): Promise<UserRow[]> {
   ]);
   const siteName = new Map<string, string>(ss.map((s: any) => [s.id, s.name]));
   return us.map((u: any) => ({
-    id: u.id, name: u.name, email: u.email, active: u.active, locale: u.locale,
+    id: u.id, name: u.name, email: u.email, active: u.active, locale: u.locale, mustChangePassword: u.mustChangePassword === true,
     roles: ras.filter((r: any) => r.userId === u.id).map((r: any) => ({
       id: r.id, role: r.role, scopeType: r.scopeType, scopeValue: r.scopeValue,
       siteName: r.scopeType === "site" ? siteName.get(r.scopeValue) : undefined,
@@ -115,7 +115,7 @@ export async function createUser(db: Db, me: Principal, input: { name: string; e
   if (dupe) return fail("exists");
   const hash = await hashPassword(input.password);
   await d.transaction(async (tx: AnyDb) => {
-    const [u] = await tx.insert(users).values({ email, name, passwordHash: hash, locale: input.locale === "en" ? "en" : "fr" }).returning({ id: users.id });
+    const [u] = await tx.insert(users).values({ email, name, passwordHash: hash, mustChangePassword: true, locale: input.locale === "en" ? "en" : "fr" }).returning({ id: users.id });
     await tx.insert(roleAssignments).values({ userId: u.id, role: input.role, scopeType: scope.type, scopeValue: scope.value, createdBy: me.user.id });
     await audit(tx, me, u.id, "insert", { name, email, role: input.role, scopeType: scope.type, scopeValue: scope.value });
   });
@@ -169,7 +169,7 @@ export async function resetPassword(db: Db, me: Principal, userId: string, passw
   return (db as AnyDb).transaction(async (tx: AnyDb) => {
     const g = await guardTarget(tx, me, userId);
     if (g) return fail(g);
-    await tx.update(users).set({ passwordHash: hash, failedLogins: 0, lockedUntil: null }).where(eq(users.id, userId));
+    await tx.update(users).set({ passwordHash: hash, mustChangePassword: true, failedLogins: 0, lockedUntil: null }).where(eq(users.id, userId));
     await revokeSessions(tx, userId);
     await audit(tx, me, userId, "password_reset", { sessionsRevoked: true });
     return { ok: true as const, code: "password_reset" };

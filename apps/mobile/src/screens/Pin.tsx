@@ -36,6 +36,7 @@ export function SetPin({ session }: { session: Session }) {
   return (
     <AuthLayout title={t("auth.setPin")} intro={t("app.pinIntro")}>
       {session.user && <Txt variant="small" tone="muted">{t("auth.signedInAs", { name: session.user.name })}</Txt>}
+      {session.notice === "app.pwChanged" && !error && <Notice tone="good">{t("app.pwChanged")}</Notice>}
       {error && <Notice tone="critical">{t(error)}</Notice>}
       <Field big label={t("auth.setPin")} value={first} onChangeText={(v) => { setFirst(digits(v)); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={6} autoFocus hint={t("app.pinHint")} />
       <Field big label={t("auth.confirmPin")} value={second} onChangeText={(v) => { setSecond(digits(v)); setError(null); }} keyboardType="number-pad" secureTextEntry maxLength={6} onSubmitEditing={() => valid(first) && valid(second) && void submit()} />
