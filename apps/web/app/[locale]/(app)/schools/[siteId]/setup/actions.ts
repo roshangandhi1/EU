@@ -111,6 +111,10 @@ export const saveSchool = form(async (c, fd) => {
   const changes: Record<string, unknown> = {};
   if (code !== c.d.school.code) changes.code = code;
   if (shiftsRunning.join() !== c.d.school.shiftsRunning.join()) changes.shiftsRunning = shiftsRunning;
+  for (const [k, max] of [["ministryCode", 20], ["province", 80], ["city", 80], ["commune", 80]] as const) {
+    const v = str(fd, k).slice(0, max);
+    if (v !== (c.d.school[k] ?? "")) changes[k] = v;
+  }
   const paperReceiptRequired = fd.get("paperReceiptRequired") === "1";
   if (paperReceiptRequired !== (c.d.school.paperReceiptRequired !== false)) changes.paperReceiptRequired = paperReceiptRequired;
   if (Object.keys(changes).length) {

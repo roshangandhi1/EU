@@ -47,6 +47,11 @@ export const school = z.object({
   shiftsRunning: z.array(shift).min(1),
   /** Every payment must carry a paper receipt number from the school's books (default yes). */
   paperReceiptRequired: z.boolean().optional(),
+  /** Report card header (bulletin): the ministry's school code and where the school is. */
+  ministryCode: z.string().max(20).optional(),
+  province: z.string().max(80).optional(),
+  city: z.string().max(80).optional(),
+  commune: z.string().max(80).optional(),
 });
 export type School = z.infer<typeof school>;
 
@@ -104,6 +109,10 @@ export const student = z.object({
   guardianName: z.string().default(""),
   guardianPhone: z.string().default(""),
   village: z.string().default(""),
+  /** Report card (bulletin) fields: national pupil ID ("N° ID"), permanent number ("N° perm.") and place of birth. */
+  idNumber: z.string().max(30).default(""),
+  permNumber: z.string().max(30).default(""),
+  birthPlace: z.string().max(80).default(""),
 });
 export type Student = z.infer<typeof student>;
 

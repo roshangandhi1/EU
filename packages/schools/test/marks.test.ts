@@ -5,8 +5,8 @@ import { EntityRegistry } from "@eu/sync";
 import { handlePush } from "@eu/sync/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  DRC_SCHEME, classResults, createSchoolSite, defaultSubjects, formatScore, loadSchool, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
-  planMarks, planSubjects, readScore, resolveScheme, resolveSubjects, schemeChanges, schemeLevelClash, schoolsActions, schoolsEntities, subjectCode,
+  DRC_SCHEME, bulletinLayout, classResults, createSchoolSite, defaultSubjects, formatScore, loadSchool, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
+  planMarks, planSubjects, readLetter, readScore, resolveScheme, resolveSubjects, schemeChanges, schemeLevelClash, schoolsActions, schoolsEntities, subjectCode,
   type GradingScheme, type Mark, type Subject, type Synced,
 } from "../src";
 
@@ -69,9 +69,9 @@ describe("grading scheme", () => {
 
   it("resolves subjects per level with the default list as the last resort", () => {
     const s = (code: string, lvl: number, scopeId: string, position = 0) => ({ level: lvl, code, name: code, maxPoints: 10, position, ...meta(code + scopeId, scopeId) }) as Synced<Subject>;
-    expect(resolveSubjects([], "s1", 1, "fr").subjects.map((x) => x.name)).toContain("Français");
-    expect(resolveSubjects([], "s1", 1, "en").subjects[0]).toMatchObject({ code: "fr", name: "French", maxPoints: 20 });
-    expect(defaultSubjects(5)[0]!.maxPoints).toBe(30);
+    expect(resolveSubjects([], "s1", 1, "fr").subjects.map((x) => x.name)).toContain("Problèmes");
+    expect(resolveSubjects([], "s1", 1, "en").subjects[0]).toMatchObject({ name: "Speaking", branch: "Congolese languages", domain: "langues", maxPoints: 20 });
+    expect(defaultSubjects(5)[0]!.maxPoints).toBe(10);
     const rows = [s("b", 1, "s1", 1), s("a", 1, "s1", 0), s("x", 2, "schools")];
     expect(resolveSubjects(rows, "s1", 1)).toMatchObject({ source: "school", subjects: [{ code: "a" }, { code: "b" }] });
     expect(resolveSubjects(rows, "s1", 2)).toMatchObject({ source: "programme", subjects: [{ code: "x" }] });
@@ -135,7 +135,7 @@ describe("planning mark changes from the grid", () => {
     expect(ops).toEqual([
       { op: "update", id: "m2", fields: { score: null, absent: true } },
       { op: "void", id: "m3" },
-      { op: "create", fields: { studentId: "d", classId: C, subject: "fr", period: "P1", score: 15.5, absent: false } },
+      { op: "create", fields: { studentId: "d", classId: C, subject: "fr", period: "P1", score: 15.5, absent: false, letter: null } },
     ]);
   });
   it("indexes the latest live mark per cell, in this class only", () => {
@@ -285,5 +285,40 @@ describe("levels 7 and 8", () => {
     expect(level.safeParse(9).success).toBe(false);
     expect(schoolClass.safeParse({ academicYearId: "00000000-0000-4000-8000-000000000001", level: 7, section: "A", shift: "morning", classroomId: null }).success).toBe(true);
     expect(defaultSubjects(8).length).toBeGreaterThan(0);
+  });
+});
+
+describe("ministry bulletin subjects and layout", () => {
+  const sum = (lvl: number, domain: string, branch?: string) =>
+    defaultSubjects(lvl).filter((s) => s.domain === domain && (branch === undefined || s.branch === branch)).reduce((n, s) => n + s.maxPoints, 0);
+  it("defaults match the sub-totals printed on the élémentaire and moyen bulletins", () => {
+    expect([sum(1, "langues", "Langues congolaises"), sum(1, "langues", "Français"), sum(1, "mst"), sum(1, "social"), sum(1, "arts")]).toEqual([40, 30, 110, 20, 20]);
+    expect([sum(3, "langues", "Langues congolaises"), sum(3, "langues", "Français"), sum(3, "mst"), sum(3, "social"), sum(3, "arts")]).toEqual([25, 35, 90, 40, 20]);
+    // Trimester maximum is 4 × the period maximum with the DRC scheme (2 periods + exam × 2): Problèmes 20 → 80.
+    const prob = defaultSubjects(1).find((s) => s.name === "Problèmes")!;
+    expect(periodsIn(DRC_SCHEME, { kind: "term", term: 1 }).reduce((n, p) => n + maxFor(prob, p, DRC_SCHEME), 0)).toBe(80);
+    const codes = defaultSubjects(3).map((s) => s.code);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(defaultSubjects(3, "en").map((s) => s.code)).toEqual(codes);
+    expect(defaultSubjects(1).find((s) => s.name === "Religion")?.optional).toBe(true);
+  });
+  it("puts sub-totals per branch in the language domain and per domain elsewhere", () => {
+    const lines = bulletinLayout(defaultSubjects(1), DRC_SCHEME.domains);
+    const subtotals = lines.filter((l) => l.type === "subtotal").map((l) => (l as { codes: string[] }).codes.length);
+    expect(subtotals).toEqual([2, 2, 7, 2, 2, 3]);
+    expect(lines.filter((l) => l.type === "domain")).toHaveLength(5);
+    expect(lines.filter((l) => l.type === "branch").map((l) => (l as { label: string }).label)).toEqual(["Langues congolaises", "Français", "Mathématiques", "Sciences", "Technologie"]);
+  });
+  it("leaves an optional subject a pupil does not take out of their maximum", () => {
+    const subjects = [{ level: 1, code: "a", name: "A", maxPoints: 10, position: 0 }, { level: 1, code: "rel", name: "Religion", maxPoints: 10, position: 1, optional: true }];
+    const marks = new Map([["s1|a|P1", { score: 8, absent: false }], ["s2|a|P1", { score: 8, absent: false }], ["s2|rel|P1", { score: 10, absent: false }]]);
+    const r = classResults({ studentIds: ["s1", "s2"], subjects, periods: [{ key: "P1", kind: "period", term: 1, n: 1 }], marks, scheme: DRC_SCHEME });
+    expect(r.rows.map((x) => [x.fullMax, x.missing, x.percent])).toEqual([[10, 0, 80], [20, 0, 90]]);
+  });
+  it("reads letter grades and updates only what changed", () => {
+    expect(readLetter("tb", DRC_SCHEME.letters)).toEqual({ kind: "letter", value: "TB" });
+    expect(readLetter("X", DRC_SCHEME.letters)).toEqual({ kind: "error", error: "letter" });
+    const prev = new Map([["s|_conduct|P1", { id: "m1", studentId: "s", classId: "c", subject: "_conduct", period: "P1", score: null, absent: false, letter: "B" } as never]]);
+    expect(planMarks(prev, "c", [{ studentId: "s", subject: "_conduct", period: "P1", input: { kind: "letter", value: "TB" } }])).toEqual([{ op: "update", id: "m1", fields: { letter: "TB" } }]);
   });
 });

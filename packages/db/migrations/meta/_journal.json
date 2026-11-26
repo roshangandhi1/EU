@@ -92,6 +92,13 @@
       "when": 1795748580000,
       "tag": "0012_receipt_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795748640000,
+      "tag": "0013_bulletin_fields",
+      "breakpoints": true
     }
   ]
 }

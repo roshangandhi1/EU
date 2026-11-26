@@ -10,7 +10,7 @@ export const schools = {
     siteId: "Short id", siteIdHint: "Lower case, e.g. luniemu", code: "Code", codeHint: "2 to 12 letters, used in student numbers, e.g. LUN", namePlaceholder: "Luniemu Primary School" },
   overview: { enrolled: "Pupils enrolled", girls: "Girls", places: "Student places", placesHint: "{baseline} baseline + {new} new · shifts counted: {shifts}",
     registersToday: "Registers taken today", collectedMonth: "Fees collected this month", arrears: "Overdue fees", notSetUp: "This school is not set up yet. Start in Setup." },
-  student: {
+  student: { birthPlace: "Place of birth", idNumber: "Pupil ID (N° ID)", permNumber: "Permanent no. (N° perm.)", bulletinHint: "Printed on the report card.", 
     title: "Students", add: "Enrol a pupil", firstName: "First name", lastName: "Surname", postName: "Post-name", sex: "Sex", female: "Girl", male: "Boy",
     dateOfBirth: "Date of birth", birthYearEstimate: "Estimated birth year", birthHint: "Give a date of birth or an estimated year",
     guardianName: "Parent or guardian", guardianPhone: "Guardian phone", village: "Village", studentNumber: "Student number",
@@ -111,7 +111,7 @@ export const schools = {
     classesAsk: "This school has no classes yet. Ask the headteacher (or the programme team) to add them.",
     feesAsk: "No academic year covers today. Ask the headteacher (or the programme team) to add it.",
   },
-  info: {
+  info: { ministryCode: "Ministry school code", province: "Educational province", city: "Town / territory", commune: "Commune / sector", bulletinHint: "Printed on report cards.", 
     desc: "The school's name, student-number code, map position and shifts.", lat: "Latitude", lng: "Longitude",
     latHint: "Decimal degrees, e.g. -8.712", lngHint: "Decimal degrees, e.g. 24.790", codeHint: "Used in new student numbers (existing ones do not change).",
   },
@@ -161,6 +161,9 @@ export const schools = {
   levelName: "Year {n}",
   // ---- Marks (notes). Kept together at the end of the file to ease merges. ----
   marks: {
+    bulletinTitle: "Report cards (working copy)", bulletinIntro: "Laid out like the ministry bulletin, to copy onto the official form. Print one pupil or the whole class (one A4 page each).", bulletinSchoolMissing: "The ministry school code or province is missing for the report card header. Add them in", bulletin: "Report card", bulletins: "Report cards for the class", 
+    errLetters: "Give at least two different letters, separated by commas.", lettersTitle: "Application and conduct", lettersIntro: "Graded with a letter each period on the report card, best first.", lettersLabel: "Letters", lettersHint: "e.g. E, TB, B, AB, M", domain: "Domain", branch: "Branch", branchPh: "e.g. French", optional: "Optional", 
+    errLetter: "Use one of: {letters}", application: "Application", conduct: "Conduct", 
     schemesTitle: "Grading schemes", schemesIntro: "A school can grade different levels with different schemes, e.g. one for years 1-6 and one for years 7-8. Marks and reports use the scheme of the pupil's class level.",
     addScheme: "Add a scheme", noSchemes: "No scheme of the school's own yet: the default below applies to every level.", newScheme: "New scheme", editScheme: "Edit: {name}",
     schemeLevels: "Levels", allOtherLevels: "All other levels", schemeNamePh: "e.g. Primary (years 1-6)",

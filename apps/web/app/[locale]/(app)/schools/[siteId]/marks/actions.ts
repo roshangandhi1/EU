@@ -1,5 +1,5 @@
 "use server";
-import { insertMutation, maxFor, planMarks, readScore, updateMutation, voidMutation, type ScoreInput } from "@eu/schools";
+import { insertMutation, isBehaviour, lettersOf, maxFor, planMarks, readLetter, readScore, updateMutation, voidMutation, type ScoreInput } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
 import { revalidatePath } from "next/cache";
 import { back, can, firstRejection, newId, push, schoolFor, signedIn, str, today } from "@/lib/schools";
@@ -27,8 +27,17 @@ export async function saveMarks(fd: FormData) {
   for (const [name, raw] of fd.entries()) {
     if (!name.startsWith("m:") || typeof raw !== "string") continue;
     const [studentId, code, per] = name.slice(2).split("|");
+    if (!studentId || per !== period || !pupils.has(studentId)) continue;
+    if (isBehaviour(code ?? "")) {
+      // Application / Conduite: a letter per period, never on an exam.
+      if (p!.kind !== "period") continue;
+      const input = readLetter(raw, lettersOf(ctx.scheme));
+      if (input.kind === "error") { bad++; continue; }
+      cells.push({ studentId, subject: code!, period, input });
+      continue;
+    }
     const sub = subjects.get(code ?? "");
-    if (!studentId || !sub || per !== period || !pupils.has(studentId)) continue;
+    if (!sub) continue;
     const input = readScore(raw, maxFor(sub, p!, ctx.scheme));
     if (input.kind === "error") { bad++; continue; }
     cells.push({ studentId, subject: sub.code, period, input });

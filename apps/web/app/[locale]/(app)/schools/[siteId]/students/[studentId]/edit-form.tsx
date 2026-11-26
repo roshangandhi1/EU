@@ -41,6 +41,9 @@ export function EditPupil({ locale, siteId, studentId, fv, today, l, v }: {
         <Field span={4} label={l.guardianName!} optional={l.optional}><input name="guardianName" maxLength={80} autoComplete="off" defaultValue={v.guardianName} /></Field>
         <Field span={4} label={l.guardianPhone!} optional={l.optional}><input name="guardianPhone" type="tel" maxLength={20} inputMode="tel" autoComplete="off" defaultValue={v.guardianPhone} /></Field>
         <Field span={4} label={l.village!} optional={l.optional}><input name="village" maxLength={80} autoComplete="off" defaultValue={v.village} /></Field>
+        <Field span={4} label={l.birthPlace!} optional={l.optional}><input name="birthPlace" maxLength={80} autoComplete="off" defaultValue={v.birthPlace} /></Field>
+        <Field span={4} label={l.idNumber!} optional={l.optional} hint={l.bulletinHint}><input name="idNumber" maxLength={30} autoComplete="off" defaultValue={v.idNumber} /></Field>
+        <Field span={4} label={l.permNumber!} optional={l.optional}><input name="permNumber" maxLength={30} autoComplete="off" defaultValue={v.permNumber} /></Field>
       </Fields>
       <FormFooter><BusyButton pending={pending} label={l.save!} busy={l.saving!} /></FormFooter>
     </form>

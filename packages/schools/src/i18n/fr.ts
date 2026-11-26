@@ -14,7 +14,7 @@ export const schools: Shape<typeof en> = {
     siteId: "Identifiant court", siteIdHint: "En minuscules, ex. luniemu", code: "Code", codeHint: "2 à 12 lettres, utilisé dans les matricules, ex. LUN", namePlaceholder: "École primaire Luniemu" },
   overview: { enrolled: "Élèves inscrits", girls: "Filles", places: "Places d'élèves", placesHint: "{baseline} existantes + {new} nouvelles · vacations comptées : {shifts}",
     registersToday: "Appels faits aujourd'hui", collectedMonth: "Frais perçus ce mois-ci", arrears: "Frais en retard", notSetUp: "Cette école n'est pas encore paramétrée. Commencez par Paramètres." },
-  student: {
+  student: { birthPlace: "Lieu de naissance", idNumber: "N° ID de l'élève", permNumber: "N° permanent", bulletinHint: "Imprimé sur le bulletin.", 
     title: "Élèves", add: "Inscrire un élève", firstName: "Prénom", lastName: "Nom", postName: "Post-nom", sex: "Sexe", female: "Fille", male: "Garçon",
     dateOfBirth: "Date de naissance", birthYearEstimate: "Année de naissance estimée", birthHint: "Indiquez une date de naissance ou une année estimée",
     guardianName: "Parent ou tuteur", guardianPhone: "Téléphone du tuteur", village: "Village", studentNumber: "Matricule",
@@ -115,7 +115,7 @@ export const schools: Shape<typeof en> = {
     classesAsk: "Cette école n'a pas encore de classes. Demandez au directeur de l'école (ou à l'équipe du programme) de les ajouter.",
     feesAsk: "Aucune année scolaire ne couvre aujourd'hui. Demandez au directeur de l'école (ou à l'équipe du programme) de l'ajouter.",
   },
-  info: {
+  info: { ministryCode: "Code de l'école (ministère)", province: "Province éducationnelle", city: "Ville / territoire", commune: "Commune / secteur", bulletinHint: "Imprimé sur les bulletins.", 
     desc: "Le nom, le code des matricules, la position sur la carte et les vacations de l'école.", lat: "Latitude", lng: "Longitude",
     latHint: "En degrés décimaux, ex. -8,712", lngHint: "En degrés décimaux, ex. 24,790", codeHint: "Utilisé dans les nouveaux matricules (les anciens ne changent pas).",
   },
@@ -165,6 +165,9 @@ export const schools: Shape<typeof en> = {
   levelName: "{n}e année",
   // ---- Notes. Regroupées à la fin du fichier pour faciliter les fusions. ----
   marks: {
+    bulletinTitle: "Bulletins (copie de travail)", bulletinIntro: "Présentés comme le bulletin du ministère, pour être recopiés sur le bulletin officiel. Imprimez un élève ou toute la classe (une page A4 chacun).", bulletinSchoolMissing: "Le code de l'école (ministère) ou la province manque pour l'en-tête du bulletin. Ajoutez-les dans", bulletin: "Bulletin", bulletins: "Bulletins de la classe", 
+    errLetters: "Donnez au moins deux lettres différentes, séparées par des virgules.", lettersTitle: "Application et conduite", lettersIntro: "Notées par une lettre à chaque période sur le bulletin, de la meilleure à la moins bonne.", lettersLabel: "Lettres", lettersHint: "ex. E, TB, B, AB, M", domain: "Domaine", branch: "Branche", branchPh: "ex. Français", optional: "Facultatif", 
+    errLetter: "Utilisez : {letters}", application: "Application", conduct: "Conduite", 
     schemesTitle: "Barèmes de notation", schemesIntro: "Une école peut noter des niveaux différents avec des barèmes différents, ex. un pour la 1re à la 6e année et un pour la 7e et la 8e. Les notes et bulletins utilisent le barème du niveau de la classe de l'élève.",
     addScheme: "Ajouter un barème", noSchemes: "Pas encore de barème propre à l'école : le barème par défaut ci-dessous s'applique à tous les niveaux.", newScheme: "Nouveau barème", editScheme: "Modifier : {name}",
     schemeLevels: "Niveaux", allOtherLevels: "Tous les autres niveaux", schemeNamePh: "ex. Primaire (1re à 6e)",
