@@ -38,7 +38,7 @@ export const en = {
   "boreholes.update": "Update",
   "boreholes.counted": "Boreholes counted",
   "boreholes.value_eur": "Value (EUR)",
-  "boreholes.target_2027": "2027 target",
+  "boreholes.milestone_2027": "Milestone Oct 2027",
   "boreholes.target_2030": "2030 target",
   "boreholes.lifecycle_label": "Stage",
   "boreholes.last_visit": "Last visit",

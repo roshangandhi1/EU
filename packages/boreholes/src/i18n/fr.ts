@@ -40,7 +40,7 @@ export const fr: Record<BoreholeKey, string> = {
   "boreholes.update": "Mettre à jour",
   "boreholes.counted": "Forages comptés",
   "boreholes.value_eur": "Valeur (EUR)",
-  "boreholes.target_2027": "Cible 2027",
+  "boreholes.milestone_2027": "Jalon oct. 2027",
   "boreholes.target_2030": "Cible 2030",
   "boreholes.lifecycle_label": "Étape",
   "boreholes.last_visit": "Dernière visite",

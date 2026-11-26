@@ -9,28 +9,59 @@ export interface IndicatorDef {
   code: string;
   unitKey: "borehole" | "cooperative" | "centre" | "smallholder" | "ha" | "foundation" | "superstructure" | "place" | "school" | "report";
   unitEur: number;
-  target2027: number | null; // logframe 2027 target (= Annex III Year 1)
-  target2030: number;
+  /** Logframe end target and the year it is due (most are 2030; some TVET and coop ones earlier). */
+  finalTarget: number;
+  finalYear: number;
   capEur: number;
   source: Source;
+  /** Reporting period 1 (01/01/2026-16/10/2026): Annex III target and the value the TPA validated. */
+  p1: { target: number; validated: number };
+  /** Reporting period 2 (17/10/2026-16/10/2027): units forecast in that period (not cumulative). */
+  p2: { units: number };
 }
 
-/** Annex III, verified against the logframe (GoCongo-EU-programme-context.md §4). */
+/**
+ * Annex III unit rates and caps, logframe end targets, and the per-period figures from the
+ * Year 1 submission (26 Oct 2026): period 1 targets and TPA-validated values (Expertise France
+ * Year 1 report, interim financial report iii.c) and the period 2 forecast budget (ii.c).
+ */
 export const INDICATORS: IndicatorDef[] = [
-  { code: "1.1.1", unitKey: "borehole", unitEur: 13_200, target2027: 30, target2030: 140, capEur: 1_848_000, source: "boreholes" },
-  { code: "1.2.1", unitKey: "cooperative", unitEur: 190_000, target2027: 1, target2030: 1, capEur: 190_000, source: "agricoop" },
-  { code: "1.2.2", unitKey: "centre", unitEur: 160_000, target2027: 0, target2030: 1, capEur: 160_000, source: "agricoop" },
-  { code: "1.2.3", unitKey: "smallholder", unitEur: 750, target2027: 300, target2030: 1_000, capEur: 750_000, source: "agricoop" },
-  { code: "2.1.1", unitKey: "ha", unitEur: 484, target2027: 200, target2030: 3_000, capEur: 1_452_000, source: "miombo" },
-  { code: "2.2.1", unitKey: "ha", unitEur: 3_000, target2027: 100, target2030: 500, capEur: 1_500_000, source: "bamboo" },
-  { code: "3.1.1", unitKey: "foundation", unitEur: 325_000, target2027: 1, target2030: 2, capEur: 650_000, source: "tvet" },
-  { code: "3.1.2", unitKey: "superstructure", unitEur: 350_000, target2027: 0, target2030: 2, capEur: 700_000, source: "tvet" },
-  { code: "3.1.3", unitKey: "centre", unitEur: 325_000, target2027: 0, target2030: 2, capEur: 650_000, source: "tvet" },
-  { code: "3.1.4", unitKey: "place", unitEur: 1_000, target2027: 0, target2030: 500, capEur: 500_000, source: "tvet" },
-  { code: "3.2.1", unitKey: "school", unitEur: 180_000, target2027: 2, target2030: 5, capEur: 900_000, source: "schools" },
-  { code: "3.2.2", unitKey: "place", unitEur: 375, target2027: 400, target2030: 1_600, capEur: 600_000, source: "schools" },
-  { code: "4.1.1", unitKey: "report", unitEur: 25_000, target2027: 1, target2030: 4, capEur: 100_000, source: "tpa" },
+  { code: "1.1.1", unitKey: "borehole", unitEur: 13_200, finalTarget: 140, finalYear: 2030, capEur: 1_848_000, source: "boreholes", p1: { target: 30, validated: 2 }, p2: { units: 65 } },
+  { code: "1.2.1", unitKey: "cooperative", unitEur: 190_000, finalTarget: 1, finalYear: 2027, capEur: 190_000, source: "agricoop", p1: { target: 1, validated: 1 }, p2: { units: 0 } },
+  { code: "1.2.2", unitKey: "centre", unitEur: 160_000, finalTarget: 1, finalYear: 2028, capEur: 160_000, source: "agricoop", p1: { target: 0, validated: 1 }, p2: { units: 0 } },
+  { code: "1.2.3", unitKey: "smallholder", unitEur: 750, finalTarget: 1_000, finalYear: 2030, capEur: 750_000, source: "agricoop", p1: { target: 300, validated: 520 }, p2: { units: 480 } },
+  { code: "2.1.1", unitKey: "ha", unitEur: 484, finalTarget: 3_000, finalYear: 2030, capEur: 1_452_000, source: "miombo", p1: { target: 200, validated: 0 }, p2: { units: 500 } },
+  { code: "2.2.1", unitKey: "ha", unitEur: 3_000, finalTarget: 500, finalYear: 2030, capEur: 1_500_000, source: "bamboo", p1: { target: 100, validated: 39 }, p2: { units: 260 } },
+  { code: "3.1.1", unitKey: "foundation", unitEur: 325_000, finalTarget: 2, finalYear: 2027, capEur: 650_000, source: "tvet", p1: { target: 1, validated: 1 }, p2: { units: 1 } },
+  { code: "3.1.2", unitKey: "superstructure", unitEur: 350_000, finalTarget: 2, finalYear: 2028, capEur: 700_000, source: "tvet", p1: { target: 0, validated: 1 }, p2: { units: 1 } },
+  { code: "3.1.3", unitKey: "centre", unitEur: 325_000, finalTarget: 2, finalYear: 2030, capEur: 650_000, source: "tvet", p1: { target: 0, validated: 0 }, p2: { units: 2 } },
+  { code: "3.1.4", unitKey: "place", unitEur: 1_000, finalTarget: 500, finalYear: 2030, capEur: 500_000, source: "tvet", p1: { target: 0, validated: 0 }, p2: { units: 500 } },
+  { code: "3.2.1", unitKey: "school", unitEur: 180_000, finalTarget: 5, finalYear: 2030, capEur: 900_000, source: "schools", p1: { target: 2, validated: 2 }, p2: { units: 3 } },
+  { code: "3.2.2", unitKey: "place", unitEur: 375, finalTarget: 1_600, finalYear: 2030, capEur: 600_000, source: "schools", p1: { target: 400, validated: 470 }, p2: { units: 1_130 } },
+  { code: "4.1.1", unitKey: "report", unitEur: 25_000, finalTarget: 4, finalYear: 2030, capEur: 100_000, source: "tpa", p1: { target: 1, validated: 1 }, p2: { units: 1 } },
 ];
+
+/** The contract's reporting periods. Each ends with a third-party assessment (TPA) that sets the payment. */
+export interface ReportingPeriod {
+  n: 1 | 2;
+  from: string;
+  to: string;
+  /** Annex III / forecast budget amount for the period. */
+  budgetEur: number;
+  /** What the TPA validated (null until it has reported). */
+  validatedEur: number | null;
+  /** On-site TPA visit, when it has happened. */
+  tpaVisit?: { from: string; to: string };
+}
+
+export const PERIODS: [ReportingPeriod, ReportingPeriod] = [
+  { n: 1, from: "2026-01-01", to: "2026-10-16", budgetEur: 2_067_800, validatedEur: 2_119_650, tpaVisit: { from: "2026-10-12", to: "2026-10-16" } },
+  // Requested in full as further pre-financing (request for payment No 1, 26 Oct 2026).
+  { n: 2, from: "2026-10-17", to: "2027-10-16", budgetEur: 5_053_750, validatedEur: null },
+];
+
+/** Cumulative value the period 2 TPA should find: what period 1 validated plus the period 2 forecast. */
+export const milestone = (d: Pick<IndicatorDef, "p1" | "p2">) => d.p1.validated + d.p2.units;
 
 export interface IndicatorRow extends IndicatorDef {
   status: Status;
