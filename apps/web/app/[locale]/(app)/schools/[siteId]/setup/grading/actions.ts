@@ -1,6 +1,6 @@
 "use server";
 import {
-  CTEB_SCHEME, DRC_SCHEME, LEVELS, defaultSubjects, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
+  CTEB_SCHEME, DRC_SCHEME, levelNumbers, levelsOf, usesSemesters, defaultSubjects, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
   type GradingScheme, type MentionBand, type Subject,
 } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
@@ -53,7 +53,7 @@ async function writeScheme(c: Awaited<ReturnType<typeof ctx>>, next: GradingSche
 }
 
 /** The levels ticked on the scheme form (1-8). */
-const levelsOf = (fd: FormData) => [...new Set(fd.getAll("levels").map(Number).filter((n) => (LEVELS as readonly number[]).includes(n)))].sort((a, b) => a - b);
+const levelsFrom = (fd: FormData) => [...new Set(fd.getAll("levels").map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 20))].sort((a, b) => a - b);
 
 /** Removes a scheme. Its levels fall back to the school's fallback scheme (or the programme's, or DRC). Marks are kept. */
 export async function deleteScheme(fd: FormData) {
@@ -87,7 +87,7 @@ export async function saveScheme(fd: FormData) {
   if (letters.length < 2 || new Set(letters).size !== letters.length) back(c.path, { error: "scheme_letters" });
   // Domains have no editor yet: a scheme keeps its own, a new one starts from the DRC domains.
   const own = live(c.d.gradingSchemes).find((s) => s.id === c.schemeId);
-  const next = { name: str(fd, "name"), levels: levelsOf(fd), terms, examFactor: decimal(str(fd, "examFactor")), passPercent: Number(str(fd, "passPercent")), mentions, letters, domains: own?.domains ?? [] };
+  const next = { name: str(fd, "name"), levels: levelsFrom(fd), terms, examFactor: decimal(str(fd, "examFactor")), passPercent: Number(str(fd, "passPercent")), mentions, letters, domains: own?.domains ?? [] };
   const parsed = gradingScheme.safeParse(next);
   if (!parsed.success) back(c.path, { error: parsed.error.issues[0]?.path[0] === "mentions" ? "scheme_mentions" : "scheme_invalid" });
   await writeScheme(c, parsed.data!);
@@ -97,8 +97,8 @@ export async function saveScheme(fd: FormData) {
 export async function restoreScheme(fd: FormData) {
   const c = await ctx(fd);
   const own = live(c.d.gradingSchemes).find((s) => s.id === c.schemeId);
-  // A scheme only for 7e-8e goes back to the CTEB semesters; any other to the primary trimesters.
-  const def = own?.levels?.length && own.levels.every((l) => l >= 7) ? CTEB_SCHEME : DRC_SCHEME;
+  // A scheme only for semester levels goes back to the semesters; any other to the primary trimesters.
+  const def = own?.levels?.length && own.levels.every((l) => usesSemesters(levelsOf(c.d.school), l)) ? CTEB_SCHEME : DRC_SCHEME;
   await writeScheme(c, { ...def, name: own?.name ?? def.name, levels: own?.levels ?? [] });
 }
 
@@ -138,7 +138,7 @@ export async function saveSubjects(fd: FormData) {
   });
   const wanted = (lvl: number): Subject[] => list.map((r, i) => ({ level: lvl, code: r.code, name: r.name, maxPoints: r.maxPoints, position: i, domain: r.domain, branch: r.branch, optional: r.optional }));
   if (wanted(c.level).some((s) => !subject.safeParse(s).success)) back(c.path, { error: "subjects_invalid" });
-  const levels = fd.get("allLevels") === "on" ? LEVELS : [c.level];
+  const levels = fd.get("allLevels") === "on" ? levelNumbers(c.d.school) : [c.level];
   await apply(c.me, subjectMutations(c, levels, wanted), c.locale, c.siteId, c.path);
 }
 

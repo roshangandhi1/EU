@@ -7,6 +7,7 @@ export * from "./fees";
 export * from "./fee-schedule";
 export * from "./fee-plans";
 export * from "./marks";
+export * from "./levels";
 export * from "./actions";
 export * from "./entities";
 export * as schoolsTables from "./db/schema";

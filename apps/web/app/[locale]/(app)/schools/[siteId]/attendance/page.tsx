@@ -1,4 +1,4 @@
-import { activeOn, absenceReason, attendanceRate, chronicAbsentees, classDay, live } from "@eu/schools";
+import { activeOn, absenceReason, attendanceRate, chronicAbsentees, classDay, live, levelsOf } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
@@ -22,6 +22,7 @@ export default async function Attendance({ params, searchParams }: { params: Pro
   const { me, locale } = await signedIn(p.locale);
   const tr = trFor(locale);
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const now = today();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(param(sp, "date")) ? param(sp, "date") : now;
   const classes = live(d.classes).sort(byLevel);
@@ -55,7 +56,7 @@ export default async function Attendance({ params, searchParams }: { params: Pro
     const absent = new Set(day.absentStudentIds);
     const reasonOf = new Map(d.absences.filter((a) => !a.voidedAt && a.classId === selected.id && a.date === date).map((a) => [a.studentId, a.reason]));
     return (
-      <Section id="register" flush icon="check" title={`${classLabel(selected, tr)}`} description={fmtDate(date, locale)} count={roster.length}
+      <Section id="register" flush icon="check" title={`${classLabel(selected, tr, LV)}`} description={fmtDate(date, locale)} count={roster.length}
         actions={<>
           {day.taken ? <span className="pill good"><Icon name="check" size={13} />{tr("attendance.taken")}</span> : <span className="pill warn">{tr("attendance.notTaken")}</span>}
           <Link className="icon-btn" href={href({ class: "" })} aria-label={t(locale, "ui.form.close")} title={t(locale, "ui.form.close")}><Icon name="x" size={18} /></Link>
@@ -114,7 +115,7 @@ export default async function Attendance({ params, searchParams }: { params: Pro
           emptyHint={can(me, "school.configure", p.siteId) ? tr("ux.noClassesHint") : tr("setupHint.classesAsk")}
           rowClass={(r) => (r.c.id === selected?.id ? "row-sel" : undefined)}
           columns={[
-            { key: "class", header: tr("common.class"), render: (r) => <strong>{classLabel(r.c, tr)}</strong> },
+            { key: "class", header: tr("common.class"), render: (r) => <strong>{classLabel(r.c, tr, LV)}</strong> },
             { key: "status", header: tr("common.status"), render: (r) => (r.day.taken ? <span className="pill good">{tr("attendance.taken")}</span> : <span className="pill warn">{tr("attendance.notTaken")}</span>) },
             { key: "present", header: tr("attendance.present"), numeric: true, render: (r) => (r.day.taken ? r.day.present : "—") },
             { key: "absent", header: tr("attendance.absent"), numeric: true, render: (r) => (r.day.taken ? r.day.absent : "—") },

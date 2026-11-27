@@ -1,4 +1,4 @@
-import { classResults, formatScore, periodsIn, type Span } from "@eu/schools";
+import { classResults, formatScore, periodsIn, type Span, levelsOf } from "@eu/schools";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyRow, Section } from "@/components/ui";
@@ -17,6 +17,7 @@ export default async function PupilResults({ params, searchParams }: { params: P
   const { me, locale } = await signedIn(p.locale);
   const tr = trFor(locale);
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const student = d.students.find((s) => s.id === p.studentId);
   if (!student) notFound();
   // The class: the one asked for, else the pupil's current class this year.
@@ -52,10 +53,10 @@ export default async function PupilResults({ params, searchParams }: { params: P
       {nav}
       <div className="print-head">
         <h1>{d.site.name}</h1>
-        <p>{tr("marks.pupilSheet")} · {studentName(student)} ({student.studentNumber}) · {classLabel(cls, tr)} · {ctx.year?.label}</p>
+        <p>{tr("marks.pupilSheet")} · {studentName(student)} ({student.studentNumber}) · {classLabel(cls, tr, LV)} · {ctx.year?.label}</p>
         <p>{tr("marks.schemeLine", { name: ctx.scheme.name, pass: ctx.scheme.passPercent })}</p>
       </div>
-      <Section className="marks-sec" id="pupil" flush icon="user" title={studentName(student)} description={`${student.studentNumber} · ${classLabel(cls, tr)} · ${ctx.year?.label ?? ""}`}
+      <Section className="marks-sec" id="pupil" flush icon="user" title={studentName(student)} description={`${student.studentNumber} · ${classLabel(cls, tr, LV)} · ${ctx.year?.label ?? ""}`}
         actions={<><Link className="btn secondary sm no-print" href={`${base}/bulletin?class=${cls.id}&student=${student.id}`}>{tr("marks.bulletin")}</Link><PrintButton label={tr("marks.print")} /><Link className="btn ghost sm no-print" href={`${base}/results?class=${cls.id}`}>{tr("marks.backToClass")}</Link></>}>
         <div className="marks-grid-wrap">
           <table className="grid marks-sheet">

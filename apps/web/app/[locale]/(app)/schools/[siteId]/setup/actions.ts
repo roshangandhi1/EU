@@ -1,6 +1,6 @@
 "use server";
 import { sites } from "@eu/db";
-import { insertMutation, planFeePlanItems, planPeriods, schoolsEntities, schoolsTables, updateMutation, voidMutation, type SchoolData } from "@eu/schools";
+import { checkLevels, defaultSemesters, planTermKind, insertMutation, levelsOf, live, type LevelDef, planFeePlanItems, planPeriods, schoolsEntities, schoolsTables, updateMutation, voidMutation, type SchoolData } from "@eu/schools";
 import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -126,11 +126,37 @@ export const saveSchool = form(async (c, fd) => {
   return null;
 }, "ux.saved");
 
+/**
+ * Saves the school's levels: number, name and trimesters/semesters per row; ticked rows are
+ * removed, blank rows ignored. A level that still has classes cannot be removed.
+ */
+export const saveLevels = form(async (c, fd) => {
+  if (!c.d.school) return "invalid";
+  const rows: LevelDef[] = [];
+  for (let i = 0; i < 40; i++) {
+    if (!fd.has(`lv_${i}`)) continue;
+    const raw = str(fd, `lv_${i}`), name = str(fd, `nm_${i}`);
+    if (!raw && !name) continue;
+    const lvl = Number(raw);
+    if (fd.get(`rm_${i}`) === "1") {
+      if (live(c.d.classes).some((k) => k.level === lvl)) return { code: "levelInUse", fields: [`lv_${i}`], vars: { n: name || raw } };
+      continue;
+    }
+    rows.push({ level: lvl, name, semesters: fd.get(`sm_${i}`) === "1" });
+  }
+  const res = checkLevels(rows);
+  if ("error" in res) return { code: res.error === "levels_duplicate" ? "levelDuplicate" : res.error === "levels_empty" ? "levelsEmpty" : "levelInvalid", fields: [] };
+  const missing = [...new Set(live(c.d.classes).map((k) => k.level))].filter((l) => !res.levels.some((r) => r.level === l));
+  if (missing.length) return { code: "levelInUse", fields: [], vars: { n: missing.join(", ") } };
+  if (JSON.stringify(res.levels) === JSON.stringify(levelsOf(c.d.school))) return null;
+  return firstRejection(await push(c.me, [updateMutation("school.school", c.siteId, c.d.school.id, { levels: res.levels }, newId())]));
+}, "ux.saved");
+
 export const addYear = form((c, fd) =>
   checked(c, "school.academic_year", { label: str(fd, "label"), startsOn: str(fd, "startsOn"), endsOn: str(fd, "endsOn") }, (f) => checkYear(f, c.d.years)));
 
 export const addTerm = form((c, fd) =>
-  checked(c, "school.term", { academicYearId: str(fd, "academicYearId"), number: int(fd, "number"), startsOn: str(fd, "startsOn"), endsOn: str(fd, "endsOn") },
+  checked(c, "school.term", { academicYearId: str(fd, "academicYearId"), kind: str(fd, "kind") === "semester" ? "semester" : "trimester", number: int(fd, "number"), startsOn: str(fd, "startsOn"), endsOn: str(fd, "endsOn") },
     (f) => checkTerm(f as never, c.d.years, c.d.terms)));
 
 export const addClassroom = form((c, fd) =>
@@ -230,11 +256,11 @@ export const editYear = form((c, fd) => {
     (f) => checkYear(f, c.d.years, id, c.d.terms));
 });
 
-/** A term keeps its year: fee items charged in it belong to that year. */
+/** A term keeps its year and kind: fee items charged in it belong to that year. */
 export const editTerm = form((c, fd) => {
   const id = str(fd, "editId");
   const prev = c.d.terms.find((t) => t.id === id);
-  const fields = { academicYearId: prev?.academicYearId ?? "", number: int(fd, "number"), startsOn: str(fd, "startsOn"), endsOn: str(fd, "endsOn") };
+  const fields = { academicYearId: prev?.academicYearId ?? "", kind: prev?.kind ?? "trimester", number: int(fd, "number"), startsOn: str(fd, "startsOn"), endsOn: str(fd, "endsOn") };
   return edited(c, "school.term", c.d.terms, id, fields, (f) => checkTerm(f as never, c.d.years, c.d.terms, id)).then(async (r) => {
     if (r !== null || !prev || prev.endsOn === fields.endsOn) return r;
     // Fees for this trimester charge up to its new last day.
@@ -313,7 +339,10 @@ export const editExemption = form(async (c, fd) => {
   ]));
 });
 
-/** "Add trimesters 1–3" for a year with none yet: splits the year in three (each can be edited). */
+/**
+ * "Add trimesters 1–3" for a year with none yet: splits the year in three. With kind=semester,
+ * "Add semesters 1–2": 1 Sep-22 Dec and 11 Jan-2 Jul. Each can be edited after.
+ */
 export async function addThreeTerms(fd: FormData) {
   const { me, locale } = await signedIn(str(fd, "locale"));
   const siteId = str(fd, "siteId");
@@ -323,8 +352,11 @@ export async function addThreeTerms(fd: FormData) {
   const d = await schoolFor(me, siteId);
   const y = d.years.find((x) => x.id === str(fd, "academicYearId") && !x.voidedAt);
   if (!y) go({ error: "not_found" });
-  if (d.terms.some((t) => !t.voidedAt && t.academicYearId === y!.id)) go({ error: "invalid" });
-  const muts = threeTerms(y!).map((t) => insertMutation("school.term", siteId, { academicYearId: y!.id, ...t }, { mutationId: newId(), recordId: newId() }));
+  const semesters = str(fd, "kind") === "semester";
+  const kind = semesters ? "semester" : "trimester";
+  if (d.terms.some((t) => !t.voidedAt && t.academicYearId === y!.id && (t.kind ?? "trimester") === kind)) go({ error: "invalid" });
+  const dates = semesters ? defaultSemesters(y!) : threeTerms(y!);
+  const muts = dates.map((t) => insertMutation("school.term", siteId, { academicYearId: y!.id, kind, ...t }, { mutationId: newId(), recordId: newId() }));
   const bad = firstRejection(await push(me, muts));
   revalidatePath(`/${locale}/schools/${siteId}`, "layout");
   go(bad ? { error: bad } : { ok: "added" });
@@ -352,7 +384,13 @@ function planFields(c: Ctx, fd: FormData, yearId: string): { fields: Record<stri
       endsOn = year && monthEnd(b) > year.endsOn ? year.endsOn : monthEnd(b);
     }
   } else if (frequency === "per_term") {
-    const a = terms.find((t) => t.number === Number(str(fd, "startTerm"))), b = terms.find((t) => t.number === Number(str(fd, "endTerm")));
+    // Trimester levels charge per trimester, semester levels per semester; a plan cannot mix them.
+    const kind = planTermKind(parseLevels(str(fd, "levels")), levelsOf(c.d.school));
+    if (kind === "mixed") return { fields: {}, problem: { code: "planMixedCycles", fields: ["levels"] } };
+    const own = terms.filter((t) => (t.kind ?? "trimester") === kind);
+    // The form offers 1-3; a year has only two semesters, so a later end means "the last one".
+    const last = Math.max(0, ...own.map((t) => t.number));
+    const a = own.find((t) => t.number === Math.min(Number(str(fd, "startTerm")), last)), b = own.find((t) => t.number === Math.min(Number(str(fd, "endTerm")), last));
     if (!a || !b) problem = { code: "planNeedsTerms", fields: ["startTerm"] };
     else { startsOn = a.startsOn; endsOn = b.endsOn; }
   }
@@ -386,7 +424,8 @@ async function savePlan(c: Ctx, fd: FormData, id: string | null): Promise<Proble
   const bad = checkFeePlan(plan, year);
   if (bad) return bad;
   const planId = id ?? newId();
-  const periods = planPeriods(plan, year!, c.d.terms.filter((t) => t.academicYearId === yearId), c.locale);
+  const kind = planTermKind(plan.levels, levelsOf(c.d.school));
+  const periods = planPeriods(plan, year!, c.d.terms.filter((t) => t.academicYearId === yearId && (t.kind ?? "trimester") === kind), c.locale);
   if (periods.length === 0) return { code: "planEmpty", fields: [] };
   const inUse = (itemId: string) => c.d.payments.some((p) => !p.voidedAt && p.feeItemIds.includes(itemId)) || c.d.exemptions.some((x) => !x.voidedAt && x.feeItemId === itemId);
   const { ops } = planFeePlanItems(c.d.feeItems, planId, plan, periods, inUse);

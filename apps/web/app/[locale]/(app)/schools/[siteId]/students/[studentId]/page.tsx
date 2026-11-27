@@ -1,4 +1,4 @@
-import { activeOn, formatCdf, live, enrolmentBalance, newestFirst, receiptLabel } from "@eu/schools";
+import { activeOn, formatCdf, live, enrolmentBalance, newestFirst, receiptLabel, levelsOf } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -21,6 +21,7 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
   const tr = trFor(locale);
   const C = tr("common.colon");
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const s = d.students.find((x) => x.id === p.studentId && !x.voidedAt);
   if (!s) notFound();
   const date = today();
@@ -83,21 +84,21 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
         <Link className="btn ghost sm no-print" href={`${base}/students`}><Icon name="arrow" size={15} className="flip" />{tr("nav.students")}</Link>
         <div className="pupil-title">
           <h2>{studentName(s)}</h2>
-          <p className="muted">{s.studentNumber}{cls ? ` · ${classLabel(cls, tr)}` : ""}{year ? ` · ${year.label}` : ""} {statusPill}</p>
+          <p className="muted">{s.studentNumber}{cls ? ` · ${classLabel(cls, tr, LV)}` : ""}{year ? ` · ${year.label}` : ""} {statusPill}</p>
         </div>
       </div>
       <Flash sp={sp} tr={tr} />
 
       <Section id="place" icon="users" title={tr("pupil.place")} description={e ? tr("pupil.enrolledSince", { date: fmtDate(e.enrolledOn, locale) }) : undefined}>
         {!e ? <p className="muted">{tr("pupil.noEnrolment")}</p> : !canWrite ? (
-          <p>{cls ? classLabel(cls, tr) : "—"}</p>
+          <p>{cls ? classLabel(cls, tr, LV) : "—"}</p>
         ) : current ? (
           <div className="pupil-actions">
             <form action={changeClass} className="pupil-inline">
               {hidden}
               <Fields>
                 <Field span={8} label={tr("pupil.changeClass")} hint={tr("pupil.changeClassHint")}>
-                  <select name="classId" defaultValue={e.classId}>{sameYear.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr)}</option>)}</select>
+                  <select name="classId" defaultValue={e.classId}>{sameYear.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr, LV)}</option>)}</select>
                 </Field>
               </Fields>
               <FormFooter><SubmitButton small variant="secondary" pending={saving}>{tr("pupil.moveSave")}</SubmitButton></FormFooter>
@@ -146,7 +147,7 @@ export default async function Pupil({ params, searchParams }: { params: Promise<
       <div id="statement">
         <Section id="fees" flush icon="coins" title={tr("pupil.statement")} description={year ? `${year.label} · ${tr("pupil.asAt", { date: fmtDate(date, locale) })}` : undefined}
           actions={<PrintButton target="statement" label={tr("print.statement")} />}>
-          <div className="print-only print-head"><strong>{d.site.name}</strong> · {studentName(s)} · {s.studentNumber}{cls ? ` · ${classLabel(cls, tr)}` : ""}</div>
+          <div className="print-only print-head"><strong>{d.site.name}</strong> · {studentName(s)} · {s.studentNumber}{cls ? ` · ${classLabel(cls, tr, LV)}` : ""}</div>
           {bal && (
             <div className="pupil-stats">
               <Stats>

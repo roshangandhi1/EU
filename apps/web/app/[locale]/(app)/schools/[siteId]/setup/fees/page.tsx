@@ -1,11 +1,11 @@
-import { activeOn, colKey, feeGrid, feeNames, formatCdf, LEVELS, live } from "@eu/schools";
+import { activeOn, colKey, feeGrid, feeNames, formatCdf, levelsOf, live, termKindFor } from "@eu/schools";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { t } from "@eu/core/i18n";
 import { EmptyRow, Field, Fields, FormFooter, Notice, Section, SubmitButton } from "@/components/ui";
 import { can, mySchools, schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
 import { Flash, param, type SP } from "../../../flash";
-import { classLabel, levelLabel, studentName } from "../../labels";
+import { classLabel, studentName } from "../../labels";
 import { FormGuard, SelectAll } from "../../../guard";
 import { plural } from "../../../text";
 import { bulkExempt, copyFees, saveFeeSchedule } from "./actions";
@@ -21,6 +21,7 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
   const tr = trFor(locale);
   if (!can(me, "school.configure", p.siteId)) return <Notice tone="warning">{tr("setup.configureOnly")}</Notice>;
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const fc = (n: number) => formatCdf(n, locale);
   const base = `/${locale}/schools/${p.siteId}/setup`;
   const date = today();
@@ -42,8 +43,11 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
 
   const names = feeNames(d.feeItems, year.id);
   const fee = param(sp, "fee") && param(sp, "fee") !== "__new" ? param(sp, "fee") : param(sp, "fee") === "__new" ? "" : (names[0] ?? "");
-  const terms = live(d.terms).filter((t) => t.academicYearId === year.id).sort((a, b) => a.number - b.number);
-  const columns: { termId: string | null; label: string }[] = [{ termId: null, label: tr("feeGrid.wholeYear") }, ...terms.map((t) => ({ termId: t.id, label: tr("feeGrid.term", { n: t.number }) }))];
+  // Trimesters, then semesters: trimester levels fill the first, semester levels the second.
+  const terms = live(d.terms).filter((t) => t.academicYearId === year.id).sort((a, b) => (b.kind ?? "trimester").localeCompare(a.kind ?? "trimester") || a.number - b.number);
+  const defs = levelsOf(d.school);
+  const columns: { termId: string | null; label: string; kind: string | null }[] = [{ termId: null, label: tr("feeGrid.wholeYear"), kind: null },
+    ...terms.map((t) => ({ termId: t.id, label: tr(t.kind === "semester" ? "feeGrid.semester" : "feeGrid.term", { n: t.number }), kind: t.kind ?? "trimester" }))];
   const g = feeGrid(d.feeItems, year.id, fee);
   const cell = (c: string, l: number) => g.amounts.get(`${c}:${l}`);
   const levelTotal = (l: number) => columns.reduce((n, c) => n + (cell(colKey(c.termId), l) ?? 0), 0);
@@ -143,14 +147,15 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
                   ))}
                   <td />
                 </tr>
-                {LEVELS.map((l) => (
+                {defs.map(({ level: l, name: lname }) => (
                   <tr key={l}>
-                    <th scope="row" className="fee-level" style={{ top: "auto", fontSize: 14.5, color: "var(--text)", verticalAlign: "middle" }}>{levelLabel(l, tr)}</th>
+                    <th scope="row" className="fee-level" style={{ top: "auto", fontSize: 14.5, color: "var(--text)", verticalAlign: "middle" }}>{lname}</th>
                     {columns.map((c) => {
                       const k = colKey(c.termId);
+                      if (c.kind && termKindFor(defs, l) !== c.kind) return <td key={k} className="fee-na" aria-hidden>—</td>;
                       return (
                         <td key={k} className="num">
-                          <input className="ctl num-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l) != null ? groupDigits(cell(k, l)!, locale) : ""} placeholder="—" aria-label={`${levelLabel(l, tr)} · ${c.label} (FC)`} />
+                          <input className="ctl num-input" name={`amt:${k}:${l}`} inputMode="numeric" pattern="[0-9 ,.]*" defaultValue={cell(k, l) != null ? groupDigits(cell(k, l)!, locale) : ""} placeholder="—" aria-label={`${lname} · ${c.label} (FC)`} />
                         </td>
                       );
                     })}
@@ -190,7 +195,7 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
           <label className="tb-field">{tr("feeGrid.filterClass")}
             <select className="ctl" name="class" defaultValue={cls}>
               <option value="">{tr("feeGrid.allClasses")}</option>
-              {yearClasses.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr)}</option>)}
+              {yearClasses.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr, LV)}</option>)}
             </select>
           </label>
           <button className="btn secondary" type="submit">{tr("feeGrid.show")}</button>
@@ -210,9 +215,9 @@ export default async function FeeSchedule({ params, searchParams }: { params: Pr
                       <td style={{ width: 44 }}><input className="tick" type="checkbox" name="studentId" value={s.id} aria-label={studentName(s)} /></td>
                       <td>
                         <strong>{studentName(s)}</strong> <span className="muted">· {s.studentNumber}</span>
-                        <div className="fee-pupil-sub muted">{classLabel(c, tr)}{exempted.has(s.id) && <span className="pill warn">{tr("feeGrid.already")}</span>}</div>
+                        <div className="fee-pupil-sub muted">{classLabel(c, tr, LV)}{exempted.has(s.id) && <span className="pill warn">{tr("feeGrid.already")}</span>}</div>
                       </td>
-                      <td className="fee-wide">{classLabel(c, tr)}</td>
+                      <td className="fee-wide">{classLabel(c, tr, LV)}</td>
                       <td className="fee-wide">{exempted.has(s.id) && <span className="pill warn">{tr("feeGrid.already")}</span>}</td>
                     </tr>
                   ))}

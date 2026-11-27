@@ -1,4 +1,4 @@
-import { DRC_SCHEME, LEVELS, domainsOf, lettersOf, live, maxFor, periodsOf, resolveScheme, resolveSubjects } from "@eu/schools";
+import { DRC_SCHEME, domainsOf, levelsOf, usesSemesters, lettersOf, live, maxFor, periodsOf, resolveScheme, resolveSubjects } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Check, ChoiceGroup, Chip, ConfirmButton, Field, Fields, Notice, Section, SubmitButton, Table } from "@/components/ui";
@@ -28,7 +28,9 @@ export default async function GradingSetup({ params, searchParams }: { params: P
   const scopeId = programme ? "schools" : p.siteId;
   const saving = t(locale, "ui.form.saving");
   const base = `/${locale}/schools/${p.siteId}/setup/grading`;
-  const level = LEVELS.find((l) => String(l) === param(sp, "level")) ?? 1;
+  const LV = levelsOf(d.school);
+  const LEVELS = LV.map((l) => l.level);
+  const level = LEVELS.find((l) => String(l) === param(sp, "level")) ?? LEVELS[0] ?? 1;
 
   // The scope's schemes (several, each for some levels; one may be the fallback for the rest).
   const schemes = live(d.gradingSchemes).filter((s) => s.scopeId === scopeId).sort((a, b) => (a.levels?.[0] ?? 99) - (b.levels?.[0] ?? 99) || a.name.localeCompare(b.name));
@@ -41,7 +43,7 @@ export default async function GradingSetup({ params, searchParams }: { params: P
   const source = selected ? (programme ? "programme" : "school") : adding ? "default" : inForce.source;
   const sourceNote = { school: tr("marks.sourceSchool"), programme: tr("marks.sourceProgramme"), default: adding ? tr("marks.newScheme") : tr("marks.sourceDefault") }[source];
   const takenBy = (l: number) => schemes.find((s) => s.id !== selected?.id && (s.levels ?? []).includes(l));
-  const levelsText = (ls: readonly number[] | undefined) => (ls && ls.length ? ls.map((l) => levelLabel(l, tr)).join(", ") : tr("marks.allOtherLevels"));
+  const levelsText = (ls: readonly number[] | undefined) => (ls && ls.length ? ls.map((l) => levelLabel(l, tr, LV)).join(", ") : tr("marks.allOtherLevels"));
   const schemeHref = (id: string) => `${base}?${new URLSearchParams({ ...(programme ? { scope: "programme" } : {}), level: String(level), scheme: id })}#scheme`;
   const subj = programme
     ? (() => { const mine = live(d.subjects).filter((s) => s.scopeId === "schools" && s.level === level); return mine.length ? { subjects: mine.sort((a, b) => a.position - b.position), source: "programme" as const } : resolveSubjects([], "", level, locale); })()
@@ -60,7 +62,7 @@ export default async function GradingSetup({ params, searchParams }: { params: P
     </>
   );
   // The subjects table shows exam maxima with the scheme that grades the level shown.
-  const levelScheme = programme ? resolveScheme(d.gradingSchemes.filter((s) => s.scopeId === "schools"), "", level).scheme : resolveScheme(d.gradingSchemes, p.siteId, level).scheme;
+  const levelScheme = programme ? resolveScheme(d.gradingSchemes.filter((s) => s.scopeId === "schools"), "", level, usesSemesters(LV, level)).scheme : resolveScheme(d.gradingSchemes, p.siteId, level, usesSemesters(LV, level)).scheme;
   const errors: Record<string, string> = { scheme_levels: tr("marks.errLevels", { levels: param(sp, "levels") }), scheme_fallback: tr("marks.errFallback"), not_found: tr("err.notFound"), scheme_terms: tr("marks.errTerms"), scheme_mentions: tr("marks.errMentions"), scheme_invalid: tr("common.invalid"), scheme_letters: tr("marks.errLetters"), subjects_invalid: tr("marks.errSubjects"), subjects_empty: tr("marks.errSubjectsEmpty") };
   const err = errors[param(sp, "error")];
 
@@ -113,7 +115,7 @@ export default async function GradingSetup({ params, searchParams }: { params: P
             <ChoiceGroup span={12} legend={tr("marks.schemeLevels")} hint={tr("marks.schemeLevelsHint")}>
               {LEVELS.map((l) => {
                 const other = takenBy(l);
-                return <Chip key={l} name="levels" value={String(l)} label={levelLabel(l, tr)} sub={other ? other.name : undefined} disabled={!!other} defaultChecked={(scheme.levels ?? []).includes(l)} />;
+                return <Chip key={l} name="levels" value={String(l)} label={levelLabel(l, tr, LV)} sub={other ? other.name : undefined} disabled={!!other} defaultChecked={(scheme.levels ?? []).includes(l)} />;
               })}
             </ChoiceGroup>
           </Fields>
@@ -185,7 +187,7 @@ export default async function GradingSetup({ params, searchParams }: { params: P
         <form method="get" className="filterbar inset">
           {programme && <input type="hidden" name="scope" value="programme" />}
           <label className="tb-field">{tr("common.level")}
-            <select className="ctl" name="level" defaultValue={String(level)}>{LEVELS.map((l) => <option key={l} value={l}>{levelLabel(l, tr)}</option>)}</select>
+            <select className="ctl" name="level" defaultValue={String(level)}>{LEVELS.map((l) => <option key={l} value={l}>{levelLabel(l, tr, LV)}</option>)}</select>
           </label>
           <button className="btn secondary" type="submit">{tr("ux.show")}</button>
         </form>
@@ -229,13 +231,13 @@ export default async function GradingSetup({ params, searchParams }: { params: P
           </Fields>
           <p className="muted small">{tr("marks.subjectsHint", { factor: String(levelScheme.examFactor).replace(".", locale === "fr" ? "," : ".") })}</p>
           <div className="savebar">
-            <span className="savebar-status"><span className="savebar-dot" aria-hidden /><span>{levelLabel(level, tr)} · {tr("marks.subjectsCount", { n: subj.subjects.length })}</span></span>
+            <span className="savebar-status"><span className="savebar-dot" aria-hidden /><span>{levelLabel(level, tr, LV)} · {tr("marks.subjectsCount", { n: subj.subjects.length })}</span></span>
             <span className="savebar-actions"><SubmitButton variant="lime" icon="check" pending={saving}>{tr("marks.saveSubjects")}</SubmitButton></span>
           </div>
         </form>
         <form action={restoreSubjects} className="marks-restore">
           {hidden}
-          <RestoreButton label={tr("marks.restoreSubjects", { level: levelLabel(level, tr) })} confirm={tr("marks.restoreSubjectsConfirm")} yes={tr("marks.restore")} no={t(locale, "ui.form.cancel")} />
+          <RestoreButton label={tr("marks.restoreSubjects", { level: levelLabel(level, tr, LV) })} confirm={tr("marks.restoreSubjectsConfirm")} yes={tr("marks.restore")} no={t(locale, "ui.form.cancel")} />
         </form>
       </Section>
     </div>

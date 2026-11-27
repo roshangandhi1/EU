@@ -1,6 +1,6 @@
 "use server";
 import { parseWholeNumber } from "@eu/schools";
-import { colKey, exemption, insertMutation, LEVELS, live, missingTermsForCopy, planFeeCopy, planFeeSchedule, updateMutation, voidMutation, type FeeGrid } from "@eu/schools";
+import { colKey, exemption, insertMutation, levelsOf, live, termKindFor, missingTermsForCopy, planFeeCopy, planFeeSchedule, updateMutation, voidMutation, type FeeGrid } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
 import { revalidatePath } from "next/cache";
 import { back, can, firstRejection, newId, push, schoolFor, signedIn, str } from "@/lib/schools";
@@ -38,12 +38,18 @@ export async function saveFeeSchedule(fd: FormData) {
   const name = (str(fd, "newFee") || str(fd, "fee")).trim();
   if (!name) back(path, { error: "invalid" });
   const out = `/${locale}/schools/${siteId}/setup/fees?${new URLSearchParams({ year: year.id, fee: name })}`;
-  const columns: (string | null)[] = [null, ...live(d.terms).filter((t) => t.academicYearId === year.id).sort((a, b) => a.number - b.number).map((t) => t.id)];
+  const yearTerms = live(d.terms).filter((t) => t.academicYearId === year.id);
+  const columns: (string | null)[] = [null, ...yearTerms.sort((a, b) => a.number - b.number).map((t) => t.id)];
+  const defs = levelsOf(d.school);
+  const levels = defs.map((l) => l.level);
   const grid: FeeGrid = { amounts: new Map(), dues: new Map() };
   for (const termId of columns) {
     const c = colKey(termId);
+    const kind = termId ? (yearTerms.find((t) => t.id === termId)?.kind ?? "trimester") : null;
     let any = false;
-    for (const l of LEVELS) {
+    for (const l of levels) {
+      // A trimester column only charges trimester levels; a semester column only semester levels.
+      if (kind && termKindFor(defs, l) !== kind) continue;
       const a = francs(str(fd, `amt:${c}:${l}`));
       if (a === "bad") back(out, { error: "fee_amount" });
       if (a !== null) {
@@ -57,7 +63,7 @@ export async function saveFeeSchedule(fd: FormData) {
   }
   // Trimester fees charge for their trimester (a pupil enrolling after it is not charged).
   const termEnd = (termId: string | null) => live(d.terms).find((t) => t.id === termId)?.endsOn ?? null;
-  const ops = planFeeSchedule(d.feeItems.filter((i) => !i.planId), year.id, name, columns, grid);
+  const ops = planFeeSchedule(d.feeItems.filter((i) => !i.planId), year.id, name, columns, grid, levels);
   if (ops.length === 0) back(out, { fee_nothing: "1" });
   const muts: Mutation[] = ops.map((o) =>
     o.op === "create"

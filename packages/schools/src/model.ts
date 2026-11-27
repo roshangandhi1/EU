@@ -52,11 +52,24 @@ export const school = z.object({
   province: z.string().max(80).optional(),
   city: z.string().max(80).optional(),
   commune: z.string().max(80).optional(),
+  /** The school's levels (classes, fees, marks), set by the admin. Null or empty = the DRC default list. */
+  levels: z.array(z.lazy(() => levelDef)).max(20).nullable().optional(),
 });
 export type School = z.infer<typeof school>;
 
-/** Levels: primary 1re to 6e année, then 7e and 8e (basic education, CTEB). */
-export const level = z.number().int().min(1).max(8);
+/** Level numbers: primary 1-6, 7e-8e (basic education, CTEB), then 9 and up (humanités, pédagogie...). */
+export const level = z.number().int().min(1).max(20);
+
+/**
+ * One level a school runs: its number (1re année = 1, 7e = 7, 1re humanités = 9...), its name as
+ * shown on screens, and whether its year runs on two semesters (secondary) or three trimesters.
+ */
+export const levelDef = z.object({
+  level,
+  name: z.string().min(1).max(40),
+  semesters: z.boolean(),
+});
+export type LevelDef = z.infer<typeof levelDef>;
 
 export const academicYear = z.object({
   label: z.string(), // e.g. "2026-2027"
@@ -65,13 +78,19 @@ export const academicYear = z.object({
 });
 export type AcademicYear = z.infer<typeof academicYear>;
 
+/** Primary classes run on trimesters, secondary on semesters; a year can hold both sets of dates. */
+export const termKind = z.enum(["trimester", "semester"]);
+export type TermKind = z.infer<typeof termKind>;
+
 export const term = z.object({
   academicYearId: id,
+  kind: termKind.default("trimester"),
   number: z.number().int().min(1).max(3),
   startsOn: isoDate,
   endsOn: isoDate,
 });
-export type Term = z.infer<typeof term>;
+/** Older records and callers may leave out kind (trimester). */
+export type Term = z.input<typeof term>;
 
 export const schoolClass = z.object({
   academicYearId: id,

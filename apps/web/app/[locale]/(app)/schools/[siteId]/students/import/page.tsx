@@ -1,4 +1,4 @@
-import { currentYear, live, schoolsEn, schoolsFr } from "@eu/schools";
+import { currentYear, live, schoolsEn, schoolsFr, levelsOf } from "@eu/schools";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { NoAccess } from "@/components/no-access";
@@ -15,6 +15,7 @@ export default async function ImportPupils({ params }: { params: Promise<{ local
   const { me, locale } = await signedIn(p.locale);
   const tr = trFor(locale);
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   if (!can(me, "student.write", p.siteId) || !can(me, "enrolment.write", p.siteId)) return <NoAccess locale={locale} reason={tr("common.forbidden")} />;
   const date = today();
   const year = currentYear(d, date);
@@ -33,7 +34,7 @@ export default async function ImportPupils({ params }: { params: Promise<{ local
         base={base}
         today={date}
         defaultDate={year && year.startsOn <= date ? year.startsOn : date}
-        classes={classes.map((c) => ({ id: c.id, yearId: c.academicYearId, label: classLabel(c, tr), code: classCode(c, classes, locale) }))}
+        classes={classes.map((c) => ({ id: c.id, yearId: c.academicYearId, label: classLabel(c, tr, LV), code: classCode(c, classes, locale) }))}
         yearId={year?.id ?? ""}
         l={(locale === "fr" ? schoolsFr : schoolsEn).pimport}
       />

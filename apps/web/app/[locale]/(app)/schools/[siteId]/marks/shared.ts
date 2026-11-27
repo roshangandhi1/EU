@@ -1,4 +1,4 @@
-import { activeOn, isSemesters, live, markIndex, periodsOf, resolveScheme, resolveSubjects, type PeriodDef, type SchoolData, type Span } from "@eu/schools";
+import { activeOn, isSemesters, levelsOf, usesSemesters, live, markIndex, periodsOf, resolveScheme, resolveSubjects, type PeriodDef, type SchoolData, type Span } from "@eu/schools";
 import type { Locale } from "@eu/core/i18n";
 import { byLevel, studentName } from "../labels";
 
@@ -33,7 +33,7 @@ export function marksContext(d: SchoolData, siteId: string, date: string, classI
   const year = years.find((y) => y.startsOn <= date && y.endsOn >= date) ?? years[0];
   const classes = live(d.classes).filter((c) => c.academicYearId === year?.id).sort(byLevel);
   const cls = classes.find((c) => c.id === classId);
-  const { scheme, source } = resolveScheme(d.gradingSchemes, siteId, cls?.level);
+  const { scheme, source } = resolveScheme(d.gradingSchemes, siteId, cls?.level, cls ? usesSemesters(levelsOf(d.school), cls.level) : undefined);
   const periods = periodsOf(scheme);
   const students = new Map(d.students.map((s) => [s.id, s]));
   const pupilsOf = (id: string) => {

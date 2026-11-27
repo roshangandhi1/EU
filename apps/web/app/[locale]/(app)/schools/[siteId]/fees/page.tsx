@@ -1,4 +1,4 @@
-import { activeOn, currentYear, dailyCollections, duplicateReceipts, formatCdf, live, enrolmentBalance, matchesReceipt, newestFirst, receiptLabel } from "@eu/schools";
+import { activeOn, currentYear, dailyCollections, duplicateReceipts, formatCdf, live, enrolmentBalance, matchesReceipt, newestFirst, receiptLabel, levelsOf } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Field, Fields, FormFooter, Notice, RowMenu, Section, SubmitButton, Table } from "@/components/ui";
@@ -19,6 +19,7 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
   const tr = trFor(locale);
   const C = tr("common.colon");
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const date = today();
   const fc = (n: number) => formatCdf(n, locale);
   const base = `/${locale}/schools/${p.siteId}`;
@@ -90,7 +91,7 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
       {canPay && (
         <Section id="pay" icon="receipt" title={tr("fees.payment")} description={tr("ux.payIntro")}>
           <PayForm key={payKey} locale={locale} siteId={p.siteId} l={pl}
-            pupils={balances.map((r) => ({ id: r.s.id, name: studentName(r.s), number: r.s.studentNumber, cls: classLabel(r.c, tr), level: r.c.level, balance: fc(Math.max(0, r.b.balance)), overdue: r.b.overdue > 0 ? fc(r.b.overdue) : "", owes: r.b.balance > 0 }))}
+            pupils={balances.map((r) => ({ id: r.s.id, name: studentName(r.s), number: r.s.studentNumber, cls: classLabel(r.c, tr, LV), level: r.c.level, balance: fc(Math.max(0, r.b.balance)), overdue: r.b.overdue > 0 ? fc(r.b.overdue) : "", owes: r.b.balance > 0 }))}
             items={items.map((i) => ({ id: i.id, name: i.name, amount: fc(i.amount), levels: i.levels }))}
             d={{
               studentId: fromParams ? param(sp, "studentId") : "", amount: fromParams ? param(sp, "amount") : "",
@@ -112,7 +113,7 @@ export default async function Fees({ params, searchParams }: { params: Promise<{
             emptyIcon="check"
             columns={[
               { key: "name", header: tr("common.name"), render: (r) => <><Link className="row-link" href={`${base}/students/${r.s.id}#fees`}><strong>{studentName(r.s)}</strong></Link><div className="muted small">{r.s.studentNumber}</div></> },
-              { key: "class", header: tr("common.class"), render: (r) => classLabel(r.c, tr) },
+              { key: "class", header: tr("common.class"), render: (r) => classLabel(r.c, tr, LV) },
               { key: "charged", header: tr("fees.charged"), numeric: true, render: (r) => fc(r.b.charged) },
               { key: "paid", header: tr("fees.paid"), numeric: true, render: (r) => fc(r.b.paid) },
               { key: "overdue", header: tr("fees.overdue"), numeric: true, render: (r) => <strong className="text-bad">{fc(r.b.overdue)}</strong> },

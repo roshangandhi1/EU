@@ -20,6 +20,8 @@ export const schoolSchools = pgTable("school_schools", {
   province: text("province").notNull().default(""),
   city: text("city").notNull().default(""),
   commune: text("commune").notNull().default(""),
+  /** The school's levels with names and trimesters/semesters; null = the DRC default list. */
+  levels: jsonb("levels").$type<{ level: number; name: string; semesters: boolean }[]>(),
 });
 
 export const schoolAcademicYears = pgTable("school_academic_years", {
@@ -32,6 +34,7 @@ export const schoolAcademicYears = pgTable("school_academic_years", {
 export const schoolTerms = pgTable("school_terms", {
   ...syncColumns(),
   academicYearId: uuid("academic_year_id").notNull(),
+  kind: text("kind").notNull().default("trimester"), // trimester | semester
   number: integer("number").notNull(),
   startsOn: date("starts_on", { mode: "string" }).notNull(),
   endsOn: date("ends_on", { mode: "string" }).notNull(),

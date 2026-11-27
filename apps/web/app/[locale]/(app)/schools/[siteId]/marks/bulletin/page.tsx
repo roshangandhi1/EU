@@ -1,4 +1,4 @@
-import { BEHAVIOUR, FINAL, bulletinLayout, finalExam, classResults, degreeOf, domainsOf, formatScore, maxFor, periodsIn, type ClassResults, type PeriodDef, type Span, type Subject } from "@eu/schools";
+import { BEHAVIOUR, FINAL, bulletinLayout, finalExam, levelName, levelsOf, classResults, degreeOf, domainsOf, formatScore, maxFor, periodsIn, type ClassResults, type PeriodDef, type Span, type Subject } from "@eu/schools";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyRow, Notice } from "@/components/ui";
@@ -52,7 +52,10 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
   const terms = [...new Set(ctx.periods.map((x) => x.term))];
   // The CTEB form (7e-8e): a MAX column at the start of each semester, the semester's periods under
   // "Travaux journaliers", a combined "Place / Nbre d'élèves" row and an "Examen de repêchage" column.
-  const cteb = degreeOf(cls.level) === "cteb";
+  // Secondary layout for every level on semesters (7e and up by default; the school's choice in Setup).
+  const cteb = ctx.sem;
+  const LV = levelsOf(d.school);
+  const className = levelName(LV, cls.level) ?? levelFr(cls.level);
   const exam = finalExam(cls.level);
   const termNames = ctx.sem ? ["PREMIER SEMESTRE", "SECOND SEMESTRE"] : ["PREMIER TRIMESTRE", "DEUXIÈME TRIMESTRE", "TROISIÈME TRIMESTRE", "QUATRIÈME TRIMESTRE"];
 
@@ -143,11 +146,11 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
             <div><span>COMMUNE / SECTEUR :</span><b>{school?.commune || ""}</b></div>
             <div><span>NÉ(E) À :</span><b>{s.birthPlace || ""}</b><span>LE :</span><b>{s.dateOfBirth ? s.dateOfBirth.split("-").reverse().join("/") : s.birthYearEstimate ?? ""}</b></div>
             <div><span>ÉCOLE :</span><b>{d.site.name}</b></div>
-            <div><span>CLASSE :</span><b>{levelFr(cls.level)} {cls.section}</b></div>
+            <div><span>CLASSE :</span><b>{className} {cls.section}</b></div>
             <div><span>CODE :</span><b>{school?.ministryCode || ""}</b></div>
             <div><span>N° PERM. :</span><b>{s.permNumber || ""}</b></div>
           </div>
-          <div className="b-heading"><strong>{cteb ? `BULLETIN DE LA ${cls.level}e ANNÉE CYCLE TERMINAL DE L'ÉDUCATION DE BASE (CTEB)` : `BULLETIN DE L'ÉLÈVE : ${degreeTitle(cls.level)}`}</strong><strong>ANNÉE SCOLAIRE {year}</strong></div>
+          <div className="b-heading"><strong>{degreeOf(cls.level) === "cteb" && cls.level <= 8 ? `BULLETIN DE LA ${cls.level}e ANNÉE CYCLE TERMINAL DE L'ÉDUCATION DE BASE (CTEB)` : cls.level > 8 ? `BULLETIN DE L'ÉLÈVE : ${className.toUpperCase()}` : `BULLETIN DE L'ÉLÈVE : ${degreeTitle(cls.level)}`}</strong><strong>ANNÉE SCOLAIRE {year}</strong></div>
         </header>
         <table className="b-table">
           <thead>
