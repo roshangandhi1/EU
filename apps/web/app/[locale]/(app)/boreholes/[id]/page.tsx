@@ -82,7 +82,7 @@ export default async function BoreholePage({ params, searchParams }: {
   const canEdit = permissions.can(me.user, "boreholes.write", { stream: "boreholes" });
   const canPop = permissions.can(me.user, "boreholes.population.write", { stream: "boreholes", siteId: id });
   const canFlow = permissions.can(me.user, "boreholes.visit.write", { stream: "boreholes", siteId: id });
-  const canFixFlow = permissions.can(me.user, "boreholes.record.void", { stream: "boreholes", siteId: id });
+  const canFixFlow = permissions.can(me.user, "boreholes.flowtest.fix", { stream: "boreholes", siteId: id });
   const f = (k: string) => t(locale, `ui.form.${k}`);
   const date = (s: string | null | undefined) => fmtDate(s, locale);
   const kw = (n: number) => `${fmtNum(n, locale, 2)} kW`;

@@ -102,7 +102,11 @@ describe("flow tests (item 2) and configurable 1.1.1 checks (item 4)", () => {
     expect(after.indicator.fails).not.toContain("no_recent_check");
     expect(after.indicator.checkedOn).toBe(today);
 
-    expect(await editFlowTest(as("field_officer"), b.siteId, (added as any).id, input)).toEqual({ ok: false, reason: "forbidden" });
+    // Only system administrators may edit or delete a logged flow test.
+    for (const role of ["field_officer", "stream_lead", "programme_manager"] as const) {
+      expect(await editFlowTest(as(role), b.siteId, (added as any).id, input)).toEqual({ ok: false, reason: "forbidden" });
+      expect(await deleteFlowTest(as(role), b.siteId, (added as any).id)).toEqual({ ok: false, reason: "forbidden" });
+    }
     const edited = await editFlowTest(admin, b.siteId, (added as any).id, { ...input, flowLpm: 0, pumpDelivers: false });
     expect(edited.ok).toBe(true);
     const [old] = await (db as any).select().from(visits).where(eq(visits.id, (added as any).id));
