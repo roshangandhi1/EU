@@ -1,4 +1,4 @@
-import { BEHAVIOUR, FINAL, bulletinLayout, classResults, degreeOf, domainsOf, formatScore, maxFor, periodsIn, type ClassResults, type PeriodDef, type Span, type Subject } from "@eu/schools";
+import { BEHAVIOUR, FINAL, bulletinLayout, finalExam, classResults, degreeOf, domainsOf, formatScore, maxFor, periodsIn, type ClassResults, type PeriodDef, type Span, type Subject } from "@eu/schools";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyRow, Notice } from "@/components/ui";
@@ -53,6 +53,7 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
   // The CTEB form (7e-8e): a MAX column at the start of each semester, the semester's periods under
   // "Travaux journaliers", a combined "Place / Nbre d'élèves" row and an "Examen de repêchage" column.
   const cteb = degreeOf(cls.level) === "cteb";
+  const exam = finalExam(cls.level);
   const termNames = ctx.sem ? ["PREMIER SEMESTRE", "SECOND SEMESTRE"] : ["PREMIER TRIMESTRE", "DEUXIÈME TRIMESTRE", "TROISIÈME TRIMESTRE", "QUATRIÈME TRIMESTRE"];
 
   // Results for every column the form has: each period, each exam, each trimester, the year.
@@ -117,12 +118,12 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
     const yr = row("Y");
     const decided = yr.percent != null && yr.missing === 0;
     const pass = decided && yr.passed;
-    // 6e année: Résultat final. A blank school average falls back to the year percentage halved.
+    // 6e and 8e: Résultat final. A blank school average falls back to the year percentage halved.
     const fin = (code: string) => idx.get(`${sid}|${code}|${FINAL.period}`);
     const ecoleMark = fin(FINAL.school);
     const ecole = ecoleMark?.score ?? (decided && yr.percent != null ? Math.round(yr.percent * 5) / 10 : null);
     const ecoleComputed = ecoleMark?.score == null && ecole != null;
-    const enafep = fin(FINAL.exam)?.score ?? null;
+    const examScore = fin(FINAL.exam)?.score ?? null;
     const dec = (n: number | null) => (n == null ? "" : new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n));
 
     return (
@@ -202,25 +203,39 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
         <footer className="b-end">
           <div>
             {cteb && <p>– L&apos;élève ne pourra passer dans la classe supérieure s&apos;il n&apos;a subi avec succès un examen de repêchage en ........................................</p>}
-            {cls.level === FINAL.level && (
+            {exam && (
               <table className="b-final">
                 <thead><tr><th>RÉSULTAT FINAL</th><th>POINTS OBT.</th><th>MAX</th></tr></thead>
                 <tbody>
                   <tr><th scope="row">MOYENNE ÉCOLE{ecoleComputed ? " **" : ""}</th><td>{dec(ecole)}</td><td>{FINAL.max}</td></tr>
-                  <tr><th scope="row">ENAFEP</th><td>{dec(enafep)}</td><td>{FINAL.max}</td></tr>
-                  <tr className="b-strong"><th scope="row">TOTAL</th><td>{ecole != null && enafep != null ? dec(Math.round((ecole + enafep) * 10) / 10) : ""}</td><td>{FINAL.max * 2}</td></tr>
+                  <tr><th scope="row">{exam}</th><td>{dec(examScore)}</td><td>{FINAL.max}</td></tr>
+                  <tr className="b-strong"><th scope="row">TOTAL</th><td>{ecole != null && examScore != null ? dec(Math.round((ecole + examScore) * 10) / 10) : ""}</td><td>{FINAL.max * 2}</td></tr>
                 </tbody>
               </table>
             )}
+            {exam === "TENASOSP" && <>
+              <p>– Décision du jury : Passe / Double</p>
+              <p>– Option orientée : ........................................</p>
+              <table className="b-final b-jury">
+                <thead><tr><th>Membres de la commission</th><th>Noms</th><th>Signatures</th></tr></thead>
+                <tbody>{["1. Superviseur", "2. Superviseur adjoint", "3. Président"].map((r) => <tr key={r}><th scope="row">{r}</th><td /><td /></tr>)}</tbody>
+              </table>
+            </>}
             <p className={decided && !pass ? "b-struck" : undefined}>– L&apos;élève passe dans la classe supérieure</p>
             <p className={decided && pass ? "b-struck" : undefined}>– L&apos;élève double la classe</p>
             {subjects.some((x) => x.optional) && <p className="b-note">* Branche facultative.</p>}
-            {cls.level === FINAL.level && ecoleComputed && <p className="b-note">** Pourcentage de l&apos;année divisé par 2 (pas de moyenne école saisie).</p>}
+            {exam && ecoleComputed && <p className="b-note">** Pourcentage de l&apos;année divisé par 2 (pas de moyenne école saisie).</p>}
           </div>
           <div className="b-sign">
             <p>Fait à ........................................, le ..... / ..... / ..........</p>
-            <p>Sceau de l&apos;École</p>
-            {cteb && <p>Signature de l&apos;élève</p>}
+            {exam === "TENASOSP" ? <>
+              <p>Signature de l&apos;élève</p>
+              <p>Sceau de l&apos;École et signature du Préfet des études</p>
+              <p>Sceau du Pool d&apos;Inspection</p>
+            </> : <>
+              <p>Sceau de l&apos;École</p>
+              {cteb && <p>Signature de l&apos;élève</p>}
+            </>}
             <p><b>Le Chef d&apos;Établissement</b><br />Noms et signature</p>
           </div>
         </footer>

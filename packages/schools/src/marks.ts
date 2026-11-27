@@ -83,11 +83,13 @@ export const BEHAVIOUR = ["_application", "_conduct"] as const;
 export const isBehaviour = (code: string) => (BEHAVIOUR as readonly string[]).includes(code);
 
 /**
- * 6e année "Résultat final" (form IMPRIGE/P.S/007): the school average out of 50 and the ENAFEP
- * national exam out of 50, kept as marks in the pseudo-period "FIN". A blank school average falls
- * back to the 6e year percentage halved.
+ * "Résultat final" at the end of a cycle: the school average out of 50 and the national exam out of
+ * 50 (ENAFEP in 6e, form IMPRIGE/P.S/007; TENASOSP in 8e, form IGE/P.S/008), kept as marks in the
+ * pseudo-period "FIN". A blank school average falls back to the year percentage halved.
  */
-export const FINAL = { period: "FIN", school: "_ecole", exam: "_enafep", max: 50, level: 6 } as const;
+export const FINAL = { period: "FIN", school: "_ecole", exam: "_examen", max: 50 } as const;
+/** The national exam that ends a level's cycle, if any. */
+export const finalExam = (lvl?: number): "ENAFEP" | "TENASOSP" | null => (lvl === 6 ? "ENAFEP" : lvl === 8 ? "TENASOSP" : null);
 export const isFinal = (code: string) => code === FINAL.school || code === FINAL.exam;
 
 // ---- The DRC primary standard (built-in default) ----
@@ -238,7 +240,7 @@ const TERMINAL: Def[] = [
 const SD_MATH: [string, string] = ["Sous-domaine des mathématiques", "Mathematics"];
 const SD_SVT: [string, string] = ["Sous-domaine des sciences de la vie et de la terre", "Life and earth sciences"];
 const SD_TIC: [string, string] = ["Sous-domaine des sciences physiques, technologie et TIC", "Physical science, technology and ICT"];
-/** CTEB 7e année, from the ministry bulletin IGE/P.S/007. 8e uses it until its own form is received. */
+/** CTEB 7e année, from the ministry bulletin IGE/P.S/007. */
 const CTEB: Def[] = [
   { fr: "Arithmétique", en: "Arithmetic", max: 10, domain: "sciences", branch: SD_MATH },
   { fr: "Statistique", en: "Statistics", max: 10, domain: "sciences", branch: SD_MATH },
@@ -262,7 +264,33 @@ const CTEB: Def[] = [
   { fr: "Éd. physique et sportive", en: "Physical education and sport", max: 20, domain: "perso" },
 ];
 
-const DEGREE: Record<number, Def[]> = { 1: ELEMENTAIRE, 2: ELEMENTAIRE, 3: MOYEN, 4: MOYEN, 5: TERMINAL, 6: TERMINAL, 7: CTEB, 8: CTEB };
+/** CTEB 8e année, from the ministry bulletin IGE/P.S/008: adds Nutrition and Chimie, other maxima. */
+const CTEB8: Def[] = [
+  { fr: "Arithmétique", en: "Arithmetic", max: 10, domain: "sciences", branch: SD_MATH },
+  { fr: "Statistique", en: "Statistics", max: 10, domain: "sciences", branch: SD_MATH },
+  { fr: "Géométrie", en: "Geometry", max: 20, domain: "sciences", branch: SD_MATH },
+  { fr: "Algèbre", en: "Algebra", max: 40, domain: "sciences", branch: SD_MATH },
+  { fr: "Anatomie", en: "Anatomy", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Botanique", en: "Botany", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Nutrition", en: "Nutrition", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Zoologie", en: "Zoology", max: 20, domain: "sciences", branch: SD_SVT },
+  { fr: "Chimie", en: "Chemistry", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Sciences physiques", en: "Physical science", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Technologie", en: "Technology", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Techn. d'info. & com. (TIC)", en: "ICT", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Anglais", en: "English", max: 30, domain: "langues" },
+  { fr: "Français", en: "French", max: 50, domain: "langues" },
+  { fr: "Religion", en: "Religion", max: 20, domain: "social", optional: true },
+  { fr: "Éducation à la vie", en: "Life skills", max: 20, domain: "social" },
+  { fr: "Éd. civique et morale", en: "Civic and moral education", max: 20, domain: "social" },
+  { fr: "Histoire", en: "History", max: 20, domain: "social" },
+  { fr: "Géographie", en: "Geography", max: 30, domain: "social" },
+  { fr: "Dessin", en: "Drawing", max: 20, domain: "arts" },
+  { fr: "Musique", en: "Music", max: 20, domain: "arts" },
+  { fr: "Éd. physique et sportive", en: "Physical education and sport", max: 20, domain: "perso" },
+];
+
+const DEGREE: Record<number, Def[]> = { 1: ELEMENTAIRE, 2: ELEMENTAIRE, 3: MOYEN, 4: MOYEN, 5: TERMINAL, 6: TERMINAL, 7: CTEB, 8: CTEB8 };
 
 /** The DRC default subjects for a level, named in the given language. Codes are stable across languages. */
 export function defaultSubjects(lvl: number, locale: "en" | "fr" = "fr"): Subject[] {

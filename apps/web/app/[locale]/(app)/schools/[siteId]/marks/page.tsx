@@ -1,4 +1,4 @@
-import { BEHAVIOUR, FINAL, formatScore, lettersOf, maxFor } from "@eu/schools";
+import { BEHAVIOUR, FINAL, finalExam, formatScore, lettersOf, maxFor } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
@@ -25,8 +25,9 @@ export default async function Marks({ params, searchParams }: { params: Promise<
   const canConfigure = can(me, "school.configure", p.siteId);
   const period = ctx.periods.find((x) => x.key === param(sp, "period")) ?? ctx.periods[0]!;
   const cls = ctx.cls;
-  // 6e année: a sheet for the Résultat final (school average and ENAFEP), as pseudo-period "FIN".
-  const hasFinal = cls?.level === FINAL.level;
+  // 6e and 8e: a sheet for the Résultat final (school average and ENAFEP / TENASOSP), as pseudo-period "FIN".
+  const exam = finalExam(cls?.level);
+  const hasFinal = !!exam;
   const final = hasFinal && param(sp, "period") === FINAL.period;
   const periodKey = final ? FINAL.period : period.key;
 
@@ -62,7 +63,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
       <label className="tb-field">{tr("marks.period")}
         <select className="ctl" name="period" defaultValue={periodKey}>
           {ctx.periods.map((x) => <option key={x.key} value={x.key}>{x.key} · {periodLong(x, locale, tr, ctx.sem)}</option>)}
-          {hasFinal && <option value={FINAL.period}>{tr("marks.finalPeriod")}</option>}
+          {hasFinal && <option value={FINAL.period}>{tr("marks.finalPeriod", { exam: exam ?? "" })}</option>}
         </select>
       </label>
       {cls && !final && (
@@ -139,7 +140,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
   });
   // Application and Conduite: a letter per period (not for exams), after the subjects.
   if (final)
-    for (const [code, title] of [[FINAL.school, tr("marks.schoolAverage")], [FINAL.exam, tr("marks.enafep")]] as const)
+    for (const [code, title] of [[FINAL.school, tr("marks.schoolAverage")], [FINAL.exam, exam ?? ""]] as const)
       columns.push({ key: code, subject: code, period: FINAL.period, title, sub: `/ ${FINAL.max}`, max: FINAL.max });
   if (!final && period.kind === "period" && !subjectFilter)
     for (const code of BEHAVIOUR) columns.push({ key: code, subject: code, period: period.key, title: tr(`marks.${code.slice(1)}`), sub: lettersOf(ctx.scheme).join(" "), max: 0, letters: lettersOf(ctx.scheme) });
@@ -154,7 +155,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
       <MarksNav base={base} active="entry" siteId={p.siteId} locale={locale} tr={tr} canConfigure={canConfigure} classId={cls.id} />
       {messages}
       {filter}
-      <Section className="marks-sec" id="sheet" flush icon="list" title={`${classLabel(cls, tr)} · ${final ? tr("marks.finalPeriod") : period.key}`} description={final ? tr("marks.finalIntro") : periodLong(period, locale, tr, ctx.sem)} count={pupils.length}
+      <Section className="marks-sec" id="sheet" flush icon="list" title={`${classLabel(cls, tr)} · ${final ? tr("marks.finalPeriod", { exam: exam ?? "" }) : period.key}`} description={final ? tr("marks.finalIntro", { exam: exam ?? "" }) : periodLong(period, locale, tr, ctx.sem)} count={pupils.length}
         actions={<Link className="btn ghost sm" href={final ? `${base}/bulletin?class=${cls.id}` : `${base}/results?class=${cls.id}&span=${period.key}`}><Icon name="chart" size={15} />{final ? tr("marks.bulletins") : tr("marks.seeResults")}</Link>}>
         {pupils.length === 0 ? <EmptyRow icon="users" title={tr("ux.noRoster")} /> : !canWrite ? <Notice tone="warning">{tr("common.forbidden")}</Notice> : (
           <MarksGrid

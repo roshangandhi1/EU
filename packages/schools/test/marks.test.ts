@@ -5,7 +5,7 @@ import { EntityRegistry } from "@eu/sync";
 import { handlePush } from "@eu/sync/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  CTEB_SCHEME, DRC_SCHEME, FINAL, bulletinLayout, classResults, createSchoolSite, defaultSubjects, domainsOf, formatScore, loadSchool, mark, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
+  CTEB_SCHEME, DRC_SCHEME, FINAL, bulletinLayout, finalExam, classResults, createSchoolSite, defaultSubjects, domainsOf, formatScore, loadSchool, mark, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
   planMarks, planSubjects, readLetter, readScore, resolveScheme, resolveSubjects, schemeChanges, schemeLevelClash, schoolsActions, schoolsEntities, subjectCode,
   type GradingScheme, type Mark, type Subject, type Synced,
 } from "../src";
@@ -338,6 +338,13 @@ describe("ministry bulletin subjects and layout", () => {
     expect(periodsIn(CTEB_SCHEME, { kind: "term", term: 1 }).reduce((n, p) => n + maxFor(alg, p, CTEB_SCHEME), 0)).toBe(160);
     expect(periodsIn(CTEB_SCHEME, { kind: "year" }).reduce((n, p) => n + maxFor(alg, p, CTEB_SCHEME), 0)).toBe(320);
     expect(periodsOf(CTEB_SCHEME).map((p) => p.key)).toEqual(["P1", "P2", "Ex1", "P3", "P4", "Ex2"]);
+    // 8e (IGE/P.S/008): Maths 80, SVT 50, Chimie/Physique/Techno/TIC 40, Langues 80, Univers social 110, Arts 40, EPS 20 = 420.
+    const s8 = defaultSubjects(8);
+    const t8 = bulletinLayout(s8, domainsOf(CTEB_SCHEME, 8)).filter((l) => l.type === "subtotal")
+      .map((l) => (l as { codes: string[] }).codes.reduce((n, c) => n + s8.find((s) => s.code === c)!.maxPoints, 0));
+    expect(t8).toEqual([80, 50, 40, 80, 110, 40, 20]);
+    expect(new Set(s8.map((s) => s.code)).size).toBe(s8.length);
+    expect([finalExam(6), finalExam(7), finalExam(8)]).toEqual(["ENAFEP", null, "TENASOSP"]);
   });
   it("gives 7e-8e the CTEB semesters unless a scheme names the level", () => {
     const row = (levels: number[], name: string) => ({ ...DRC_SCHEME, name, levels, id: name, scopeId: "s1", deviceTime: "2026-10-01T00:00:00Z", voidedAt: null } as never);

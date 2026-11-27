@@ -1,5 +1,5 @@
 "use server";
-import { FINAL, insertMutation, isBehaviour, isFinal, lettersOf, maxFor, planMarks, readLetter, readScore, updateMutation, voidMutation, type ScoreInput } from "@eu/schools";
+import { FINAL, finalExam, insertMutation, isBehaviour, isFinal, lettersOf, maxFor, planMarks, readLetter, readScore, updateMutation, voidMutation, type ScoreInput } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
 import { revalidatePath } from "next/cache";
 import { back, can, firstRejection, newId, push, schoolFor, signedIn, str, today } from "@/lib/schools";
@@ -17,7 +17,7 @@ export async function saveMarks(fd: FormData) {
   if (!can(me, "marks.write", siteId)) back(path, { error: "forbidden" });
   const d = await schoolFor(me, siteId);
   const ctx = marksContext(d, siteId, today(), classId, locale);
-  const final = period === FINAL.period && ctx.cls?.level === FINAL.level;
+  const final = period === FINAL.period && !!finalExam(ctx.cls?.level);
   const p = ctx.periods.find((x) => x.key === period);
   if (!ctx.cls || (!p && !final)) back(path, { error: "invalid" });
   const subjects = new Map(ctx.subjectsOf(ctx.cls!.level).subjects.map((s) => [s.code, s]));
