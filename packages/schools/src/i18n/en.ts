@@ -216,7 +216,7 @@ export const schools = {
     errLevels: "Already in another scheme: {levels}. Untick them there first.", errFallback: "Another scheme already covers all other levels. Tick the levels this one grades.",
     tab: "Marks", nav: "Marks", entryTab: "Enter marks", resultsTab: "Results", setupLink: "Grading and subjects",
     chooseClass: "Choose a class", period: "Period", periods: "Periods", terms: "Terms", subject: "Subject", allSubjects: "All subjects", span: "Results for",
-    periodLong: "Period {n}", examLong: "Term {n} exam", termLong: "Term {n}", termShort: "Term {n}", wholeYear: "Whole year", yearShort: "Year",
+    periodLong: "Period {n}", semLong: "Semester {n}", semExamLong: "Semester {n} exam", examLong: "Term {n} exam", termLong: "Term {n}", termShort: "Term {n}", wholeYear: "Whole year", yearShort: "Year",
     progressTitle: "Marks entered", progressIntro: "How much of each class's mark sheet has been typed in, period by period. Open a cell to enter marks.",
     entered: "{n} of {total} marks entered", enterTitle: "Enter marks", enterIntro: "Choose the class and the period on the paper mark sheet.",
     defaultScheme: "Using the standard scheme “{name}” and the default subjects. The headteacher can change them in Grading and subjects.",

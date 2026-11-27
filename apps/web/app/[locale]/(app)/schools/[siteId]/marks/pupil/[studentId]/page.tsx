@@ -35,8 +35,8 @@ export default async function PupilResults({ params, searchParams }: { params: P
   type Col = { key: string; label: string; title: string; span: Span; strong?: boolean };
   const cols: Col[] = [];
   for (const n of terms) {
-    for (const x of ctx.periods.filter((y) => y.term === n)) cols.push({ key: x.key, label: x.key, title: periodLong(x, locale, tr), span: { kind: "period", key: x.key } });
-    cols.push({ key: `T${n}`, label: `T${n}`, title: termLabel(n, locale, tr), span: { kind: "term", term: n }, strong: true });
+    for (const x of ctx.periods.filter((y) => y.term === n)) cols.push({ key: x.key, label: x.key, title: periodLong(x, locale, tr, ctx.sem), span: { kind: "period", key: x.key } });
+    cols.push({ key: `T${n}`, label: `${ctx.sem ? "S" : "T"}${n}`, title: termLabel(n, locale, tr, ctx.sem), span: { kind: "term", term: n }, strong: true });
   }
   cols.push({ key: "Y", label: tr("marks.yearShort"), title: tr("marks.wholeYear"), span: { kind: "year" }, strong: true });
   const results = new Map(cols.map((c) => {

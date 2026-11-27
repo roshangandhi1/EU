@@ -220,7 +220,7 @@ export const schools: Shape<typeof en> = {
     errLevels: "Déjà dans un autre barème : {levels}. Décochez-les d'abord là-bas.", errFallback: "Un autre barème couvre déjà tous les autres niveaux. Cochez les niveaux de celui-ci.",
     tab: "Notes", nav: "Notes", entryTab: "Saisie des notes", resultsTab: "Résultats", setupLink: "Barème et branches",
     chooseClass: "Choisir une classe", period: "Période", periods: "Périodes", terms: "Trimestres", subject: "Branche", allSubjects: "Toutes les branches", span: "Résultats de",
-    periodLong: "{ord} période", examLong: "Examen du {ord} trimestre", termLong: "{ord} trimestre", termShort: "Trimestre {n}", wholeYear: "Année entière", yearShort: "Année",
+    periodLong: "{ord} période", semLong: "{ord} semestre", semExamLong: "Examen du {ord} semestre", examLong: "Examen du {ord} trimestre", termLong: "{ord} trimestre", termShort: "Trimestre {n}", wholeYear: "Année entière", yearShort: "Année",
     progressTitle: "Notes saisies", progressIntro: "Avancement de la saisie des fiches de cotes de chaque classe, période par période. Ouvrez une case pour saisir les notes.",
     entered: "{n} notes saisies sur {total}", enterTitle: "Saisir des notes", enterIntro: "Choisissez la classe et la période indiquées sur la fiche de cotes papier.",
     defaultScheme: "Barème standard « {name} » et branches par défaut. Le directeur peut les modifier dans Barème et branches.",

@@ -1,6 +1,6 @@
 "use server";
 import {
-  DRC_SCHEME, LEVELS, defaultSubjects, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
+  CTEB_SCHEME, DRC_SCHEME, LEVELS, defaultSubjects, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
   type GradingScheme, type MentionBand, type Subject,
 } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
@@ -93,11 +93,13 @@ export async function saveScheme(fd: FormData) {
   await writeScheme(c, parsed.data!);
 }
 
-/** Puts the DRC standard periods, pass mark and mentions back into this scheme, keeping its name and levels. */
+/** Puts the DRC standard periods (CTEB semesters for a 7e-8e scheme), pass mark and mentions back into this scheme, keeping its name and levels. */
 export async function restoreScheme(fd: FormData) {
   const c = await ctx(fd);
   const own = live(c.d.gradingSchemes).find((s) => s.id === c.schemeId);
-  await writeScheme(c, { ...DRC_SCHEME, name: own?.name ?? DRC_SCHEME.name, levels: own?.levels ?? [] });
+  // A scheme only for 7e-8e goes back to the CTEB semesters; any other to the primary trimesters.
+  const def = own?.levels?.length && own.levels.every((l) => l >= 7) ? CTEB_SCHEME : DRC_SCHEME;
+  await writeScheme(c, { ...def, name: own?.name ?? def.name, levels: own?.levels ?? [] });
 }
 
 function subjectMutations(c: Awaited<ReturnType<typeof ctx>>, levels: readonly number[], wanted: (lvl: number) => Subject[]): Mutation[] {

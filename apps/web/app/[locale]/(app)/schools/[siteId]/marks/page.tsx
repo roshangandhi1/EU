@@ -61,7 +61,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
       </label>
       <label className="tb-field">{tr("marks.period")}
         <select className="ctl" name="period" defaultValue={periodKey}>
-          {ctx.periods.map((x) => <option key={x.key} value={x.key}>{x.key} · {periodLong(x, locale, tr)}</option>)}
+          {ctx.periods.map((x) => <option key={x.key} value={x.key}>{x.key} · {periodLong(x, locale, tr, ctx.sem)}</option>)}
           {hasFinal && <option value={FINAL.period}>{tr("marks.finalPeriod")}</option>}
         </select>
       </label>
@@ -90,7 +90,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
               <thead>
                 <tr>
                   <th className="mg-pupil">{tr("common.class")}</th>
-                  {ctx.periods.map((x) => <th key={x.key} className="num" title={periodLong(x, locale, tr)}>{x.key}</th>)}
+                  {ctx.periods.map((x) => <th key={x.key} className="num" title={periodLong(x, locale, tr, ctx.sem)}>{x.key}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -154,7 +154,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
       <MarksNav base={base} active="entry" siteId={p.siteId} locale={locale} tr={tr} canConfigure={canConfigure} classId={cls.id} />
       {messages}
       {filter}
-      <Section className="marks-sec" id="sheet" flush icon="list" title={`${classLabel(cls, tr)} · ${final ? tr("marks.finalPeriod") : period.key}`} description={final ? tr("marks.finalIntro") : periodLong(period, locale, tr)} count={pupils.length}
+      <Section className="marks-sec" id="sheet" flush icon="list" title={`${classLabel(cls, tr)} · ${final ? tr("marks.finalPeriod") : period.key}`} description={final ? tr("marks.finalIntro") : periodLong(period, locale, tr, ctx.sem)} count={pupils.length}
         actions={<Link className="btn ghost sm" href={final ? `${base}/bulletin?class=${cls.id}` : `${base}/results?class=${cls.id}&span=${period.key}`}><Icon name="chart" size={15} />{final ? tr("marks.bulletins") : tr("marks.seeResults")}</Link>}>
         {pupils.length === 0 ? <EmptyRow icon="users" title={tr("ux.noRoster")} /> : !canWrite ? <Notice tone="warning">{tr("common.forbidden")}</Notice> : (
           <MarksGrid

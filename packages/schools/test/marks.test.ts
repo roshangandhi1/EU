@@ -5,7 +5,7 @@ import { EntityRegistry } from "@eu/sync";
 import { handlePush } from "@eu/sync/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  DRC_SCHEME, FINAL, bulletinLayout, classResults, createSchoolSite, defaultSubjects, domainsOf, formatScore, loadSchool, mark, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
+  CTEB_SCHEME, DRC_SCHEME, FINAL, bulletinLayout, classResults, createSchoolSite, defaultSubjects, domainsOf, formatScore, loadSchool, mark, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
   planMarks, planSubjects, readLetter, readScore, resolveScheme, resolveSubjects, schemeChanges, schemeLevelClash, schoolsActions, schoolsEntities, subjectCode,
   type GradingScheme, type Mark, type Subject, type Synced,
 } from "../src";
@@ -325,6 +325,25 @@ describe("ministry bulletin subjects and layout", () => {
     // The 6e Résultat final is kept as marks in the pseudo-period FIN.
     expect(mark.safeParse({ studentId: "00000000-0000-4000-8000-000000000001", classId: "00000000-0000-4000-8000-000000000002", subject: FINAL.exam, period: FINAL.period, score: 33.5, absent: false }).success).toBe(true);
     expect(mark.safeParse({ studentId: "00000000-0000-4000-8000-000000000001", classId: "00000000-0000-4000-8000-000000000002", subject: FINAL.exam, period: "FINAL", score: 33.5, absent: false }).success).toBe(false);
+  });
+  it("lays out the 7e CTEB form: semesters, sub-domains and a sub-total for every domain", () => {
+    const subs = defaultSubjects(7);
+    const lines = bulletinLayout(subs, domainsOf(CTEB_SCHEME, 7));
+    const max = (codes: string[]) => codes.reduce((n, c) => n + subs.find((s) => s.code === c)!.maxPoints, 0);
+    const totals = lines.filter((l) => l.type === "subtotal").map((l) => max((l as { codes: string[] }).codes));
+    // Maths 80, SVT 30, Physique/Techno/TIC 30, Langues 100, Univers social 100, Arts 40, EPS 20.
+    expect(totals).toEqual([80, 30, 30, 100, 100, 40, 20]);
+    // Each semester: 2 periods + an exam worth 2 → 4 × the period maximum; the year 8 ×.
+    const alg = subs.find((s) => s.name === "Algèbre")!;
+    expect(periodsIn(CTEB_SCHEME, { kind: "term", term: 1 }).reduce((n, p) => n + maxFor(alg, p, CTEB_SCHEME), 0)).toBe(160);
+    expect(periodsIn(CTEB_SCHEME, { kind: "year" }).reduce((n, p) => n + maxFor(alg, p, CTEB_SCHEME), 0)).toBe(320);
+    expect(periodsOf(CTEB_SCHEME).map((p) => p.key)).toEqual(["P1", "P2", "Ex1", "P3", "P4", "Ex2"]);
+  });
+  it("gives 7e-8e the CTEB semesters unless a scheme names the level", () => {
+    const row = (levels: number[], name: string) => ({ ...DRC_SCHEME, name, levels, id: name, scopeId: "s1", deviceTime: "2026-10-01T00:00:00Z", voidedAt: null } as never);
+    expect(resolveScheme([row([], "catch-all")], "s1", 7).scheme.terms).toHaveLength(2);
+    expect(resolveScheme([row([], "catch-all")], "s1", 6).scheme.name).toBe("catch-all");
+    expect(resolveScheme([row([7, 8], "own 7-8")], "s1", 8).scheme.name).toBe("own 7-8");
   });
   it("leaves an optional subject a pupil does not take out of their maximum", () => {
     const subjects = [{ level: 1, code: "a", name: "A", maxPoints: 10, position: 0 }, { level: 1, code: "rel", name: "Religion", maxPoints: 10, position: 1, optional: true }];
