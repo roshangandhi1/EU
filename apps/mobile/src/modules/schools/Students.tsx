@@ -12,7 +12,7 @@ import {
   useDialog, useFormScroll, useLeaveGuard,
 } from "../../ui";
 import { currentYear, live, studentName, today, type SchoolData } from "./data";
-import { ACCENT, classLabel, maskDate, schoolName } from "./parts";
+import { ACCENT, classLabel, longLabels, schoolLevels, maskDate, schoolName } from "./parts";
 
 const SHOW_MAX = 200;
 
@@ -30,6 +30,7 @@ export function Students({ session, data, onBack }: { session: Session; data: Sc
   const year = currentYear(data, date);
   const yearClasses = live(data.classes).filter((c) => c.academicYearId === year?.id).sort((a, b) => a.level - b.level || a.section.localeCompare(b.section));
   const shifts = new Set(yearClasses.map((c) => c.shift)).size;
+  const LV = schoolLevels(data.school);
   const rows = useMemo(() => {
     const n = normaliseName(q);
     return data.students
@@ -48,7 +49,7 @@ export function Students({ session, data, onBack }: { session: Session; data: Sc
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginHorizontal: -16 }}>
         <View style={{ width: 8 }} />
         <Chips
-          options={[{ value: "all", label: t("ux.allClasses") }, ...yearClasses.map((c) => ({ value: c.id, label: classLabel(c, shifts, t) }))]}
+          options={[{ value: "all", label: t("ux.allClasses") }, ...yearClasses.map((c) => ({ value: c.id, label: classLabel(c, shifts, t, LV) }))]}
           selected={[filter]}
           onToggle={setFilter}
         />
@@ -80,7 +81,7 @@ export function Students({ session, data, onBack }: { session: Session; data: Sc
             <View style={groupItemStyle(index, shown.length)}>
               <ListRow
                 title={studentName(s)}
-                detail={`${s.studentNumber}${c ? ` · ${classLabel(c, shifts, t)}` : ""}`}
+                detail={`${s.studentNumber}${c ? ` · ${classLabel(c, shifts, t, LV)}` : ""}`}
                 leading={<Avatar name={studentName(s)} />}
                 trailing={s.pending ? <StatusChip label={t("ux.notSynced")} tone="warning" /> : undefined}
               />
@@ -104,6 +105,7 @@ function Enrol({ session, data, onDone }: { session: Session; data: SchoolData; 
   const year = currentYear(data, date);
   const classes = live(data.classes).filter((c) => c.academicYearId === year?.id).sort((a, b) => a.level - b.level || a.section.localeCompare(b.section));
   const shifts = new Set(classes.map((c) => c.shift)).size;
+  const LV = schoolLevels(data.school);
   const form = useFormScroll();
   const { ask, node: dialog } = useDialog();
   const [f, setF] = useState({ firstName: "", lastName: "", postName: "", dateOfBirth: "", birthYear: "", guardianName: "", guardianPhone: "", village: "" });
@@ -210,7 +212,7 @@ function Enrol({ session, data, onDone }: { session: Session; data: SchoolData; 
       </Anchor>
       <Anchor form={form} name="class">
         <Section title={t("schools.student.enrolledIn")}>
-          <Segmented columns={shifts > 1 ? 2 : 3} value={classId} onChange={(v) => { setClassId(v); clearErr("class"); }} options={classes.map((c) => ({ value: c.id, label: classLabel(c, shifts, t) }))} />
+          <Segmented columns={shifts > 1 || longLabels(classes.map((c) => classLabel(c, shifts, t, LV))) ? 2 : 3} value={classId} onChange={(v) => { setClassId(v); clearErr("class"); }} options={classes.map((c) => ({ value: c.id, label: classLabel(c, shifts, t, LV) }))} />
           {errors.class ? <Txt variant="small" tone="critical">{errors.class}</Txt> : null}
         </Section>
       </Anchor>

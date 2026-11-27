@@ -9,7 +9,7 @@ import { Icon } from "../../icons";
 import type { Session } from "../../session";
 import { Button, Card, DateField, groupItemStyle, Header, Notice, Page, Segmented, Stat, StatusChip, Toast, Txt, ui, useDialog, useLeaveGuard } from "../../ui";
 import { currentYear, live, studentName, today, type Local, type SchoolData } from "./data";
-import { ACCENT, classLabel, schoolName } from "./parts";
+import { ACCENT, classLabel, longLabels, schoolLevels, schoolName } from "./parts";
 
 type Reason = Absence["reason"];
 const REASONS = absenceReason.options;
@@ -37,6 +37,7 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
   }, [classes, date]); // eslint-disable-line react-hooks/exhaustive-deps
   const cls = classes.find((c) => c.id === classId) ?? null;
   const shifts = new Set(classes.map((c) => c.shift)).size;
+  const LV = schoolLevels(data.school);
 
   const existing = useMemo(() => live(data.absences).filter((a) => a.classId === classId && a.date === date), [data.absences, classId, date]);
   const taken = !!classId && takenFor(classId);
@@ -122,7 +123,7 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
   const guardChange = async (apply: () => void) => {
     if (!dirty) return apply();
     const v = await ask<"save" | "discard" | "stay">({
-      title: t("ux.saveBeforeChange", { cls: cls ? classLabel(cls, shifts, t) : "" }),
+      title: t("ux.saveBeforeChange", { cls: cls ? classLabel(cls, shifts, t, LV) : "" }),
       message: t("ux.saveBeforeChangeBody", { n: absent.size }),
       actions: [
         { label: t("schools.attendance.saveRegister"), value: "save", kind: "primary" },
@@ -158,10 +159,10 @@ export function Attendance({ session, data, onBack }: { session: Session; data: 
         <View style={{ gap: 6 }}>
           <Txt variant="label">{t("schools.student.enrolledIn")}</Txt>
           <Segmented
-            columns={Math.min(classes.length, shifts > 1 ? 2 : 3)}
+            columns={Math.min(classes.length, shifts > 1 || longLabels(classes.map((c) => classLabel(c, shifts, t, LV))) ? 2 : 3)}
             value={classId}
             onChange={setClassId}
-            options={classes.map((c) => ({ value: c.id, label: `${classLabel(c, shifts, t)}${takenFor(c.id) ? " ✓" : ""}` }))}
+            options={classes.map((c) => ({ value: c.id, label: `${classLabel(c, shifts, t, LV)}${takenFor(c.id) ? " ✓" : ""}` }))}
           />
         </View>
       )}

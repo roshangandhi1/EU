@@ -2,12 +2,12 @@
   "expo": {
     "name": "GoCongo",
     "slug": "gocongo-eu",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
       "package": "cd.gocongo.eu",
-      "versionCode": 7,
+      "versionCode": 8,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",

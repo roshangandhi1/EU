@@ -1,14 +1,27 @@
-import type { Payment, ReceiptBook, SchoolClass } from "@eu/schools/mobile";
+import { DEFAULT_LEVELS, levelsOf, type LevelDef, type Payment, type ReceiptBook, type School, type SchoolClass } from "@eu/schools/mobile";
 import { streamAccent } from "@eu/core/tokens";
 import type { Local } from "./data";
 
 /** The schools stream colour, for the header stripe and icons. */
 export const ACCENT = streamAccent.schools;
 
-/** "1A", or "1A · Morning" when the school runs more than one shift. */
-export function classLabel(c: Pick<SchoolClass, "level" | "section" | "shift">, shifts: number, t: (k: string) => string): string {
-  return shifts > 1 ? `${c.level}${c.section} · ${t(`schools.shift.${c.shift}`)}` : `${c.level}${c.section}`;
+/** The levels a school runs (its own list from Setup on the web, else the DRC default). */
+export const schoolLevels = (school: Pick<School, "levels"> | null | undefined): LevelDef[] => levelsOf(school);
+
+/**
+ * "1A", or "1A · Morning" when the school runs more than one shift. Years 1-8 keep the short
+ * number; a level the school renamed in Setup, or one above 8 (humanités), shows its name
+ * ("1re humanités A"), because "9A" means nothing to a headteacher.
+ */
+export function classLabel(c: Pick<SchoolClass, "level" | "section" | "shift">, shifts: number, t: (k: string) => string, levels: readonly LevelDef[] = DEFAULT_LEVELS): string {
+  const name = levels.find((l) => l.level === c.level)?.name;
+  const standard = DEFAULT_LEVELS.find((l) => l.level === c.level)?.name;
+  const base = c.level <= 8 && (!name || name === standard) ? `${c.level}${c.section}` : `${name ?? standard ?? c.level} ${c.section}`;
+  return shifts > 1 ? `${base} · ${t(`schools.shift.${c.shift}`)}` : base;
 }
+
+/** True when any of these labels is too long for three buttons in a row on a small phone. */
+export const longLabels = (labels: readonly string[]) => labels.some((l) => l.length > 6);
 
 /** The first receipt number in this person's books that no payment has used: what they will write next. */
 export function nextReceipt(userId: string, books: readonly Local<ReceiptBook>[], payments: readonly Local<Payment>[]): number | null {
