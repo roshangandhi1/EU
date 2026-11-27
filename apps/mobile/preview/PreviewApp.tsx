@@ -48,6 +48,8 @@ function demoStore(): Map<string, Row[]> {
   const yearId = put("school.academic_year", sc, { label: `${y}-${y + 1}`, startsOn: `${y}-09-01`, endsOn: `${y + 1}-07-02` });
   const termId = put("school.term", sc, { academicYearId: yearId, number: 1, startsOn: `${y}-09-01`, endsOn: `${y}-12-20` });
   const classIds = [1, 2, 3, 4, 5, 6].map((level) => put("school.class", sc, { academicYearId: yearId, level, section: "A", shift: "morning", classroomId: null }));
+  // Secondary classes on the default levels: 7e-8e EB, and 1re humanités (level 9).
+  for (const level of [7, 8, 9]) put("school.class", sc, { academicYearId: yearId, level, section: "A", shift: "morning", classroomId: null });
   const feeId = put("school.fee_item", sc, { academicYearId: yearId, termId, name: "Minerval T1", levels: [1, 2, 3, 4, 5, 6], amount: 15_000, dueOn: `${y}-10-15` });
   put("school.receipt_book", sc, { firstNumber: 1001, lastNumber: 1100, assignedTo: "preview-user" });
   put("school.device_tag", sc, { phoneId: "preview-device", tag: "A" });
@@ -92,7 +94,7 @@ function demoStore(): Map<string, Row[]> {
   ] as const;
   holes.forEach(([code, village, lat, lng, lifecycle, visited], i) => {
     const scope = `bh-${code}`;
-    put("boreholes.borehole", scope, { code, village, gpsLat: lat, gpsLng: lng, lifecycle, pumpRatingKw: i % 2 ? 1.1 : 2.2, handedOverOn: daysAgo(125), commissionedOn: lifecycle === "drilled" ? null : daysAgo(120) });
+    put("boreholes.borehole", scope, { code, village, gpsLat: lat, gpsLng: lng, lifecycle, pumpRatingKw: i % 2 ? 1.1 : 2.2, hasTaps: code !== "DEMO-BH05", handedOverOn: daysAgo(125), commissionedOn: lifecycle === "drilled" ? null : daysAgo(120) });
     if (visited !== null)
       put("boreholes.visit", scope, {
         visitedOn: daysAgo(visited), kind: "routine",

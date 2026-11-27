@@ -9,7 +9,7 @@ import { addDays } from "../../time";
 import { Avatar, Button, Card, DateField, Field, Header, IconBadge, ListGroup, ListRow, Notice, Page, Stat, StatusChip, Toast, Txt, useDateLabel, useDialog, useLeaveGuard } from "../../ui";
 import { colors } from "@eu/core/tokens";
 import { live, studentName, today, type Local, type SchoolData } from "./data";
-import { ACCENT, classLabel, nextReceipt, schoolName } from "./parts";
+import { ACCENT, classLabel, schoolLevels, nextReceipt, schoolName } from "./parts";
 
 /** Paper receipts are often typed up days later, but not months: older ones go through the web. */
 const BACKDATE_DAYS = 30;
@@ -38,6 +38,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
   const enrolled = activeOn(data.enrolments, date, data.years);
   const classes = new Map(data.classes.map((c) => [c.id, c]));
   const shifts = new Set(live(data.classes).map((c) => c.shift)).size;
+  const LV = schoolLevels(data.school);
   const classOf = (id: string) => classes.get(enrolled.find((e) => e.studentId === id)?.classId ?? "");
   const ids = new Set(enrolled.map((e) => e.studentId));
   const n = normaliseName(q);
@@ -129,7 +130,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
                   <ListRow
                     key={s.id}
                     title={studentName(s)}
-                    detail={`${s.studentNumber}${c ? ` · ${classLabel(c, shifts, t)}` : ""}`}
+                    detail={`${s.studentNumber}${c ? ` · ${classLabel(c, shifts, t, LV)}` : ""}`}
                     leading={<Avatar name={studentName(s)} />}
                     status={!b ? undefined : b.balance > 0 ? <StatusChip label={fmt(b.balance)} tone={b.overdue > 0 ? "warning" : "muted"} /> : <StatusChip label={t("ux.paidUp")} tone="good" icon="check" />}
                     onPress={() => pick(s)}
@@ -148,7 +149,7 @@ export function Fees({ session, data, onBack }: { session: Session; data: School
               <Avatar name={studentName(student)} size={48} />
               <View style={{ flex: 1 }}>
                 <Txt variant="heading" lines={1}>{studentName(student)}</Txt>
-                <Txt variant="small" tone="muted">{student.studentNumber}{classOf(student.id) ? ` · ${classLabel(classOf(student.id)!, shifts, t)}` : ""}</Txt>
+                <Txt variant="small" tone="muted">{student.studentNumber}{classOf(student.id) ? ` · ${classLabel(classOf(student.id)!, shifts, t, LV)}` : ""}</Txt>
               </View>
             </View>
             {bal && (
