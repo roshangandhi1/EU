@@ -49,7 +49,7 @@ export default async function Results({ params, searchParams }: { params: Promis
   const num = (n: number) => formatScore(Math.round(n * 2) / 2, locale);
   const pct = (n: number | null) => (n == null ? "—" : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(n)} %`);
   const mention = (m: { en: string; fr: string } | null) => (m ? m[locale] : "—");
-  const title = `${classLabel(cls, tr)} · ${spanLabel(span, ctx.periods, locale, tr)}`;
+  const title = `${classLabel(cls, tr)} · ${spanLabel(span, ctx.periods, locale, tr, ctx.sem)}`;
   const sep = locale === "fr" ? " : " : ": ";
   const terms = [...new Set(ctx.periods.map((x) => x.term))];
 
@@ -65,10 +65,10 @@ export default async function Results({ params, searchParams }: { params: Promis
         <label className="tb-field">{tr("marks.span")}
           <select className="ctl" name="span" defaultValue={spanKey(span)}>
             <optgroup label={tr("marks.periods")}>
-              {ctx.periods.map((x) => <option key={x.key} value={x.key}>{x.key} · {periodLong(x, locale, tr)}</option>)}
+              {ctx.periods.map((x) => <option key={x.key} value={x.key}>{x.key} · {periodLong(x, locale, tr, ctx.sem)}</option>)}
             </optgroup>
             <optgroup label={tr("marks.terms")}>
-              {terms.map((n) => <option key={n} value={`T${n}`}>{termLabel(n, locale, tr)}</option>)}
+              {terms.map((n) => <option key={n} value={`T${n}`}>{termLabel(n, locale, tr, ctx.sem)}</option>)}
             </optgroup>
             <option value="Y">{tr("marks.wholeYear")}</option>
           </select>

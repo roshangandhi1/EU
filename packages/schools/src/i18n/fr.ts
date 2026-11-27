@@ -210,7 +210,7 @@ export const schools: Shape<typeof en> = {
   levelName: "{n}e année",
   // ---- Notes. Regroupées à la fin du fichier pour faciliter les fusions. ----
   marks: {
-    bulletinTitle: "Bulletins (copie de travail)", bulletinIntro: "Présentés comme le bulletin du ministère, pour être recopiés sur le bulletin officiel. Imprimez un élève ou toute la classe (une page A4 chacun).", bulletinSchoolMissing: "Le code de l'école (ministère) ou la province manque pour l'en-tête du bulletin. Ajoutez-les dans", bulletin: "Bulletin", bulletins: "Bulletins de la classe", 
+    finalPeriod: "Résultat final ({exam})", finalIntro: "Fin de cycle : la moyenne école et le {exam}, chacun sur 50, pour la case Résultat final du bulletin. Laissez la moyenne école vide pour utiliser le pourcentage de l'année divisé par 2.", schoolAverage: "Moyenne école", bulletinTitle: "Bulletins (copie de travail)", bulletinIntro: "Présentés comme le bulletin du ministère, pour être recopiés sur le bulletin officiel. Imprimez un élève ou toute la classe (une page A4 chacun).", bulletinSchoolMissing: "Le code de l'école (ministère) ou la province manque pour l'en-tête du bulletin. Ajoutez-les dans", bulletin: "Bulletin", bulletins: "Bulletins de la classe", 
     errLetters: "Donnez au moins deux lettres différentes, séparées par des virgules.", lettersTitle: "Application et conduite", lettersIntro: "Notées par une lettre à chaque période sur le bulletin, de la meilleure à la moins bonne.", lettersLabel: "Lettres", lettersHint: "ex. E, TB, B, AB, M", domain: "Domaine", branch: "Branche", branchPh: "ex. Français", optional: "Facultatif", 
     errLetter: "Utilisez : {letters}", application: "Application", conduct: "Conduite", 
     schemesTitle: "Barèmes de notation", schemesIntro: "Une école peut noter des niveaux différents avec des barèmes différents, ex. un pour la 1re à la 6e année et un pour la 7e et la 8e. Les notes et bulletins utilisent le barème du niveau de la classe de l'élève.",
@@ -220,7 +220,7 @@ export const schools: Shape<typeof en> = {
     errLevels: "Déjà dans un autre barème : {levels}. Décochez-les d'abord là-bas.", errFallback: "Un autre barème couvre déjà tous les autres niveaux. Cochez les niveaux de celui-ci.",
     tab: "Notes", nav: "Notes", entryTab: "Saisie des notes", resultsTab: "Résultats", setupLink: "Barème et branches",
     chooseClass: "Choisir une classe", period: "Période", periods: "Périodes", terms: "Trimestres", subject: "Branche", allSubjects: "Toutes les branches", span: "Résultats de",
-    periodLong: "{ord} période", examLong: "Examen du {ord} trimestre", termLong: "{ord} trimestre", termShort: "Trimestre {n}", wholeYear: "Année entière", yearShort: "Année",
+    periodLong: "{ord} période", semLong: "{ord} semestre", semExamLong: "Examen du {ord} semestre", examLong: "Examen du {ord} trimestre", termLong: "{ord} trimestre", termShort: "Trimestre {n}", wholeYear: "Année entière", yearShort: "Année",
     progressTitle: "Notes saisies", progressIntro: "Avancement de la saisie des fiches de cotes de chaque classe, période par période. Ouvrez une case pour saisir les notes.",
     entered: "{n} notes saisies sur {total}", enterTitle: "Saisir des notes", enterIntro: "Choisissez la classe et la période indiquées sur la fiche de cotes papier.",
     defaultScheme: "Barème standard « {name} » et branches par défaut. Le directeur peut les modifier dans Barème et branches.",

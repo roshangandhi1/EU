@@ -70,7 +70,7 @@ export const mark = z.object({
   studentId: id,
   classId: id,
   subject: z.string().min(1).max(24),
-  period: z.string().regex(/^(P[1-9]|Ex[1-4])$/),
+  period: z.string().regex(/^(P[1-9]|Ex[1-4]|FIN)$/),
   score: markScore.nullable(),
   absent: z.boolean(),
   /** Letter grade for Application / Conduite (subject "_application" / "_conduct"). */
@@ -81,6 +81,16 @@ export type Mark = z.input<typeof mark>;
 /** The two letter-graded rows of the report card, stored as marks with these subject codes. */
 export const BEHAVIOUR = ["_application", "_conduct"] as const;
 export const isBehaviour = (code: string) => (BEHAVIOUR as readonly string[]).includes(code);
+
+/**
+ * "Résultat final" at the end of a cycle: the school average out of 50 and the national exam out of
+ * 50 (ENAFEP in 6e, form IMPRIGE/P.S/007; TENASOSP in 8e, form IGE/P.S/008), kept as marks in the
+ * pseudo-period "FIN". A blank school average falls back to the year percentage halved.
+ */
+export const FINAL = { period: "FIN", school: "_ecole", exam: "_examen", max: 50 } as const;
+/** The national exam that ends a level's cycle, if any. */
+export const finalExam = (lvl?: number): "ENAFEP" | "TENASOSP" | null => (lvl === 6 ? "ENAFEP" : lvl === 8 ? "TENASOSP" : null);
+export const isFinal = (code: string) => code === FINAL.school || code === FINAL.exam;
 
 // ---- The DRC primary standard (built-in default) ----
 
@@ -99,15 +109,46 @@ export const DRC_SCHEME: GradingScheme = {
   examFactor: 2,
   passPercent: 50,
   mentions: DRC_MENTIONS,
-  domains: [
+  domains: [],
+  letters: DEFAULT_LETTERS,
+};
+
+/**
+ * 7e-8e année (cycle terminal de l'éducation de base, form IGE/P.S/007): two semesters, each with
+ * two periods of "travaux journaliers" and an exam worth twice a period.
+ */
+export const CTEB_SCHEME: GradingScheme = {
+  ...DRC_SCHEME,
+  name: "RDC CTEB 7e-8e (standard)",
+  levels: [7, 8],
+  terms: [{ periods: 2, exam: true }, { periods: 2, exam: true }],
+};
+/** The ministry default scheme for a level: semesters for the CTEB (7e-8e), trimesters before. */
+export const defaultScheme = (lvl?: number): GradingScheme => ((lvl ?? 0) >= 7 ? CTEB_SCHEME : DRC_SCHEME);
+/** Whether a scheme's terms are semesters (two of them) rather than trimesters, for labels. */
+export const isSemesters = (s: Pick<GradingScheme, "terms">) => s.terms.length === 2;
+
+/**
+ * The ministry report card domains for a level. On the terminal forms (5e-6e) mathematics, science
+ * and technology each get their own sub-total; on the earlier forms the domain has one.
+ */
+export function drcDomains(lvl?: number): ReportDomain[] {
+  if ((lvl ?? 0) >= 7)
+    return [
+      { key: "sciences", fr: "Domaine des sciences", en: "Sciences", subtotal: "branch" },
+      { key: "langues", fr: "Domaine des langues", en: "Languages", subtotal: "domain" },
+      { key: "social", fr: "Domaine de l'univers social et environnement", en: "Social world and environment", subtotal: "domain" },
+      { key: "arts", fr: "Domaine des arts", en: "Arts", subtotal: "domain" },
+      { key: "perso", fr: "Domaine du développement personnel", en: "Personal development", subtotal: "domain" },
+    ];
+  return [
     { key: "langues", fr: "Domaine des langues", en: "Languages", subtotal: "branch" },
-    { key: "mst", fr: "Domaine des mathématiques, sciences et technologie", en: "Mathematics, science and technology", subtotal: "domain" },
+    { key: "mst", fr: "Domaine des mathématiques, sciences et technologie", en: "Mathematics, science and technology", subtotal: (lvl ?? 0) >= 5 ? "branch" : "domain" },
     { key: "social", fr: "Domaine de l'univers social et environnement", en: "Social world and environment", subtotal: "domain" },
     { key: "arts", fr: "Domaine des arts", en: "Arts", subtotal: "domain" },
     { key: "perso", fr: "Domaine du développement personnel", en: "Personal development", subtotal: "domain" },
-  ],
-  letters: DEFAULT_LETTERS,
-};
+  ];
+}
 
 type Def = { fr: string; en: string; max: number; domain: string; branch?: [string, string]; optional?: boolean };
 const LC: [string, string] = ["Langues congolaises", "Congolese languages"];
@@ -166,15 +207,94 @@ const MOYEN: Def[] = [
   ...COMMON_TAIL,
 ];
 
-/**
- * Levels 5 and up: no ministry bulletin received yet, so the moyen subjects are used as a starting
- * point. The headteacher can edit names and maxima per level.
- */
-const DEGREE: Record<number, Def[]> = { 1: ELEMENTAIRE, 2: ELEMENTAIRE, 3: MOYEN, 4: MOYEN };
+/** Degré terminal (5e-6e année), from the ministry bulletins IMPRIGE/P.S/006 and /007 (same subjects). */
+const TERMINAL: Def[] = [
+  { fr: "Gram. & Conjugaison", en: "Grammar and conjugation", max: 10, domain: "langues", branch: LC },
+  { fr: "Expr. orale & Vocab.", en: "Speaking and vocabulary", max: 10, domain: "langues", branch: LC },
+  { fr: "Orth. & Rédaction", en: "Spelling and composition", max: 10, domain: "langues", branch: LC },
+  { fr: "Expr. orale & Vocab.", en: "Speaking and vocabulary", max: 10, domain: "langues", branch: FR },
+  { fr: "Orthographe", en: "Spelling", max: 10, domain: "langues", branch: FR },
+  { fr: "Rédaction", en: "Composition", max: 10, domain: "langues", branch: FR },
+  { fr: "Gram. Conj. Analyse", en: "Grammar, conjugation, analysis", max: 20, domain: "langues", branch: FR },
+  { fr: "Lecture - écriture en langues congolaises", en: "Reading and writing in Congolese languages", max: 20, domain: "langues" },
+  { fr: "Lecture - écriture en langue française", en: "Reading and writing in French", max: 20, domain: "langues" },
+  { fr: "Numération", en: "Numeracy", max: 10, domain: "mst", branch: MA },
+  { fr: "Opérations", en: "Operations", max: 10, domain: "mst", branch: MA },
+  { fr: "Mesures des grandeurs", en: "Measurement", max: 10, domain: "mst", branch: MA },
+  { fr: "Formes géométriques", en: "Geometric shapes", max: 10, domain: "mst", branch: MA },
+  { fr: "Problèmes", en: "Problems", max: 20, domain: "mst", branch: MA },
+  { fr: "Physique - Info.", en: "Physics and IT", max: 10, domain: "mst", branch: SC },
+  { fr: "Anat. - Zool. - Botanique", en: "Anatomy, zoology, botany", max: 20, domain: "mst", branch: SC },
+  { fr: "Technologie", en: "Technology", max: 10, domain: "mst", branch: TE },
+  { fr: "Éd. civique et morale", en: "Civic and moral education", max: 10, domain: "social" },
+  { fr: "Éd. à la santé et environnement", en: "Health and environment", max: 10, domain: "social" },
+  { fr: "Géographie", en: "Geography", max: 10, domain: "social" },
+  { fr: "Histoire", en: "History", max: 10, domain: "social" },
+  { fr: "Arts plastiques", en: "Visual arts", max: 10, domain: "arts" },
+  { fr: "Arts dramatiques", en: "Drama", max: 10, domain: "arts" },
+  { fr: "Initiation aux travaux productifs", en: "Introduction to productive work", max: 10, domain: "perso" },
+  { fr: "Éd. physique et sportive", en: "Physical education and sport", max: 10, domain: "perso" },
+  { fr: "Religion", en: "Religion", max: 10, domain: "perso", optional: true },
+];
+
+const SD_MATH: [string, string] = ["Sous-domaine des mathématiques", "Mathematics"];
+const SD_SVT: [string, string] = ["Sous-domaine des sciences de la vie et de la terre", "Life and earth sciences"];
+const SD_TIC: [string, string] = ["Sous-domaine des sciences physiques, technologie et TIC", "Physical science, technology and ICT"];
+/** CTEB 7e année, from the ministry bulletin IGE/P.S/007. */
+const CTEB: Def[] = [
+  { fr: "Arithmétique", en: "Arithmetic", max: 10, domain: "sciences", branch: SD_MATH },
+  { fr: "Statistique", en: "Statistics", max: 10, domain: "sciences", branch: SD_MATH },
+  { fr: "Géométrie", en: "Geometry", max: 20, domain: "sciences", branch: SD_MATH },
+  { fr: "Algèbre", en: "Algebra", max: 40, domain: "sciences", branch: SD_MATH },
+  { fr: "Anatomie", en: "Anatomy", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Botanique", en: "Botany", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Zoologie", en: "Zoology", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Sciences physiques", en: "Physical science", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Technologie", en: "Technology", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Techn. d'info. & com. (TIC)", en: "ICT", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Anglais", en: "English", max: 30, domain: "langues" },
+  { fr: "Français", en: "French", max: 70, domain: "langues" },
+  { fr: "Religion", en: "Religion", max: 20, domain: "social", optional: true },
+  { fr: "Éducation à la vie", en: "Life skills", max: 20, domain: "social" },
+  { fr: "Éd. civique et morale", en: "Civic and moral education", max: 20, domain: "social" },
+  { fr: "Géographie", en: "Geography", max: 20, domain: "social" },
+  { fr: "Histoire", en: "History", max: 20, domain: "social" },
+  { fr: "Dessin", en: "Drawing", max: 20, domain: "arts" },
+  { fr: "Musique", en: "Music", max: 20, domain: "arts" },
+  { fr: "Éd. physique et sportive", en: "Physical education and sport", max: 20, domain: "perso" },
+];
+
+/** CTEB 8e année, from the ministry bulletin IGE/P.S/008: adds Nutrition and Chimie, other maxima. */
+const CTEB8: Def[] = [
+  { fr: "Arithmétique", en: "Arithmetic", max: 10, domain: "sciences", branch: SD_MATH },
+  { fr: "Statistique", en: "Statistics", max: 10, domain: "sciences", branch: SD_MATH },
+  { fr: "Géométrie", en: "Geometry", max: 20, domain: "sciences", branch: SD_MATH },
+  { fr: "Algèbre", en: "Algebra", max: 40, domain: "sciences", branch: SD_MATH },
+  { fr: "Anatomie", en: "Anatomy", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Botanique", en: "Botany", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Nutrition", en: "Nutrition", max: 10, domain: "sciences", branch: SD_SVT },
+  { fr: "Zoologie", en: "Zoology", max: 20, domain: "sciences", branch: SD_SVT },
+  { fr: "Chimie", en: "Chemistry", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Sciences physiques", en: "Physical science", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Technologie", en: "Technology", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Techn. d'info. & com. (TIC)", en: "ICT", max: 10, domain: "sciences", branch: SD_TIC },
+  { fr: "Anglais", en: "English", max: 30, domain: "langues" },
+  { fr: "Français", en: "French", max: 50, domain: "langues" },
+  { fr: "Religion", en: "Religion", max: 20, domain: "social", optional: true },
+  { fr: "Éducation à la vie", en: "Life skills", max: 20, domain: "social" },
+  { fr: "Éd. civique et morale", en: "Civic and moral education", max: 20, domain: "social" },
+  { fr: "Histoire", en: "History", max: 20, domain: "social" },
+  { fr: "Géographie", en: "Geography", max: 30, domain: "social" },
+  { fr: "Dessin", en: "Drawing", max: 20, domain: "arts" },
+  { fr: "Musique", en: "Music", max: 20, domain: "arts" },
+  { fr: "Éd. physique et sportive", en: "Physical education and sport", max: 20, domain: "perso" },
+];
+
+const DEGREE: Record<number, Def[]> = { 1: ELEMENTAIRE, 2: ELEMENTAIRE, 3: MOYEN, 4: MOYEN, 5: TERMINAL, 6: TERMINAL, 7: CTEB, 8: CTEB8 };
 
 /** The DRC default subjects for a level, named in the given language. Codes are stable across languages. */
 export function defaultSubjects(lvl: number, locale: "en" | "fr" = "fr"): Subject[] {
-  const defs = DEGREE[lvl] ?? MOYEN;
+  const defs = DEGREE[lvl] ?? CTEB;
   const taken = new Set<string>();
   return defs.map((d, i) => {
     const code = subjectCode(d.branch ? `${d.branch[0].slice(0, 3)} ${d.fr}` : d.fr, taken);
@@ -191,8 +311,15 @@ export function degreeOf(lvl: number): "elementaire" | "moyen" | "terminal" | "c
   return lvl <= 2 ? "elementaire" : lvl <= 4 ? "moyen" : lvl <= 6 ? "terminal" : "cteb";
 }
 
-/** A scheme's report card domains; schemes made before domains existed use the DRC ones. */
-export const domainsOf = (s: Partial<Pick<GradingScheme, "domains">>): ReportDomain[] => (s.domains?.length ? s.domains : DRC_SCHEME.domains);
+/**
+ * A scheme's report card domains for a level. A scheme with none, or with an unedited copy of the
+ * DRC ones (saved by an earlier version), uses the ministry domains for that level.
+ */
+export function domainsOf(s: Partial<Pick<GradingScheme, "domains">>, lvl?: number): ReportDomain[] {
+  const own = s.domains ?? [];
+  const copy = [1, 5, 7].some((l) => JSON.stringify(own) === JSON.stringify(drcDomains(l)));
+  return own.length && !copy ? own : drcDomains(lvl);
+}
 /** A scheme's letter grades for Application and Conduite. */
 export const lettersOf = (s: Partial<Pick<GradingScheme, "letters">>): string[] => (s.letters?.length ? s.letters : DEFAULT_LETTERS);
 
@@ -259,18 +386,21 @@ export type SchemeSource = "school" | "programme" | "default";
  * The scheme in force at a school for a class level. In each scope (the school, then the
  * programme) the scheme that lists the level wins, then the scope's fallback scheme (no levels).
  * `rows` may mix school and programme ("schools") records. Without a level, only fallbacks count.
+ * Levels 7-8 skip the fallbacks and default to the CTEB semesters.
  */
 export function resolveScheme(rows: readonly Rec<GradingScheme>[], siteId: string, lvl?: number): { scheme: GradingScheme; source: SchemeSource; record?: Rec<GradingScheme> } {
   const live = rows.filter((r) => !r.voidedAt);
   const pick = (scopeId: string) => {
     const mine = live.filter((r) => r.scopeId === scopeId);
-    return (lvl !== undefined ? latest(mine.filter((r) => (r.levels ?? []).includes(lvl))) : undefined) ?? latest(mine.filter((r) => (r.levels ?? []).length === 0));
+    const exact = lvl !== undefined ? latest(mine.filter((r) => (r.levels ?? []).includes(lvl))) : undefined;
+    // 7e-8e (CTEB) run on semesters: a primary school's catch-all scheme does not apply to them.
+    return exact ?? ((lvl ?? 0) >= 7 ? undefined : latest(mine.filter((r) => (r.levels ?? []).length === 0)));
   };
   const own = pick(siteId);
   if (own) return { scheme: own, source: "school", record: own };
   const prog = pick("schools");
   if (prog) return { scheme: prog, source: "programme", record: prog };
-  return { scheme: DRC_SCHEME, source: "default" };
+  return { scheme: defaultScheme(lvl), source: "default" };
 }
 
 /**
@@ -540,8 +670,8 @@ export type BulletinLine =
 
 /**
  * The rows of a report card, as on the ministry bulletins: each domain's heading, branch headings
- * ("Français"), the subjects, and sub-totals either after each branch of two or more subjects
- * (Domaine des langues) or once for the whole domain. Subjects without a known domain come last.
+ * ("Français"), the subjects, and sub-totals either after each named branch (Domaine des langues,
+ * and mathematics, science and technology from 5e) or once for the whole domain. Subjects without a known domain come last.
  */
 export function bulletinLayout(subjects: readonly Subject[], domains: readonly ReportDomain[], locale: "en" | "fr" = "fr"): BulletinLine[] {
   const out: BulletinLine[] = [];
@@ -564,9 +694,9 @@ export function bulletinLayout(subjects: readonly Subject[], domains: readonly R
       const branch = b[0]!.branch ?? "";
       if (branch) out.push({ type: "branch", label: branch });
       for (const s of b) out.push({ type: "subject", subject: s });
-      if (g.domain?.subtotal === "branch" && branch && b.length >= 2) out.push({ type: "subtotal", codes: b.map((s) => s.code) });
+      if (g.domain?.subtotal === "branch" && branch) out.push({ type: "subtotal", codes: b.map((s) => s.code) });
     }
-    if (g.domain?.subtotal === "domain" && g.subjects.length >= 2) out.push({ type: "subtotal", codes: g.subjects.map((s) => s.code) });
+    if (g.domain?.subtotal === "domain") out.push({ type: "subtotal", codes: g.subjects.map((s) => s.code) });
   }
   return out;
 }

@@ -1,4 +1,4 @@
-import { BEHAVIOUR, formatScore, lettersOf, maxFor } from "@eu/schools";
+import { BEHAVIOUR, FINAL, finalExam, formatScore, lettersOf, maxFor } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
@@ -25,6 +25,11 @@ export default async function Marks({ params, searchParams }: { params: Promise<
   const canConfigure = can(me, "school.configure", p.siteId);
   const period = ctx.periods.find((x) => x.key === param(sp, "period")) ?? ctx.periods[0]!;
   const cls = ctx.cls;
+  // 6e and 8e: a sheet for the Résultat final (school average and ENAFEP / TENASOSP), as pseudo-period "FIN".
+  const exam = finalExam(cls?.level);
+  const hasFinal = !!exam;
+  const final = hasFinal && param(sp, "period") === FINAL.period;
+  const periodKey = final ? FINAL.period : period.key;
 
   if (!ctx.year || ctx.classes.length === 0) {
     return (
@@ -56,11 +61,12 @@ export default async function Marks({ params, searchParams }: { params: Promise<
         </select>
       </label>
       <label className="tb-field">{tr("marks.period")}
-        <select className="ctl" name="period" defaultValue={period.key}>
-          {ctx.periods.map((x) => <option key={x.key} value={x.key}>{x.key} · {periodLong(x, locale, tr)}</option>)}
+        <select className="ctl" name="period" defaultValue={periodKey}>
+          {ctx.periods.map((x) => <option key={x.key} value={x.key}>{x.key} · {periodLong(x, locale, tr, ctx.sem)}</option>)}
+          {hasFinal && <option value={FINAL.period}>{tr("marks.finalPeriod", { exam: exam ?? "" })}</option>}
         </select>
       </label>
-      {cls && (
+      {cls && !final && (
         <label className="tb-field">{tr("marks.subject")}
           <select className="ctl" name="subject" defaultValue={param(sp, "subject")}>
             <option value="">{tr("marks.allSubjects")}</option>
@@ -85,7 +91,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
               <thead>
                 <tr>
                   <th className="mg-pupil">{tr("common.class")}</th>
-                  {ctx.periods.map((x) => <th key={x.key} className="num" title={periodLong(x, locale, tr)}>{x.key}</th>)}
+                  {ctx.periods.map((x) => <th key={x.key} className="num" title={periodLong(x, locale, tr, ctx.sem)}>{x.key}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -124,7 +130,8 @@ export default async function Marks({ params, searchParams }: { params: Promise<
   }
 
   const subjects = ctx.subjectsOf(cls.level).subjects;
-  const shown = subjects.filter((s) => !param(sp, "subject") || s.code === param(sp, "subject"));
+  const subjectFilter = final ? "" : param(sp, "subject");
+  const shown = final ? [] : subjects.filter((s) => !subjectFilter || s.code === subjectFilter);
   const pupils = ctx.pupilsOf(cls.id);
   const idx = ctx.index(cls.id);
   const columns: GridColumn[] = shown.map((s) => {
@@ -132,7 +139,10 @@ export default async function Marks({ params, searchParams }: { params: Promise<
     return { key: s.code, subject: s.code, period: period.key, title: s.branch ? `${s.branch} · ${s.name}` : s.name, sub: `/ ${max}`, max };
   });
   // Application and Conduite: a letter per period (not for exams), after the subjects.
-  if (period.kind === "period" && !param(sp, "subject"))
+  if (final)
+    for (const [code, title] of [[FINAL.school, tr("marks.schoolAverage")], [FINAL.exam, exam ?? ""]] as const)
+      columns.push({ key: code, subject: code, period: FINAL.period, title, sub: `/ ${FINAL.max}`, max: FINAL.max });
+  if (!final && period.kind === "period" && !subjectFilter)
     for (const code of BEHAVIOUR) columns.push({ key: code, subject: code, period: period.key, title: tr(`marks.${code.slice(1)}`), sub: lettersOf(ctx.scheme).join(" "), max: 0, letters: lettersOf(ctx.scheme) });
   const values: Record<string, string> = {};
   for (const s of pupils) for (const c of columns) {
@@ -145,13 +155,13 @@ export default async function Marks({ params, searchParams }: { params: Promise<
       <MarksNav base={base} active="entry" siteId={p.siteId} locale={locale} tr={tr} canConfigure={canConfigure} classId={cls.id} />
       {messages}
       {filter}
-      <Section className="marks-sec" id="sheet" flush icon="list" title={`${classLabel(cls, tr)} · ${period.key}`} description={periodLong(period, locale, tr)} count={pupils.length}
-        actions={<Link className="btn ghost sm" href={`${base}/results?class=${cls.id}&span=${period.key}`}><Icon name="chart" size={15} />{tr("marks.seeResults")}</Link>}>
+      <Section className="marks-sec" id="sheet" flush icon="list" title={`${classLabel(cls, tr)} · ${final ? tr("marks.finalPeriod", { exam: exam ?? "" }) : period.key}`} description={final ? tr("marks.finalIntro", { exam: exam ?? "" }) : periodLong(period, locale, tr, ctx.sem)} count={pupils.length}
+        actions={<Link className="btn ghost sm" href={final ? `${base}/bulletin?class=${cls.id}` : `${base}/results?class=${cls.id}&span=${period.key}`}><Icon name="chart" size={15} />{final ? tr("marks.bulletins") : tr("marks.seeResults")}</Link>}>
         {pupils.length === 0 ? <EmptyRow icon="users" title={tr("ux.noRoster")} /> : !canWrite ? <Notice tone="warning">{tr("common.forbidden")}</Notice> : (
           <MarksGrid
-            key={`${cls.id}:${period.key}:${param(sp, "subject")}:${param(sp, "t")}`}
+            key={`${cls.id}:${periodKey}:${subjectFilter}:${param(sp, "t")}`}
             action={saveMarks}
-            hidden={{ locale, siteId: p.siteId, classId: cls.id, period: period.key, subject: param(sp, "subject") }}
+            hidden={{ locale, siteId: p.siteId, classId: cls.id, period: periodKey, subject: subjectFilter }}
             pupils={pupils.map((s) => ({ id: s.id, name: studentName(s), number: s.studentNumber }))}
             columns={columns}
             values={values}

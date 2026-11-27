@@ -206,7 +206,7 @@ export const schools = {
   levelName: "Year {n}",
   // ---- Marks (notes). Kept together at the end of the file to ease merges. ----
   marks: {
-    bulletinTitle: "Report cards (working copy)", bulletinIntro: "Laid out like the ministry bulletin, to copy onto the official form. Print one pupil or the whole class (one A4 page each).", bulletinSchoolMissing: "The ministry school code or province is missing for the report card header. Add them in", bulletin: "Report card", bulletins: "Report cards for the class", 
+    finalPeriod: "Final result ({exam})", finalIntro: "End of cycle: the school average and the {exam} exam, each out of 50, for the Résultat final box on the report card. Leave the school average blank to use this year's percentage halved.", schoolAverage: "School average", bulletinTitle: "Report cards (working copy)", bulletinIntro: "Laid out like the ministry bulletin, to copy onto the official form. Print one pupil or the whole class (one A4 page each).", bulletinSchoolMissing: "The ministry school code or province is missing for the report card header. Add them in", bulletin: "Report card", bulletins: "Report cards for the class", 
     errLetters: "Give at least two different letters, separated by commas.", lettersTitle: "Application and conduct", lettersIntro: "Graded with a letter each period on the report card, best first.", lettersLabel: "Letters", lettersHint: "e.g. E, TB, B, AB, M", domain: "Domain", branch: "Branch", branchPh: "e.g. French", optional: "Optional", 
     errLetter: "Use one of: {letters}", application: "Application", conduct: "Conduct", 
     schemesTitle: "Grading schemes", schemesIntro: "A school can grade different levels with different schemes, e.g. one for years 1-6 and one for years 7-8. Marks and reports use the scheme of the pupil's class level.",
@@ -216,7 +216,7 @@ export const schools = {
     errLevels: "Already in another scheme: {levels}. Untick them there first.", errFallback: "Another scheme already covers all other levels. Tick the levels this one grades.",
     tab: "Marks", nav: "Marks", entryTab: "Enter marks", resultsTab: "Results", setupLink: "Grading and subjects",
     chooseClass: "Choose a class", period: "Period", periods: "Periods", terms: "Terms", subject: "Subject", allSubjects: "All subjects", span: "Results for",
-    periodLong: "Period {n}", examLong: "Term {n} exam", termLong: "Term {n}", termShort: "Term {n}", wholeYear: "Whole year", yearShort: "Year",
+    periodLong: "Period {n}", semLong: "Semester {n}", semExamLong: "Semester {n} exam", examLong: "Term {n} exam", termLong: "Term {n}", termShort: "Term {n}", wholeYear: "Whole year", yearShort: "Year",
     progressTitle: "Marks entered", progressIntro: "How much of each class's mark sheet has been typed in, period by period. Open a cell to enter marks.",
     entered: "{n} of {total} marks entered", enterTitle: "Enter marks", enterIntro: "Choose the class and the period on the paper mark sheet.",
     defaultScheme: "Using the standard scheme “{name}” and the default subjects. The headteacher can change them in Grading and subjects.",

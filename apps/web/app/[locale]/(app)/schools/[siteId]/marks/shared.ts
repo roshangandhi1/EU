@@ -1,4 +1,4 @@
-import { activeOn, live, markIndex, periodsOf, resolveScheme, resolveSubjects, type PeriodDef, type SchoolData, type Span } from "@eu/schools";
+import { activeOn, isSemesters, live, markIndex, periodsOf, resolveScheme, resolveSubjects, type PeriodDef, type SchoolData, type Span } from "@eu/schools";
 import type { Locale } from "@eu/core/i18n";
 import { byLevel, studentName } from "../labels";
 
@@ -10,20 +10,21 @@ const ordFr = (n: number, fem: boolean) => (n === 1 ? (fem ? "1re" : "1er") : `$
 export const periodShort = (p: Pick<PeriodDef, "key">) => p.key;
 
 /** "1re période" / "Period 1", "Examen du 1er trimestre" / "Term 1 exam". */
-export function periodLong(p: PeriodDef, locale: Locale, tr: Tr): string {
-  if (p.kind === "exam") return tr("marks.examLong", { ord: locale === "fr" ? ordFr(p.term, false) : String(p.term), n: p.term });
+export function periodLong(p: PeriodDef, locale: Locale, tr: Tr, sem = false): string {
+  if (p.kind === "exam") return tr(sem ? "marks.semExamLong" : "marks.examLong", { ord: locale === "fr" ? ordFr(p.term, false) : String(p.term), n: p.term });
   return tr("marks.periodLong", { ord: locale === "fr" ? ordFr(p.n, true) : String(p.n), n: p.n });
 }
 
-export function termLabel(term: number, locale: Locale, tr: Tr): string {
-  return tr("marks.termLong", { ord: locale === "fr" ? ordFr(term, false) : String(term), n: term });
+/** "1er trimestre", or "1er semestre" for a semester scheme (7e-8e). */
+export function termLabel(term: number, locale: Locale, tr: Tr, sem = false): string {
+  return tr(sem ? "marks.semLong" : "marks.termLong", { ord: locale === "fr" ? ordFr(term, false) : String(term), n: term });
 }
 
-export function spanLabel(span: Span, periods: PeriodDef[], locale: Locale, tr: Tr): string {
+export function spanLabel(span: Span, periods: PeriodDef[], locale: Locale, tr: Tr, sem = false): string {
   if (span.kind === "year") return tr("marks.wholeYear");
-  if (span.kind === "term") return termLabel(span.term, locale, tr);
+  if (span.kind === "term") return termLabel(span.term, locale, tr, sem);
   const p = periods.find((x) => x.key === span.key);
-  return p ? `${periodLong(p, locale, tr)} (${p.key})` : span.key;
+  return p ? `${periodLong(p, locale, tr, sem)} (${p.key})` : span.key;
 }
 
 /** Everything the marks pages need for one school: year, classes, scheme, and a chosen class. */
@@ -43,5 +44,5 @@ export function marksContext(d: SchoolData, siteId: string, date: string, classI
       .sort((a, b) => studentName(a).localeCompare(studentName(b)));
   };
   const subjectsOf = (level: number) => resolveSubjects(d.subjects, siteId, level, locale);
-  return { year, classes, cls, scheme, schemeSource: source, periods, pupilsOf, subjectsOf, index: (id: string) => markIndex(d.marks, id) };
+  return { year, classes, cls, scheme, schemeSource: source, sem: isSemesters(scheme), periods, pupilsOf, subjectsOf, index: (id: string) => markIndex(d.marks, id) };
 }

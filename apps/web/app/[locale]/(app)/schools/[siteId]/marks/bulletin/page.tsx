@@ -1,4 +1,4 @@
-import { BEHAVIOUR, bulletinLayout, classResults, degreeOf, domainsOf, formatScore, maxFor, periodsIn, type ClassResults, type PeriodDef, type Span, type Subject } from "@eu/schools";
+import { BEHAVIOUR, FINAL, bulletinLayout, finalExam, classResults, degreeOf, domainsOf, formatScore, maxFor, periodsIn, type ClassResults, type PeriodDef, type Span, type Subject } from "@eu/schools";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyRow, Notice } from "@/components/ui";
@@ -14,11 +14,13 @@ import "./bulletin.css";
 const DEGREE = {
   elementaire: "DEGRÉ ÉLÉMENTAIRE (1re, 2e ANNÉE)",
   moyen: "DEGRÉ MOYEN (3e, 4e ANNÉE)",
-  terminal: "DEGRÉ TERMINAL (5e, 6e ANNÉE)",
+  terminal: "DEGRÉ TERMINAL",
   cteb: "ÉDUCATION DE BASE (7e, 8e ANNÉE)",
 } as const;
 const ordP = (n: number) => (n === 1 ? "1re P." : `${n}e P.`);
 const levelFr = (n: number) => (n === 1 ? "1re année" : `${n}e année`);
+/** The terminal forms are printed per year ("DEGRÉ TERMINAL (6e ANNÉE)"); the others cover two years. */
+const degreeTitle = (lvl: number) => (degreeOf(lvl) === "terminal" ? `${DEGREE.terminal} (${lvl}e ANNÉE)` : DEGREE[degreeOf(lvl)]);
 
 /**
  * The report card ("bulletin") laid out like the ministry form, as a working copy ("copie de
@@ -40,7 +42,7 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
   const { scheme } = ctx;
   // Report cards print subject names in French, as the school entered them.
   const subjects: Subject[] = ctx.subjectsOf(cls.level).subjects;
-  const lines = bulletinLayout(subjects, domainsOf(scheme), "fr");
+  const lines = bulletinLayout(subjects, domainsOf(scheme, cls.level), "fr");
   const pupils = ctx.pupilsOf(cls.id);
   const only = param(sp, "student");
   const shown = only ? pupils.filter((s) => s.id === only) : pupils;
@@ -48,6 +50,11 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
   const idx = ctx.index(cls.id);
   const ids = pupils.map((s) => s.id);
   const terms = [...new Set(ctx.periods.map((x) => x.term))];
+  // The CTEB form (7e-8e): a MAX column at the start of each semester, the semester's periods under
+  // "Travaux journaliers", a combined "Place / Nbre d'élèves" row and an "Examen de repêchage" column.
+  const cteb = degreeOf(cls.level) === "cteb";
+  const exam = finalExam(cls.level);
+  const termNames = ctx.sem ? ["PREMIER SEMESTRE", "SECOND SEMESTRE"] : ["PREMIER TRIMESTRE", "DEUXIÈME TRIMESTRE", "TROISIÈME TRIMESTRE", "QUATRIÈME TRIMESTRE"];
 
   // Results for every column the form has: each period, each exam, each trimester, the year.
   const res = new Map<string, ClassResults>();
@@ -74,30 +81,35 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
       for (const x of subs(codes)) { const b = r.bySubject.get(x.code); if (b && b.max > 0) { o += b.obtained; any = true; } }
       return any ? num(o) : "";
     };
-    const cells = (codes: string[], perCol?: boolean) => {
-      const out: React.ReactNode[] = [<td key="mp" className="b-max">{num(max(codes, [{ key: "P1", kind: "period", term: 1, n: 1 }]))}</td>];
+    const perMax = (codes: string[], k: string) => <td key={k} className="b-max">{num(max(codes, [{ key: "P1", kind: "period", term: 1, n: 1 }]))}</td>;
+    const cells = (codes: string[], subject = false) => {
+      const out: React.ReactNode[] = cteb ? [] : [perMax(codes, "mp")];
       for (const t of terms) {
         const inTerm = ctx.periods.filter((x) => x.term === t);
+        if (cteb) out.push(perMax(codes, `mp${t}`));
         for (const x of inTerm.filter((q) => q.kind === "period")) out.push(<td key={x.key}>{got(codes, x.key)}</td>);
         const ex = inTerm.find((q) => q.kind === "exam");
         if (ex) out.push(<td key={`mx${t}`} className="b-max">{num(max(codes, [ex]))}</td>, <td key={ex.key}>{got(codes, ex.key)}</td>);
         out.push(<td key={`mt${t}`} className="b-max">{num(max(codes, inTerm))}</td>, <td key={`T${t}`} className="b-strong">{got(codes, `T${t}`)}</td>);
       }
       out.push(<td key="my" className="b-max">{num(max(codes, ctx.periods))}</td>, <td key="Y" className="b-strong">{got(codes, "Y")}</td>);
-      void perCol;
+      // Examen de repêchage (% and teacher's signature), filled in by hand on subject rows.
+      if (cteb) out.push(...(subject ? [<td key="rp" />, <td key="rs" />] : [<td key="rp" className="b-black" />, <td key="rs" className="b-black" />]));
       return out;
     };
     // Footer rows: one value per "points" column; the maxima columns are blacked out as on the form.
     const footer = (label: string, value: (key: string, kind: "period" | "exam" | "term" | "year") => string, onlyPeriods = false) => {
-      const out: React.ReactNode[] = [<td key="mp" className="b-black" />];
+      const out: React.ReactNode[] = cteb ? [] : [<td key="mp" className="b-black" />];
       for (const t of terms) {
         const inTerm = ctx.periods.filter((x) => x.term === t);
+        if (cteb) out.push(<td key={`mp${t}`} className="b-black" />);
         for (const x of inTerm.filter((q) => q.kind === "period")) out.push(<td key={x.key}>{value(x.key, "period")}</td>);
         const ex = inTerm.find((q) => q.kind === "exam");
         if (ex) out.push(<td key={`mx${t}`} className="b-black" />, <td key={ex.key} className={onlyPeriods ? "b-black" : undefined}>{onlyPeriods ? "" : value(ex.key, "exam")}</td>);
         out.push(<td key={`mt${t}`} className="b-black" />, <td key={`T${t}`} className={onlyPeriods ? "b-black" : "b-strong"}>{onlyPeriods ? "" : value(`T${t}`, "term")}</td>);
       }
       out.push(<td key="my" className="b-black" />, <td key="Y" className={onlyPeriods ? "b-black" : "b-strong"}>{onlyPeriods ? "" : value("Y", "year")}</td>);
+      if (cteb) out.push(<td key="rp" className="b-black" />, <td key="rs" className="b-black" />);
       return <tr className="b-foot"><th scope="row">{label}</th>{out}</tr>;
     };
     const all = subjects.map((x) => x.code);
@@ -106,6 +118,13 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
     const yr = row("Y");
     const decided = yr.percent != null && yr.missing === 0;
     const pass = decided && yr.passed;
+    // 6e and 8e: Résultat final. A blank school average falls back to the year percentage halved.
+    const fin = (code: string) => idx.get(`${sid}|${code}|${FINAL.period}`);
+    const ecoleMark = fin(FINAL.school);
+    const ecole = ecoleMark?.score ?? (decided && yr.percent != null ? Math.round(yr.percent * 5) / 10 : null);
+    const ecoleComputed = ecoleMark?.score == null && ecole != null;
+    const examScore = fin(FINAL.exam)?.score ?? null;
+    const dec = (n: number | null) => (n == null ? "" : new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n));
 
     return (
       <article key={sid} className="bulletin">
@@ -128,29 +147,32 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
             <div><span>CODE :</span><b>{school?.ministryCode || ""}</b></div>
             <div><span>N° PERM. :</span><b>{s.permNumber || ""}</b></div>
           </div>
-          <div className="b-heading"><strong>BULLETIN DE L&apos;ÉLÈVE : {DEGREE[degreeOf(cls.level)]}</strong><strong>ANNÉE SCOLAIRE {year}</strong></div>
+          <div className="b-heading"><strong>{cteb ? `BULLETIN DE LA ${cls.level}e ANNÉE CYCLE TERMINAL DE L'ÉDUCATION DE BASE (CTEB)` : `BULLETIN DE L'ÉLÈVE : ${degreeTitle(cls.level)}`}</strong><strong>ANNÉE SCOLAIRE {year}</strong></div>
         </header>
         <table className="b-table">
           <thead>
             <tr>
               <th rowSpan={2} className="b-branches">BRANCHES</th>
-              <th rowSpan={2} className="b-max">MAX per.</th>
+              {!cteb && <th rowSpan={2} className="b-max">MAX per.</th>}
               {terms.map((t) => {
                 const inTerm = ctx.periods.filter((x) => x.term === t);
-                const n = inTerm.filter((x) => x.kind === "period").length + (inTerm.some((x) => x.kind === "exam") ? 2 : 0) + 2;
-                return <th key={t} colSpan={n}>{["PREMIER", "DEUXIÈME", "TROISIÈME", "QUATRIÈME"][t - 1]} TRIMESTRE</th>;
+                const n = inTerm.filter((x) => x.kind === "period").length + (inTerm.some((x) => x.kind === "exam") ? 2 : 0) + 2 + (cteb ? 1 : 0);
+                return <th key={t} colSpan={n}>{termNames[t - 1] ?? `${t}`}</th>;
               })}
-              <th colSpan={2}>TOTAL</th>
+              <th colSpan={2}>{cteb ? "TOTAL GÉNÉRAL" : "TOTAL"}</th>
+              {cteb && <th colSpan={2}>EXAMEN DE REPÊCHAGE</th>}
             </tr>
             <tr>
               {terms.flatMap((t) => {
                 const inTerm = ctx.periods.filter((x) => x.term === t);
-                const out = inTerm.filter((x) => x.kind === "period").map((x) => <th key={x.key}>{ordP(x.n)}</th>);
-                if (inTerm.some((x) => x.kind === "exam")) out.push(<th key={`mx${t}`} className="b-max">MAX EX.</th>, <th key={`ex${t}`}>PTS OBT.</th>);
-                out.push(<th key={`mt${t}`} className="b-max">MAX TRIM.</th>, <th key={`t${t}`}>PTS OBT.</th>);
+                const out = cteb ? [<th key={`mp${t}`} className="b-max">MAX.</th>] : [];
+                out.push(...inTerm.filter((x) => x.kind === "period").map((x) => <th key={x.key}>{cteb ? `TJ ${ordP(x.n)}` : ordP(x.n)}</th>));
+                if (inTerm.some((x) => x.kind === "exam")) out.push(<th key={`mx${t}`} className="b-max">{cteb ? "MAX. EXAM." : "MAX EX."}</th>, <th key={`ex${t}`}>PTS OBT.</th>);
+                out.push(<th key={`mt${t}`} className="b-max">{cteb ? "TOTAL" : "MAX TRIM."}</th>, <th key={`t${t}`}>PTS OBT.</th>);
                 return out;
               })}
               <th className="b-max">MAX</th><th>PTS OBT.</th>
+              {cteb && <><th>%</th><th>SIGN. PROF.</th></>}
             </tr>
           </thead>
           <tbody>
@@ -159,30 +181,61 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
               if (l.type === "branch") return <tr key={i} className="b-branch"><th colSpan={99}>{l.label.toUpperCase()}</th></tr>;
               if (l.type === "subtotal") return <tr key={i} className="b-sub"><th scope="row">Sous-total</th>{cells(l.codes)}</tr>;
               const off = !takes(l.subject);
-              return <tr key={i} className={off ? "b-off" : undefined}><th scope="row">{l.subject.name}{l.subject.optional ? " *" : ""}</th>{off ? <td colSpan={98} className="b-na">non suivi</td> : cells([l.subject.code])}</tr>;
+              return <tr key={i} className={off ? "b-off" : undefined}><th scope="row">{l.subject.name}{l.subject.optional ? " *" : ""}</th>{off ? <td colSpan={98} className="b-na">non suivi</td> : cells([l.subject.code], true)}</tr>;
             })}
           </tbody>
           <tfoot>
             {footer("Maxima généraux", (k) => num(max(all, spanOf(k))))}
             {footer("Totaux", (k) => { const r = row(k); return r.max > 0 ? num(r.obtained) : ""; })}
             {footer("Pourcentage", (k) => pct(row(k).percent))}
-            {footer("Place", (k) => { const r = row(k); return r.rank ? `${r.rank}` : ""; })}
-            {footer("Nbre d'élèves", (k) => { const r = res.get(k)!; return r.ranked ? String(r.ranked) : ""; })}
+            {cteb ? footer("Place / Nbre d'élèves", (k) => { const r = row(k); const n = res.get(k)!.ranked; return r.rank ? `${r.rank} / ${n}` : ""; }) : <>
+              {footer("Place", (k) => { const r = row(k); return r.rank ? `${r.rank}` : ""; })}
+              {footer("Nbre d'élèves", (k) => { const r = res.get(k)!; return r.ranked ? String(r.ranked) : ""; })}
+            </>}
             {footer("Application", letter(BEHAVIOUR[0]), true)}
             {footer("Conduite", letter(BEHAVIOUR[1]), true)}
-            {footer("Signat. de l'inst.", () => "", true)}
-            {footer("Signat. du resp.", () => "", true)}
+            {cteb ? footer("Signature", () => "", true) : <>
+              {footer("Signat. de l'inst.", () => "", true)}
+              {footer("Signat. du resp.", () => "", true)}
+            </>}
           </tfoot>
         </table>
         <footer className="b-end">
           <div>
+            {cteb && <p>– L&apos;élève ne pourra passer dans la classe supérieure s&apos;il n&apos;a subi avec succès un examen de repêchage en ........................................</p>}
+            {exam && (
+              <table className="b-final">
+                <thead><tr><th>RÉSULTAT FINAL</th><th>POINTS OBT.</th><th>MAX</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">MOYENNE ÉCOLE{ecoleComputed ? " **" : ""}</th><td>{dec(ecole)}</td><td>{FINAL.max}</td></tr>
+                  <tr><th scope="row">{exam}</th><td>{dec(examScore)}</td><td>{FINAL.max}</td></tr>
+                  <tr className="b-strong"><th scope="row">TOTAL</th><td>{ecole != null && examScore != null ? dec(Math.round((ecole + examScore) * 10) / 10) : ""}</td><td>{FINAL.max * 2}</td></tr>
+                </tbody>
+              </table>
+            )}
+            {exam === "TENASOSP" && <>
+              <p>– Décision du jury : Passe / Double</p>
+              <p>– Option orientée : ........................................</p>
+              <table className="b-final b-jury">
+                <thead><tr><th>Membres de la commission</th><th>Noms</th><th>Signatures</th></tr></thead>
+                <tbody>{["1. Superviseur", "2. Superviseur adjoint", "3. Président"].map((r) => <tr key={r}><th scope="row">{r}</th><td /><td /></tr>)}</tbody>
+              </table>
+            </>}
             <p className={decided && !pass ? "b-struck" : undefined}>– L&apos;élève passe dans la classe supérieure</p>
             <p className={decided && pass ? "b-struck" : undefined}>– L&apos;élève double la classe</p>
             {subjects.some((x) => x.optional) && <p className="b-note">* Branche facultative.</p>}
+            {exam && ecoleComputed && <p className="b-note">** Pourcentage de l&apos;année divisé par 2 (pas de moyenne école saisie).</p>}
           </div>
           <div className="b-sign">
             <p>Fait à ........................................, le ..... / ..... / ..........</p>
-            <p>Sceau de l&apos;École</p>
+            {exam === "TENASOSP" ? <>
+              <p>Signature de l&apos;élève</p>
+              <p>Sceau de l&apos;École et signature du Préfet des études</p>
+              <p>Sceau du Pool d&apos;Inspection</p>
+            </> : <>
+              <p>Sceau de l&apos;École</p>
+              {cteb && <p>Signature de l&apos;élève</p>}
+            </>}
             <p><b>Le Chef d&apos;Établissement</b><br />Noms et signature</p>
           </div>
         </footer>
