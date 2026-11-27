@@ -9,6 +9,8 @@ export interface BoreholeRow extends BoreholeLite {
   gpsLng: number | null;
   due: DueItem[];
   dueCount: number;
+  /** False for boreholes without taps (grazing clusters): the tank/taps question is not asked. */
+  hasTaps: boolean;
 }
 
 export interface Schedule {
@@ -65,6 +67,7 @@ export async function loadBoreholes(client: SyncClient, schedule: Schedule, toda
         lifecycle: String(r.lifecycle ?? ""),
         gpsLat: num(r.gpsLat),
         gpsLng: num(r.gpsLng),
+        hasTaps: r.hasTaps !== false,
         due,
         dueCount: due.filter((d) => d.status === "due" || d.status === "overdue").length,
       };

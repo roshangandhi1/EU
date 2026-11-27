@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isLocale } from "@eu/core/i18n";
-import { updateBorehole } from "@eu/boreholes/server";
+import { addFlowTest, deleteFlowTest, editFlowTest, updateBorehole, type FlowTestInput } from "@eu/boreholes/server";
 import { handlePush } from "@eu/sync/server";
 import { boreholeSchema } from "@eu/boreholes";
 import { boreholes } from "@eu/boreholes/db/schema";
@@ -54,6 +54,7 @@ export async function updateBoreholeAction(fd: FormData) {
     waterCommittee: str(fd, "waterCommittee") || null,
     commissionedOn: dates[0] || null, handedOverOn: dates[1] || null,
     sopHandedOver: fd.get("sopHandedOver") === "yes",
+    hasTaps: fd.get("hasTaps") === "yes",
     notes: str(fd, "notes") || null,
   };
   // Optional additions to the lists: a water-quality test and a trained caretaker.
@@ -114,4 +115,50 @@ export async function addPopulationAction(fd: FormData) {
   revalidatePath(path);
   if (r.status === "applied" || r.status === "duplicate") back({ ok: "pop" }, "#population");
   back({ error: r.reason ?? r.status }, "#population");
+}
+
+/** Reads and checks a flow test form: same limits as the phone (0 to 2,000 L/min, date not in the future). */
+function flowInput(fd: FormData): FlowTestInput | null {
+  const on = str(fd, "testedOn");
+  const flow = dec(fd, "flowLpm");
+  const pump = str(fd, "pump");
+  const taps = str(fd, "taps");
+  const undertaker = str(fd, "undertaker");
+  if (!isIsoDate(on) || on > todayDrc() || flow === null || bad(flow, 0, 2000) || !["yes", "no"].includes(pump) || !["yes", "no", "na"].includes(taps)
+    || !undertaker || undertaker.length > 200) return null;
+  return { testedOn: on, flowLpm: flow, pumpDelivers: pump === "yes", tankFillsTapsOk: taps === "na" ? null : taps === "yes", undertaker, notes: str(fd, "notes").slice(0, 4000) || null };
+}
+
+/** Log a water flow test (anyone who can record visits). Stored as a visit, so it syncs and counts like a phone check. */
+export async function addFlowTestAction(fd: FormData) {
+  const { siteId, me, path, back, ctx } = await ctxFor(fd);
+  if (!permissions.can(me.user, "boreholes.visit.write", { stream: "boreholes", siteId })) back({ error: "forbidden" }, "#flow");
+  const input = flowInput(fd);
+  if (!input) back({ error: "flow_invalid" }, "#flow");
+  const r = await addFlowTest(ctx, siteId, input!);
+  revalidatePath(path);
+  if (r.ok) back({ ok: "flow_saved" }, "#flow");
+  back({ error: r.ok ? "" : r.reason }, "#flow");
+}
+
+/** Correct a flow test (stream leads, managers, system administrators). */
+export async function editFlowTestAction(fd: FormData) {
+  const { siteId, me, path, back, ctx } = await ctxFor(fd);
+  if (!permissions.can(me.user, "boreholes.record.void", { stream: "boreholes", siteId })) back({ error: "forbidden" }, "#flow");
+  const input = flowInput(fd);
+  if (!input) back({ error: "flow_invalid" }, "#flow");
+  const r = await editFlowTest(ctx, siteId, str(fd, "testId"), input!);
+  revalidatePath(path);
+  if (r.ok) back({ ok: "flow_updated" }, "#flow");
+  back({ error: r.ok ? "" : r.reason }, "#flow");
+}
+
+/** Delete a flow test (stream leads, managers, system administrators). */
+export async function deleteFlowTestAction(fd: FormData) {
+  const { siteId, me, path, back, ctx } = await ctxFor(fd);
+  if (!permissions.can(me.user, "boreholes.record.void", { stream: "boreholes", siteId })) back({ error: "forbidden" }, "#flow");
+  const r = await deleteFlowTest(ctx, siteId, str(fd, "testId"));
+  revalidatePath(path);
+  if (r.ok) back({ ok: "flow_deleted" }, "#flow");
+  back({ error: r.ok ? "" : r.reason }, "#flow");
 }

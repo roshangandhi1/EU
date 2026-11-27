@@ -106,6 +106,13 @@
       "when": 1795748700000,
       "tag": "0014_levels_semesters",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795788772011,
+      "tag": "0015_archive_flow_tests_criteria",
+      "breakpoints": true
     }
   ]
 }

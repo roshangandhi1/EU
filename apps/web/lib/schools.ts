@@ -34,14 +34,15 @@ export function can(me: Principal, action: string, siteId?: string | null): bool
 /** Schools the user can read. */
 export async function mySchools(me: Principal) {
   const all = await listSchoolSites(db());
-  return all.filter((s) => can(me, "school.read", s.id));
+  // Archived (inactive) schools are listed only under "Archived" on the schools page.
+  return all.filter((s) => s.active && can(me, "school.read", s.id));
 }
 
 /** Loads a school the user may read, or 404s. */
 export async function schoolFor(me: Principal, siteId: string): Promise<SchoolData> {
   if (!can(me, "school.read", siteId)) notFound();
   const data = await loadSchool(db(), siteId);
-  if (!data) notFound();
+  if (!data || !data.site.active) notFound();
   return data;
 }
 

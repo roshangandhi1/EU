@@ -72,6 +72,8 @@ export interface BoreholeDetail {
   visits: { id: string; visitedOn: string; kind: string; technician: string; done: number; bad: number; flowLpm: number | null; notes: string | null; photos: string[] }[];
   openFaults: { id: string; openedOn: string; description: string; severity: string; taskKey: string | null; photos: string[] }[];
   populations: (typeof populationEstimates.$inferSelect)[];
+  /** Every live visit with a flow reading; `editable` = a flow test (no maintenance checklist), which the web can edit or delete. */
+  flowTests: { id: string; testedOn: string; flowLpm: number; pumpDelivers: boolean | null; tankFillsTapsOk: boolean | null; undertaker: string; notes: string | null; editable: boolean }[];
   taskLabels: Map<string, { en: string; fr: string }>;
 }
 
@@ -112,6 +114,14 @@ export async function loadBoreholeDetail(siteId: string, today: string): Promise
     openFaults: fs
       .sort((a: any, b: any) => (a.openedOn < b.openedOn ? 1 : -1))
       .map((f: any) => ({ id: f.id, openedOn: f.openedOn, description: f.description, severity: f.severity, taskKey: f.taskKey ?? null, photos: (f.photos ?? []).filter((p: string) => uploaded.has(p)) })),
+    flowTests: vs
+      .filter((v: any) => visitFlow(v) !== null)
+      .sort((a: any, b: any) => (a.visitedOn < b.visitedOn ? 1 : a.visitedOn > b.visitedOn ? -1 : b.deviceTime - a.deviceTime))
+      .map((v: any) => ({
+        id: v.id, testedOn: v.visitedOn, flowLpm: visitFlow(v)!, pumpDelivers: v.operational?.pumpDelivers ?? null,
+        tankFillsTapsOk: v.operational ? (v.operational.tankFillsTapsOk ?? null) : null,
+        undertaker: v.undertaker || names.get(v.createdBy) || "—", notes: v.notes ?? null, editable: (v.results ?? []).length === 0,
+      })),
     populations: pops.sort((a: any, b: any) => (a.estimatedOn < b.estimatedOn ? 1 : -1)),
     taskLabels: new Map(tasks.map((t) => [t.key, t.label])),
   };

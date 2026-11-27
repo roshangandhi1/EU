@@ -10,6 +10,10 @@ import { loadSchool } from "@eu/schools";
 import { createSchool } from "./actions";
 import { SetupForm } from "./[siteId]/setup/setup-form";
 import { Flash, type SP } from "./flash";
+import { permissions } from "@/lib/registry";
+import { canDeleteSites } from "@/lib/site-delete";
+import { ArchiveNotice, ArchivedList, deleteLabels } from "@/components/archived";
+import { DeleteSite } from "@/components/delete-site";
 
 export default async function SchoolsPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: SP }) {
   const { me, locale } = await signedIn((await params).locale);
@@ -26,12 +30,16 @@ export default async function SchoolsPage({ params, searchParams }: { params: Pr
     }),
   );
   const canCreate = can(me, "sites.manage");
+  const canDelete = canDeleteSites(permissions, me.user);
+  const del = canDelete ? deleteLabels(locale) : null;
+  const arch = sp as { deleted?: string; restored?: string; n?: string };
   // A headteacher with one school goes straight to it.
-  if (rows.length === 1 && !canCreate && !sp.ok && !sp.error) redirect(`/${locale}/schools/${rows[0]!.id}`);
+  if (rows.length === 1 && !canCreate && !sp.ok && !sp.error && !arch.deleted && !arch.restored) redirect(`/${locale}/schools/${rows[0]!.id}`);
   return (
     <section data-stream="schools">
       <PageHeader icon={<Icon name="school" size={24} />} title={tr("list.title")} subtitle={tr("list.subtitle")} />
       <Flash sp={sp} tr={tr} />
+      <ArchiveNotice locale={locale} sp={arch} />
       {rows.length === 0 && !canCreate && <Notice>{tr("common.noAccess")}</Notice>}
       <Table
         rows={rows}
@@ -42,8 +50,10 @@ export default async function SchoolsPage({ params, searchParams }: { params: Pr
           { key: "name", header: tr("common.name"), render: (r) => <Link href={`/${locale}/schools/${r.id}`}>{r.name}</Link> },
           { key: "enrolled", header: tr("list.pupils"), numeric: true, render: (r) => r.enrolled },
           { key: "places", header: tr("list.places"), numeric: true, render: (r) => r.places },
+          ...(del ? [{ key: "del", header: "", render: (r: (typeof rows)[number]) => <DeleteSite siteId={r.id} kind="school" name={r.name} locale={locale} back={`/${locale}/schools`} labels={del} /> }] : []),
         ]}
       />
+      {canDelete && <ArchivedList locale={locale} kind="school" back={`/${locale}/schools`} />}
       {canCreate && (
         <Section id="add-school" icon="plus" title={tr("list.addSchool")} description={tr("ux.addSchoolIntro")}>
           <SetupForm action={createSchool} hidden={{ locale }} submit={tr("list.addSchool")} busy={t(locale, "ui.form.saving")}>

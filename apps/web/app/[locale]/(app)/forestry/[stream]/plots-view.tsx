@@ -6,6 +6,7 @@ import type { MultiPolygon } from "geojson";
 import { featureCollection } from "@eu/maps";
 import { MapView } from "@eu/maps/web";
 import { fmtDate, fmtNum } from "@/lib/format";
+import { DeleteSite, type DeleteLabels } from "@/components/delete-site";
 
 export interface PlotItem {
   siteId: string;
@@ -35,8 +36,10 @@ const OUTCOME_ICON: Record<string, string> = {
 type Filter = "all" | "unapproved" | "not_counted";
 
 /** Map plus list of plots. A row or a polygon opens the plot; search and chips narrow the list. */
-export function PlotsView({ locale, stream, plots, labels }: {
+export function PlotsView({ locale, stream, plots, labels, del }: {
   locale: string;
+  /** Set for system administrators: a per-row archive button. */
+  del?: DeleteLabels;
   stream: string;
   plots: PlotItem[];
   labels: { plot: string; village: string; area: string; perHa: string; outcome: string; unapproved: string; plantedOn: string; plants: string; survival: string;
@@ -79,11 +82,11 @@ export function PlotsView({ locale, stream, plots, labels }: {
         {shown.length === 0 ? <p className="muted" style={{ padding: 16 }}>{labels.noMatch}</p> : (
           <table className="grid stack">
             <thead>
-              <tr><th>{labels.plot}</th><th>{labels.village}</th><th className="num">{labels.area}</th><th>{labels.plantedOn}</th><th className="num">{labels.plants}</th><th className="num">{labels.perHa}</th><th className="num">{labels.survival}</th><th>{labels.outcome}</th></tr>
+              <tr><th>{labels.plot}</th><th>{labels.village}</th><th className="num">{labels.area}</th><th>{labels.plantedOn}</th><th className="num">{labels.plants}</th><th className="num">{labels.perHa}</th><th className="num">{labels.survival}</th><th>{labels.outcome}</th>{del && <th className="actions-col"><span className="sr-only">{del.action}</span></th>}</tr>
             </thead>
             <tbody>
               {shown.map((p) => (
-                <tr key={p.siteId} onClick={(e) => { if (!(e.target as HTMLElement).closest("a")) router.push(href(p.siteId)); }}>
+                <tr key={p.siteId} onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button,dialog")) router.push(href(p.siteId)); }}>
                   <td><Link className="row-link" href={href(p.siteId)}>{p.code}</Link><br /><span className="muted small">{labels.statuses[p.status] ?? p.status}</span></td>
                   <td data-label={labels.village}>{p.village}</td>
                   <td className="num" data-label={labels.area}>{fmt(p.areaHa)}</td>
@@ -92,6 +95,7 @@ export function PlotsView({ locale, stream, plots, labels }: {
                   <td className="num" data-label={labels.perHa}>{fmt(p.plantedPerHa, 0)}</td>
                   <td className="num" data-label={labels.survival}>{p.survivalPct === null ? "—" : `${fmt(p.survivalPct, 0)} %`}</td>
                   <td data-label={labels.outcome}><span className="badge" style={{ borderColor: OUTCOME_COLORS[p.outcome] }}>{OUTCOME_ICON[p.outcome]} {labels.outcomes[p.outcome]}</span></td>
+                  {del && <td className="row-actions" onClick={(e) => e.stopPropagation()}><DeleteSite siteId={p.siteId} kind="plot" name={p.code} locale={locale === "en" ? "en" : "fr"} back={`/${locale}/forestry/${stream}`} labels={del} /></td>}
                 </tr>
               ))}
             </tbody>

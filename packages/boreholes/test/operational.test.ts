@@ -8,7 +8,7 @@ const b: BoreholeForCheck = {
 };
 const visit = (id: string, on: string, flow: number | null, received = on) => ({
   id, visitedOn: on, deviceTime: new Date(`${on}T10:00:00Z`), serverTime: new Date(`${received}T10:00:00Z`),
-  operational: { pumpDelivers: true, flowLpm: flow, tankFillsTapsOk: true },
+  operational: { pumpDelivers: true, flowLpm: flow, tankFillsTapsOk: true as boolean | null },
 });
 const s = { minFlowLpmByPumpKw: { "1.1": 15 }, maxCheckAgeDays: 90 };
 
@@ -38,5 +38,33 @@ describe("1.1.1 operational", () => {
     const r = indicator111([{ borehole: b, visits: [visit("v1", "2026-10-10", 20, "2026-10-20")] }], "2026-10-16", "evidence", s);
     expect(r.counted).toBe(0);
     expect(r.rows[0]!.lateSynced).toEqual(["v1"]);
+  });
+});
+
+describe("configurable 1.1.1 checks", () => {
+  const at = "2026-10-16";
+  const run = (bh: BoreholeForCheck, vs: ReturnType<typeof visit>[], criteria: Parameters<typeof indicator111>[3]["criteria"]) =>
+    indicator111([{ borehole: bh, visits: vs }], at, "captured", { ...s, criteria }).rows[0]!;
+  const noTaps = (id: string, on: string) => ({ ...visit(id, on, 20), operational: { pumpDelivers: true, flowLpm: 20, tankFillsTapsOk: null } });
+
+  it("defaults to the original eight checks", () => {
+    expect(run(b, [visit("v1", "2026-10-01", 20)], null).counted).toBe(true);
+    expect(run({ ...b, gpsLat: null }, [visit("v1", "2026-10-01", 20)], null).counted).toBe(true);
+  });
+  it("skips the tank/taps check only for boreholes without taps", () => {
+    expect(run(b, [noTaps("v1", "2026-10-01")], null).fails).toEqual(["tank_taps"]);
+    expect(run({ ...b, hasTaps: false }, [noTaps("v1", "2026-10-01")], null).counted).toBe(true);
+  });
+  it("switches checks on and off", () => {
+    expect(run({ ...b, sopHandedOver: false }, [visit("v1", "2026-10-01", 20)], { on: { sop: false } }).counted).toBe(true);
+    expect(run(b, [visit("v1", "2026-10-01", 20)], { on: { gps: true, population: true, handover: true, photo: true } }).fails)
+      .toEqual(["gps", "handover", "population", "photo"]);
+    // With "recent" off, an old check still serves the pump/flow checks.
+    expect(run(b, [visit("v1", "2026-01-01", 20)], { on: { recent_check: false } }).counted).toBe(true);
+    expect(run(b, [visit("v1", "2026-01-01", 20)], null).fails).toEqual(["no_recent_check"]);
+  });
+  it("limits the water quality test's age when set", () => {
+    expect(run(b, [visit("v1", "2026-10-01", 20)], { on: {}, waterQualityMaxAgeDays: 365 }).counted).toBe(true);
+    expect(run(b, [visit("v1", "2026-10-01", 20)], { on: {}, waterQualityMaxAgeDays: 30 }).fails).toEqual(["water_quality"]);
   });
 });

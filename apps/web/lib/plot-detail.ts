@@ -47,7 +47,7 @@ export interface PlotDetail {
   latest: { id: string; geom: MultiPolygon; source: string; recordedAt: Date; areaHa: number } | null;
   latestApproved: boolean;
   approval: { effectiveFrom: string; checkedAgainst: string | null; boundaryId: string } | null;
-  plantings: { id: string; plantedOn: string; isGapFilling: boolean; lines: { species: string; count: number }[]; team: string | null; by: string; photos: string[] }[];
+  plantings: { id: string; plantedOn: string; isGapFilling: boolean; lines: { species: string; count: number }[]; team: string | null; notes: string | null; by: string; photos: string[] }[];
   visits: { id: string; visitedOn: string; by: string; estimate: StockingEstimate | null; threats: string[]; meanHeightCm: number | null; photos: string[] }[];
 }
 
@@ -87,7 +87,7 @@ export async function loadPlotDetail(stream: ForestryStream, siteId: string, asA
     approval: approval ? { effectiveFrom: approval.effectiveFrom, checkedAgainst: approval.checkedAgainst ?? null, boundaryId: approval.boundaryId } : null,
     plantings: pls
       .sort((a: any, b: any) => (a.plantedOn < b.plantedOn ? 1 : -1))
-      .map((e: any) => ({ id: e.id, plantedOn: e.plantedOn, isGapFilling: e.isGapFilling, lines: e.lines, team: e.team ?? null, by: names.get(e.createdBy) ?? "—", photos: (e.photos ?? []).filter((p: string) => uploaded.has(p)) })),
+      .map((e: any) => ({ id: e.id, plantedOn: e.plantedOn, isGapFilling: e.isGapFilling, lines: e.lines, team: e.team ?? null, notes: e.notes ?? null, by: names.get(e.createdBy) ?? "—", photos: (e.photos ?? []).filter((p: string) => uploaded.has(p)) })),
     visits: vs
       .sort((a: any, b: any) => (a.visitedOn < b.visitedOn ? 1 : -1))
       .map((v: any) => ({

@@ -19,6 +19,8 @@ import { fmtEur, fmtNum, tn } from "@/lib/format";
 import { titled } from "@/lib/meta";
 import { INDICATORS } from "@/lib/indicator-defs";
 import { loadPeriods, milestone, pickPeriods } from "@/lib/periods";
+import { canDeleteSites } from "@/lib/site-delete";
+import { ArchiveNotice, ArchivedList, deleteLabels } from "@/components/archived";
 
 export const dynamic = "force-dynamic";
 export const generateMetadata = titled((l, p) => t(l, p.stream === "miombo" ? "ui.nav.miombo" : "ui.nav.bamboo"));
@@ -28,7 +30,7 @@ const TARGETS = { bamboo: def("2.2.1"), miombo: def("2.1.1") };
 
 export default async function ForestryStreamPage({ params, searchParams }: {
   params: Promise<{ locale: string; stream: string }>;
-  searchParams: Promise<{ asAt?: string; mode?: string }>;
+  searchParams: Promise<{ asAt?: string; mode?: string; deleted?: string; restored?: string; n?: string }>;
 }) {
   const { locale, stream } = await params;
   if (!isLocale(locale) || (stream !== "bamboo" && stream !== "miombo")) notFound();
@@ -52,6 +54,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
   const canImport = permissions.can(me.user, fa(s, "import.run"), { stream: s });
   const fmt = (n: number, d = 2) => fmtNum(n, locale, d);
   const pub = canPublish(me.user, s) ? await publishLabels(locale, s) : null;
+  const canDelete = canDeleteSites(permissions, me.user);
   const canReview = permissions.can(me.user, "evidence.manage", { stream: "platform" });
 
   return (
@@ -66,6 +69,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
         </>}
       />
 
+      <ArchiveNotice locale={locale} sp={sp} />
       <form className="filterbar" method="get">
         <label className="tb-field">{t(locale, "forestry.as_at")}<input className="ctl" type="date" name="asAt" defaultValue={asAt} /></label>
         <label className="tb-field">{t(locale, "ui.form.mode")}
@@ -102,6 +106,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
         <PlotsView
           locale={locale}
           stream={s}
+          del={canDelete ? deleteLabels(locale) : undefined}
           plots={plots.map((p) => {
             const r = result.plots.find((x) => x.siteId === p.siteId)!;
             const x = plotExtras(inputs.find((i) => i.siteId === p.siteId)!);
@@ -122,6 +127,7 @@ export default async function ForestryStreamPage({ params, searchParams }: {
           }}
         />
       )}
+      {canDelete && <ArchivedList locale={locale} kind="plot" stream={s} back={`/${locale}/forestry/${s}`} />}
     </section>
   );
 }

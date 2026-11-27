@@ -14,9 +14,10 @@ import { loadPlotDetail } from "@/lib/plot-detail";
 import { fmtDate, fmtNum, tn } from "@/lib/format";
 import { titled } from "@/lib/meta";
 import { NoAccess } from "@/components/no-access";
+import { ModalEdit } from "@/components/modal-edit";
 import { Icon } from "@/components/icons";
-import { Chip, ChoiceGroup, Field, Fields, FormFooter, Notice, PageHeader, Section, SubmitButton, Table } from "@/components/ui";
-import { approveBoundaryAction, updatePlotAction } from "./actions";
+import { Adder, Chip, ChoiceGroup, ConfirmButton, Field, Fields, FormFooter, Notice, PageHeader, Section, SubmitButton, Table } from "@/components/ui";
+import { addPlantingAction, approveBoundaryAction, deletePlantingAction, editPlantingAction, updatePlotAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const generateMetadata = titled(async (l, p) => {
@@ -33,6 +34,29 @@ const STATUSES = ["planned", "pegged", "planted", "established", "failed", "harv
 function Thumbs({ ids }: { ids: string[] }) {
   if (ids.length === 0) return <span className="muted">—</span>;
   return <span className="thumbs">{ids.map((id) => <a key={id} href={`/api/files/${id}`} target="_blank" rel="noreferrer"><img src={`/api/files/${id}`} alt="" loading="lazy" /></a>)}</span>;
+}
+
+type PlantingDefaults = { plantedOn: string; counts: Record<string, number>; gap: boolean; team: string; notes: string };
+
+/** The planting fields, shared by "Log a planting" and "Edit planting": one count per species, like the phone's lines. */
+function PlantingFields({ fo, f, today, species, v, k }: { fo: (k: string) => string; f: (k: string) => string; today: string; species: { key: string; latin: string }[]; v: PlantingDefaults; k: string }) {
+  return (
+    <Fields>
+      <Field span={4} label={fo("planting.date")}><input type="date" name="plantedOn" required defaultValue={v.plantedOn} max={today} /></Field>
+      <ChoiceGroup legend={fo("pl.kind")} span={8}>
+        <Chip type="radio" name="kind" value="first" defaultChecked={!v.gap} label={fo("pl.first")} id={`${k}-f`} />
+        <Chip type="radio" name="kind" value="gap" defaultChecked={v.gap} label={fo("pl.gap")} id={`${k}-g`} />
+      </ChoiceGroup>
+      <p className="fgroup s12" style={{ gridColumn: "1 / -1", margin: "4px 0 0" }}>{fo("pl.counts")} <span className="muted small">· {fo("pl.counts_hint")}</span></p>
+      {species.map((x) => (
+        <Field key={x.key} span={4} label={<em>{x.latin}</em>} optional={f("optional")}>
+          <input name={`count:${x.key}`} inputMode="numeric" pattern="[0-9 ]*" defaultValue={v.counts[x.key] ?? ""} />
+        </Field>
+      ))}
+      <Field span={4} label={fo("pl.team")} optional={f("optional")}><input name="team" maxLength={200} defaultValue={v.team} /></Field>
+      <Field span={8} label={fo("pl.notes")} optional={f("optional")}><input name="notes" maxLength={1000} defaultValue={v.notes} /></Field>
+    </Fields>
+  );
 }
 
 export default async function PlotPage({ params, searchParams }: {
@@ -54,14 +78,16 @@ export default async function PlotPage({ params, searchParams }: {
   const { plot: p, result: r, extras: x } = d;
   const canApprove = permissions.can(me.user, fa(s, "boundary.approve"), { stream: s, siteId: id });
   const canEdit = permissions.can(me.user, fa(s, "plot.write"), { stream: s, siteId: id });
+  // Logging, editing and deleting plantings on the web: system administrators (Roshan, 27 Nov 2026).
+  const canPlant = permissions.can(me.user, "platform.admin", { stream: "platform" });
   const f = (k: string) => t(locale, `ui.form.${k}`);
   const date = (v: string | Date | null | undefined) => fmtDate(v, locale);
   const latin = new Map(d.settings.speciesList.map((x) => [x.key, x.latin]));
   const sp2 = (k: string) => latin.get(k) ?? k;
   const area = d.latest?.areaHa ?? r.areaHa;
   const perHa = area > 0 ? x.plants / area : 0;
-  const okText = sp.ok === "approved" ? fo("detail.approved_ok") : sp.ok === "saved" ? fo("detail.saved") : sp.ok === "conflict" ? fo("detail.conflict") : null;
-  const errText = sp.error ? (sp.error === "invalid" ? fo("detail.invalid") : sp.error === "forbidden" ? fo("forbidden") : fo("detail.err", { reason: sp.error })) : null;
+  const okText = sp.ok === "planting_saved" ? fo("pl.saved") : sp.ok === "planting_updated" ? fo("pl.updated") : sp.ok === "planting_deleted" ? fo("pl.deleted") : sp.ok === "approved" ? fo("detail.approved_ok") : sp.ok === "saved" ? fo("detail.saved") : sp.ok === "conflict" ? fo("detail.conflict") : null;
+  const errText = sp.error ? (sp.error === "planting_invalid" ? fo("pl.invalid") : sp.error === "invalid" ? fo("detail.invalid") : sp.error === "forbidden" ? fo("forbidden") : fo("detail.err", { reason: sp.error })) : null;
   const lastVisit = d.visits[0];
   const overlays = d.latest ? [{
     id: "plot", kind: "fill" as const, defaultColor: OUTCOME_COLORS[r.outcome] ?? "#AFC437", labelBy: "code", solidWhen: "approved",
@@ -142,8 +168,34 @@ export default async function PlotPage({ params, searchParams }: {
               { key: "count", header: fo("planting.count"), numeric: true, render: (e) => <strong>{fmtNum(e.lines.reduce((n, ln) => n + ln.count, 0), locale)}</strong> },
               { key: "by", header: fo("m.team"), render: (e) => e.team || e.by },
               { key: "photos", header: fo("detail.photos"), render: (e) => <Thumbs ids={e.photos} /> },
+              ...(canPlant ? [{ key: "act", header: "", render: (e: (typeof d.plantings)[number]) => (
+                <span className="row-tools">
+                  <ModalEdit label={fo("pl.edit")} close={f("close")}>
+                    <form action={editPlantingAction}>
+                      <input type="hidden" name="locale" value={locale} /><input type="hidden" name="stream" value={s} /><input type="hidden" name="siteId" value={id} /><input type="hidden" name="plantingId" value={e.id} />
+                      <PlantingFields fo={fo} f={f} today={today} species={d.settings.speciesList} k={e.id}
+                        v={{ plantedOn: e.plantedOn, counts: Object.fromEntries(e.lines.map((ln) => [ln.species, ln.count])), gap: e.isGapFilling, team: e.team ?? "", notes: e.notes ?? "" }} />
+                      <FormFooter><SubmitButton icon="check" pending={f("saving")}>{fo("pl.save")}</SubmitButton></FormFooter>
+                    </form>
+                  </ModalEdit>
+                  <form action={deletePlantingAction}>
+                    <input type="hidden" name="locale" value={locale} /><input type="hidden" name="stream" value={s} /><input type="hidden" name="siteId" value={id} /><input type="hidden" name="plantingId" value={e.id} />
+                    <ConfirmButton label={fo("pl.delete")} confirm={fo("pl.delete_confirm")} yes={f("yesRemove")} no={f("keep")} />
+                  </form>
+                </span>
+              ) }] : []),
             ]}
           />
+          {canPlant && (d.settings.speciesList.length === 0 ? <div className="fsec-pad"><Notice tone="warning">{fo("pl.no_species")}</Notice></div> : (
+            <Adder label={fo("pl.add")} cancel={f("cancel")} resetKey={sp.ok}>
+              <p className="muted small" style={{ marginTop: 0 }}>{fo("pl.intro")}{r.outcome === "missing_evidence" ? ` ${fo("pl.photo_note")}` : ""}</p>
+              <form action={addPlantingAction}>
+                <input type="hidden" name="locale" value={locale} /><input type="hidden" name="stream" value={s} /><input type="hidden" name="siteId" value={id} />
+                <PlantingFields fo={fo} f={f} today={today} species={d.settings.speciesList} k="new" v={{ plantedOn: today, counts: {}, gap: d.plantings.length > 0, team: "", notes: "" }} />
+                <FormFooter><SubmitButton icon="check" pending={f("saving")}>{fo("pl.save")}</SubmitButton></FormFooter>
+              </form>
+            </Adder>
+          ))}
         </Section>
 
         <Section id="monitoring" icon="search" title={fo("detail.monitoring")} count={d.visits.length} flush className="full">
