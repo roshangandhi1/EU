@@ -13,9 +13,10 @@ import { db } from "@/lib/http";
 import { boreholes } from "@eu/boreholes/db/schema";
 import { eq } from "drizzle-orm";
 import { NoAccess } from "@/components/no-access";
+import { ModalEdit } from "@/components/modal-edit";
 import { Icon } from "@/components/icons";
-import { Adder, Field, Fields, FormFooter, Notice, PageHeader, Section, SubmitButton, Table } from "@/components/ui";
-import { addPopulationAction, updateBoreholeAction } from "./actions";
+import { Adder, Chip, ChoiceGroup, ConfirmButton, Field, Fields, FormFooter, Notice, PageHeader, Section, SubmitButton, Table } from "@/components/ui";
+import { addFlowTestAction, addPopulationAction, deleteFlowTestAction, editFlowTestAction, updateBoreholeAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const generateMetadata = titled(async (l, p) => {
@@ -39,6 +40,29 @@ function Thumbs({ ids }: { ids: string[] }) {
   );
 }
 
+type FlowDefaults = { testedOn: string; flowLpm: string; undertaker: string; pump: string; taps: string; notes: string };
+
+/** The flow test fields, shared by "Log a flow test" and "Edit test". Same rules as the phone. */
+function FlowFields({ b, f, today, v, k }: { b: (k: string) => string; f: (k: string) => string; today: string; v: FlowDefaults; k: string }) {
+  return (
+    <Fields>
+      <Field span={4} label={b("ft.date")}><input type="date" name="testedOn" required defaultValue={v.testedOn} max={today} /></Field>
+      <Field span={4} label={b("ft.value")} hint={b("ft.value_hint")}><input name="flowLpm" required inputMode="decimal" pattern="\s*[0-9]+([.,][0-9]+)?\s*" defaultValue={v.flowLpm} /></Field>
+      <Field span={4} label={b("ft.undertaker")} hint={b("ft.undertaker_hint")}><input name="undertaker" required maxLength={200} defaultValue={v.undertaker} /></Field>
+      <ChoiceGroup legend={b("ft.pump")} span={6}>
+        <Chip type="radio" name="pump" value="yes" required defaultChecked={v.pump === "yes"} label={b("ft.yes")} id={`${k}-py`} />
+        <Chip type="radio" name="pump" value="no" defaultChecked={v.pump === "no"} label={b("ft.no")} id={`${k}-pn`} />
+      </ChoiceGroup>
+      <ChoiceGroup legend={b("ft.taps")} span={6}>
+        <Chip type="radio" name="taps" value="yes" required defaultChecked={v.taps === "yes"} label={b("ft.yes")} id={`${k}-ty`} />
+        <Chip type="radio" name="taps" value="no" defaultChecked={v.taps === "no"} label={b("ft.no")} id={`${k}-tn`} />
+        <Chip type="radio" name="taps" value="na" defaultChecked={v.taps === "na"} label={b("ft.no_taps")} id={`${k}-tx`} />
+      </ChoiceGroup>
+      <Field span={12} label={b("ft.notes")} optional={f("optional")}><input name="notes" maxLength={1000} defaultValue={v.notes} /></Field>
+    </Fields>
+  );
+}
+
 export default async function BoreholePage({ params, searchParams }: {
   params: Promise<{ locale: string; id: string }>;
   searchParams: Promise<{ ok?: string; error?: string }>;
@@ -57,6 +81,8 @@ export default async function BoreholePage({ params, searchParams }: {
   const { attrs: a, row, extras: x } = d;
   const canEdit = permissions.can(me.user, "boreholes.write", { stream: "boreholes" });
   const canPop = permissions.can(me.user, "boreholes.population.write", { stream: "boreholes", siteId: id });
+  const canFlow = permissions.can(me.user, "boreholes.visit.write", { stream: "boreholes", siteId: id });
+  const canFixFlow = permissions.can(me.user, "boreholes.record.void", { stream: "boreholes", siteId: id });
   const f = (k: string) => t(locale, `ui.form.${k}`);
   const date = (s: string | null | undefined) => fmtDate(s, locale);
   const kw = (n: number) => `${fmtNum(n, locale, 2)} kW`;
@@ -66,8 +92,8 @@ export default async function BoreholePage({ params, searchParams }: {
     const lbl = d.taskLabels.get(k);
     return lbl ? lbl[locale] || lbl.en || lbl.fr : k;
   };
-  const errText = sp.error ? (sp.error === "invalid" ? b("detail.invalid") : ["forbidden", "not_found", "coords", "already_exists"].includes(sp.error) ? b(`err.${sp.error}`) : b("err.unknown", { reason: sp.error })) : null;
-  const okText = sp.ok === "saved" ? b("detail.saved") : sp.ok === "pop" ? b("detail.pop_saved") : sp.ok === "conflict" ? b("detail.conflict") : null;
+  const errText = sp.error ? (sp.error === "flow_invalid" ? b("ft.invalid") : sp.error === "invalid" ? b("detail.invalid") : ["forbidden", "not_found", "coords", "already_exists"].includes(sp.error) ? b(`err.${sp.error}`) : b("err.unknown", { reason: sp.error })) : null;
+  const okText = sp.ok === "flow_saved" ? b("ft.saved") : sp.ok === "flow_updated" ? b("ft.updated") : sp.ok === "flow_deleted" ? b("ft.deleted") : sp.ok === "saved" ? b("detail.saved") : sp.ok === "pop" ? b("detail.pop_saved") : sp.ok === "conflict" ? b("detail.conflict") : null;
   const located = a.gpsLat != null && a.gpsLng != null;
   const overlays = located ? [{
     id: "bh", kind: "circle" as const, defaultColor: "#2B7BB9", labelBy: "code",
@@ -106,6 +132,7 @@ export default async function BoreholePage({ params, searchParams }: {
             <div><dt>{b("detail.commissioned_on")}</dt><dd>{date(a.commissionedOn)}</dd></div>
             <div><dt>{b("detail.handed_over_on")}</dt><dd>{date(a.handedOverOn)}</dd></div>
             <div><dt>{b("detail.sop")}</dt><dd>{b(a.sopHandedOver ? "detail.yes" : "detail.no")}</dd></div>
+            {a.hasTaps === false && <div><dt>{b("ft.taps")}</dt><dd className="muted">{b("detail.no_taps_note")}</dd></div>}
             <div style={{ gridColumn: "1 / -1" }}><dt>{b("detail.status")}</dt><dd>
               {row.indicator.counted
                 ? <span className="badge" style={{ borderColor: DUE_COLORS.ok }}>✓ {b("detail.counts_note")}</span>
@@ -152,6 +179,49 @@ export default async function BoreholePage({ params, searchParams }: {
               { key: "photos", header: b("detail.photos"), render: (r) => <Thumbs ids={r.photos} /> },
             ]}
           />
+        </Section>
+
+        <Section id="flow" icon="drop" title={b("ft.title")} description={b("ft.intro")} count={d.flowTests.length} flush className="full">
+          <Table
+            flush
+            rows={d.flowTests}
+            rowKey={(r) => r.id}
+            empty={b("ft.none")}
+            emptyIcon="drop"
+            columns={[
+              { key: "date", header: b("ft.date"), render: (r) => <strong className="nowrap">{date(r.testedOn)}</strong> },
+              { key: "flow", header: b("ft.value"), numeric: true, render: (r) => <strong>{fmtNum(r.flowLpm, locale, 1)}</strong> },
+              { key: "pump", header: b("ft.pump"), render: (r) => (r.pumpDelivers === null ? "—" : <span className={r.pumpDelivers ? "pill good" : "pill bad"}>{b(r.pumpDelivers ? "ft.yes" : "ft.no")}</span>) },
+              { key: "taps", header: b("ft.taps"), render: (r) => (r.pumpDelivers === null ? "—" : r.tankFillsTapsOk === null ? <span className="pill">{b("ft.no_taps")}</span> : <span className={r.tankFillsTapsOk ? "pill good" : "pill bad"}>{b(r.tankFillsTapsOk ? "ft.yes" : "ft.no")}</span>) },
+              { key: "by", header: b("ft.undertaker"), render: (r) => <>{r.undertaker}{r.notes && <div className="muted small">{r.notes}</div>}</> },
+              { key: "src", header: b("ft.source"), render: (r) => <span className="muted small">{b(r.editable ? "ft.from_web" : "ft.from_phone")}</span> },
+              ...(canFixFlow ? [{ key: "act", header: "", render: (r: (typeof d.flowTests)[number]) => (r.editable ? (
+                <span className="row-tools">
+                  <ModalEdit label={b("ft.edit")} close={f("close")}>
+                    <form action={editFlowTestAction}>
+                      <input type="hidden" name="locale" value={locale} /><input type="hidden" name="siteId" value={id} /><input type="hidden" name="testId" value={r.id} />
+                      <FlowFields b={b} f={f} today={today} k={r.id} v={{ testedOn: r.testedOn, flowLpm: coord(r.flowLpm, locale), undertaker: r.undertaker === "—" ? "" : r.undertaker,
+                        pump: r.pumpDelivers === null ? "" : r.pumpDelivers ? "yes" : "no", taps: r.tankFillsTapsOk === null ? "na" : r.tankFillsTapsOk ? "yes" : "no", notes: r.notes ?? "" }} />
+                      <FormFooter><SubmitButton icon="check" pending={f("saving")}>{b("ft.save")}</SubmitButton></FormFooter>
+                    </form>
+                  </ModalEdit>
+                  <form action={deleteFlowTestAction}>
+                    <input type="hidden" name="locale" value={locale} /><input type="hidden" name="siteId" value={id} /><input type="hidden" name="testId" value={r.id} />
+                    <ConfirmButton label={b("ft.delete")} confirm={b("ft.delete_confirm")} yes={f("yesRemove")} no={f("keep")} />
+                  </form>
+                </span>
+              ) : <span className="muted small" title={b("ft.phone_readonly")}>—</span>) }] : []),
+            ]}
+          />
+          {canFlow && (
+            <Adder label={b("ft.add")} cancel={f("cancel")} resetKey={sp.ok}>
+              <form action={addFlowTestAction}>
+                <input type="hidden" name="locale" value={locale} /><input type="hidden" name="siteId" value={id} />
+                <FlowFields b={b} f={f} today={today} k="new" v={{ testedOn: today, flowLpm: "", undertaker: "", pump: "", taps: a.hasTaps === false ? "na" : "", notes: "" }} />
+                <FormFooter><SubmitButton icon="check" pending={f("saving")}>{b("ft.save")}</SubmitButton></FormFooter>
+              </form>
+            </Adder>
+          )}
         </Section>
 
         <Section id="visits" icon="clock" title={b("detail.visits")} count={d.visits.length} flush className="full">
@@ -241,6 +311,7 @@ export default async function BoreholePage({ params, searchParams }: {
                 <Field span={4} label={b("detail.commissioned_on")} optional={f("optional")}><input type="date" name="commissionedOn" max={today} defaultValue={a.commissionedOn ?? ""} /></Field>
                 <Field span={4} label={b("detail.handed_over_on")} optional={f("optional")}><input type="date" name="handedOverOn" max={today} defaultValue={a.handedOverOn ?? ""} /></Field>
                 <div className="fld s4 fld-bare"><span /><label className="check-row"><input type="checkbox" name="sopHandedOver" value="yes" defaultChecked={a.sopHandedOver} /><span>{b("detail.sop")}</span></label><span /></div>
+                <div className="fld s12 fld-bare"><span /><label className="check-row"><input type="checkbox" name="hasTaps" value="yes" defaultChecked={a.hasTaps !== false} /><span>{b("detail.has_taps")}</span></label><span /></div>
                 <Field span={12} label={b("detail.notes")} optional={f("optional")}><textarea name="notes" rows={2} maxLength={4000} defaultValue={a.notes ?? ""} /></Field>
               </Fields>
               <p className="fgroup">{b("detail.add_wq")}</p>

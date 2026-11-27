@@ -311,3 +311,54 @@ export async function buildPublicLayer(db: Db, stream: ForestryStream, asAt: str
     summary: { plots: features.length, hectares: Math.round(ha * 10) / 10, countedHectares: Math.round(countedHa * 10) / 10 },
   };
 }
+
+/** A planting logged on the web: the same record (and validation) as the phone's planting form. */
+export interface PlantingInput {
+  plantedOn: string;
+  lines: { species: string; count: number }[];
+  isGapFilling: boolean;
+  team?: string | null;
+  notes?: string | null;
+}
+
+type PlantingDone = { ok: true; id: string } | { ok: false; reason: string };
+const plantingOutcome = (r: { status: string; reason?: string }, id: string): PlantingDone =>
+  r.status === "applied" || r.status === "duplicate" ? { ok: true, id } : { ok: false, reason: r.reason ?? r.status };
+
+export async function addPlanting(ctx: ServerCtx, stream: ForestryStream, siteId: string, p: PlantingInput, keep: { photos?: string[]; gpsLat?: number | null; gpsLng?: number | null; gpsAccuracyM?: number | null; spacingM?: string | null } = {}): Promise<PlantingDone> {
+  const now = ctx.now?.() ?? new Date();
+  const id = randomUUID();
+  const fields = {
+    plantedOn: p.plantedOn, lines: p.lines, isGapFilling: p.isGapFilling, team: p.team ?? null, notes: p.notes ?? null,
+    photos: keep.photos ?? [], spacingM: keep.spacingM ?? null, gpsLat: keep.gpsLat ?? null, gpsLng: keep.gpsLng ?? null, gpsAccuracyM: keep.gpsAccuracyM ?? null,
+  };
+  const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [{ mutationId: randomUUID(), entity: `${stream}.planting`, recordId: id, op: "insert", scopeId: siteId, deviceTime: now.toISOString(), fields }] });
+  return plantingOutcome(res.results[0]!, id);
+}
+
+async function livePlanting(ctx: ServerCtx, siteId: string, id: string) {
+  const [row] = await (ctx.db as AnyDb).select().from(plantingEvents).where(and(eq(plantingEvents.id, id), eq(plantingEvents.scopeId, siteId), isNull(plantingEvents.voidedAt)));
+  return row ?? null;
+}
+
+/**
+ * Edit a planting (phone or web). Plantings are append-only, so the corrected planting is recorded
+ * (keeping the original's photos and GPS) and the old one voided, with the reason in the audit log.
+ */
+export async function editPlanting(ctx: ServerCtx, stream: ForestryStream, siteId: string, id: string, p: PlantingInput): Promise<PlantingDone> {
+  if (!ctx.permissions.can(ctx.user, fa(stream, "record.void"), { stream, siteId })) return { ok: false, reason: "forbidden" };
+  const old = await livePlanting(ctx, siteId, id);
+  if (!old) return { ok: false, reason: "not_found" };
+  const added = await addPlanting(ctx, stream, siteId, p, { photos: old.photos, gpsLat: old.gpsLat, gpsLng: old.gpsLng, gpsAccuracyM: old.gpsAccuracyM, spacingM: old.spacingM });
+  if (!added.ok) return added;
+  const now = ctx.now?.() ?? new Date();
+  const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [{ mutationId: randomUUID(), entity: `${stream}.planting`, recordId: id, op: "void", scopeId: siteId, voidReason: `Corrected on the web (replaced by ${added.id})`, deviceTime: now.toISOString() }] });
+  return plantingOutcome(res.results[0]!, added.id);
+}
+
+export async function deletePlanting(ctx: ServerCtx, stream: ForestryStream, siteId: string, id: string, reason = "Deleted on the web"): Promise<PlantingDone> {
+  if (!(await livePlanting(ctx, siteId, id))) return { ok: false, reason: "not_found" };
+  const now = ctx.now?.() ?? new Date();
+  const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [{ mutationId: randomUUID(), entity: `${stream}.planting`, recordId: id, op: "void", scopeId: siteId, voidReason: reason, deviceTime: now.toISOString() }] });
+  return plantingOutcome(res.results[0]!, id);
+}

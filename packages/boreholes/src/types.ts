@@ -24,7 +24,8 @@ export interface TaskResult {
 export interface OperationalCheck {
   pumpDelivers: boolean;
   flowLpm: number | null;
-  tankFillsTapsOk: boolean;
+  /** null = not applicable: the borehole has no taps (e.g. a grazing cluster). */
+  tankFillsTapsOk: boolean | null;
 }
 
 export interface MaintenanceTaskDef {

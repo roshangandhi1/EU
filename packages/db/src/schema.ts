@@ -106,6 +106,29 @@ export const sites = pgTable(
   (t) => [index("sites_kind").on(t.kind)],
 );
 
+/**
+ * An archived (deleted) borehole, plot or school. Archiving voids every live record held under the
+ * site and deactivates it; `records` lists exactly what was voided, so a restore brings back those
+ * records and nothing that had been voided before for another reason.
+ */
+export const siteArchives = pgTable(
+  "site_archives",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    siteId: text("site_id").notNull(),
+    kind: text("kind").notNull(),
+    stream: text("stream").notNull(),
+    name: text("name").notNull(),
+    reason: text("reason").notNull(),
+    records: jsonb("records").$type<{ entity: string; recordId: string }[]>().notNull(),
+    archivedBy: text("archived_by").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }).notNull().defaultNow(),
+    restoredBy: text("restored_by"),
+    restoredAt: timestamp("restored_at", { withTimezone: true }),
+  },
+  (t) => [index("site_archives_site").on(t.siteId), index("site_archives_kind").on(t.kind, t.restoredAt)],
+);
+
 /** Append-only history of every change to synced data, from phone or web. */
 export const auditLog = pgTable(
   "audit_log",

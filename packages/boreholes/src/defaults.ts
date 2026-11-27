@@ -28,4 +28,6 @@ export const defaultSettings = {
   maxCheckAgeDays: 90,
   dueSoonDays: 7,
   overdueGraceDays: 7,
+  /** Which checks count for 1.1.1; null = DEFAULT_CRITERIA (see operational.ts). */
+  criteria: null as { on?: Partial<Record<string, boolean>>; waterQualityMaxAgeDays?: number | null } | null,
 };

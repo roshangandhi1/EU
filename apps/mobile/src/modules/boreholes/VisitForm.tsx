@@ -131,7 +131,7 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
     if (visitedOn > today) e.date = t("ux.dateFuture");
     if (pumpDelivers === null) e.pump = t("ux.answerRequired");
     if (bucketProblem) e.bucket = bucketProblem;
-    if (tankTaps === null) e.taps = t("ux.answerRequired");
+    if (tankTaps === null && borehole.hasTaps) e.taps = t("ux.answerRequired");
     for (const task of tasks) if (readingOf(task.key) === "bad") e[`task:${task.key}`] = t("ux.numberInvalid");
     return e;
   };
@@ -150,7 +150,7 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
       templateKey: schedule.templateKey,
       templateVersion: schedule.templateVersion,
       results,
-      operational: { pumpDelivers, flowLpm: lpm, tankFillsTapsOk: tankTaps },
+      operational: { pumpDelivers, flowLpm: lpm, tankFillsTapsOk: borehole.hasTaps ? tankTaps : null },
       flowLpm: lpm,
       partsUsed: [],
       faultsClosed: [],
@@ -225,11 +225,13 @@ export function VisitForm({ session, borehole, schedule, onDone }: { session: Se
           <Field label={t("boreholes.m.bucket_seconds")} value={bucketSec} onChangeText={(v) => { setBucketSec(v); clear("bucket"); }} keyboardType="decimal-pad" suffix="s"
             error={errors.bucket ?? bucketProblem} hint={lpm === null ? t("boreholes.visit.flow_help") : undefined} />
           {lpm !== null && !bucketProblem && <Notice tone="good" icon="drop" title={t("boreholes.m.flow_result", { lpm })} />}
-          <View style={[s.question, !!errors.taps && s.questionErr]}>
-            <Txt variant="label">{t("boreholes.op.tank_taps")}</Txt>
-            <Segmented value={tankTaps} onChange={(v) => { setTankTaps(v); clear("taps"); }} options={yesNo} tones={{ false: "critical" }} />
-            {errors.taps ? <Txt variant="small" tone="critical">{errors.taps}</Txt> : null}
-          </View>
+          {borehole.hasTaps ? (
+            <View style={[s.question, !!errors.taps && s.questionErr]}>
+              <Txt variant="label">{t("boreholes.op.tank_taps")}</Txt>
+              <Segmented value={tankTaps} onChange={(v) => { setTankTaps(v); clear("taps"); }} options={yesNo} tones={{ false: "critical" }} />
+              {errors.taps ? <Txt variant="small" tone="critical">{errors.taps}</Txt> : null}
+            </View>
+          ) : <Txt variant="small" tone="muted">{t("boreholes.detail.no_taps_note")}</Txt>}
         </Section>
       </Anchor>
 

@@ -7,6 +7,7 @@ import { isLocale } from "@eu/core/i18n";
 import { fa, plotSchema, type ForestryStream } from "@eu/forestry";
 import { plotBoundaries, plots } from "@eu/forestry/db/schema";
 import { handlePush } from "@eu/sync/server";
+import { addPlanting, deletePlanting, editPlanting, loadSettings, type PlantingInput } from "@eu/forestry/server";
 import { db } from "@/lib/http";
 import { entities, permissions } from "@/lib/registry";
 import { currentPrincipal } from "@/lib/session";
@@ -87,4 +88,61 @@ export async function updatePlotAction(fd: FormData) {
   if (r.status === "applied") back({ ok: "saved" });
   if (r.status === "partial") back({ ok: "conflict" });
   back({ error: r.reason ?? r.status }, "#edit");
+}
+
+/** Planting on the web is for system administrators (Roshan, 27 Nov 2026); phones keep their own rules. */
+const canPlantOnWeb = (me: { user: Parameters<typeof permissions.can>[0] }) => permissions.can(me.user, "platform.admin", { stream: "platform" });
+
+/**
+ * Reads a planting form: one count per species (blank = none), same rules as the phone's form
+ * (a date not in the future, at least one species, whole counts of 1 or more).
+ */
+async function plantingInput(fd: FormData, stream: ForestryStream): Promise<PlantingInput | null> {
+  const on = str(fd, "plantedOn");
+  if (!isIsoDate(on) || on > todayDrc()) return null;
+  const known = new Set((await loadSettings(db(), stream)).speciesList.map((x) => x.key));
+  const lines: { species: string; count: number }[] = [];
+  for (const [k, v] of fd.entries()) {
+    if (!k.startsWith("count:") || typeof v !== "string" || !v.trim()) continue;
+    const species = k.slice(6);
+    const n = Number(v.replace(/[\s\u202f]/g, ""));
+    if (!known.has(species) || !Number.isInteger(n) || n < 1 || n > 10_000_000) return null;
+    lines.push({ species, count: n });
+  }
+  if (lines.length === 0) return null;
+  const team = str(fd, "team");
+  const notes = str(fd, "notes");
+  if (team.length > 200 || notes.length > 4000) return null;
+  return { plantedOn: on, lines, isGapFilling: str(fd, "kind") === "gap", team: team || null, notes: notes || null };
+}
+
+export async function addPlantingAction(fd: FormData) {
+  const { stream, siteId, me, path, back, ctx } = await ctxFor(fd);
+  if (!canPlantOnWeb(me)) back({ error: "forbidden" }, "#planting");
+  const input = await plantingInput(fd, stream);
+  if (!input) back({ error: "planting_invalid" }, "#planting");
+  const r = await addPlanting(ctx, stream, siteId, input!);
+  revalidatePath(path);
+  if (r.ok) back({ ok: "planting_saved" }, "#planting");
+  back({ error: r.ok ? "" : r.reason }, "#planting");
+}
+
+export async function editPlantingAction(fd: FormData) {
+  const { stream, siteId, me, path, back, ctx } = await ctxFor(fd);
+  if (!canPlantOnWeb(me)) back({ error: "forbidden" }, "#planting");
+  const input = await plantingInput(fd, stream);
+  if (!input) back({ error: "planting_invalid" }, "#planting");
+  const r = await editPlanting(ctx, stream, siteId, str(fd, "plantingId"), input!);
+  revalidatePath(path);
+  if (r.ok) back({ ok: "planting_updated" }, "#planting");
+  back({ error: r.ok ? "" : r.reason }, "#planting");
+}
+
+export async function deletePlantingAction(fd: FormData) {
+  const { stream, siteId, me, path, back, ctx } = await ctxFor(fd);
+  if (!canPlantOnWeb(me)) back({ error: "forbidden" }, "#planting");
+  const r = await deletePlanting(ctx, stream, siteId, str(fd, "plantingId"));
+  revalidatePath(path);
+  if (r.ok) back({ ok: "planting_deleted" }, "#planting");
+  back({ error: r.ok ? "" : r.reason }, "#planting");
 }

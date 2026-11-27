@@ -80,18 +80,24 @@ export async function loadBoreholes(
   admitted: ReadonlySet<string> = new Set(),
 ): Promise<{ rows: BoreholeRow[]; counted: number }> {
   const d = db as AnyDb;
-  const [attrs, vs, fs, templates, settings] = await Promise.all([
+  const [attrs, vs, fs, templates, settings, pops] = await Promise.all([
     d.select().from(boreholes).where(isNull(boreholes.voidedAt)),
     d.select().from(visits),
     d.select().from(faults).where(and(isNull(faults.voidedAt), isNull(faults.closedOn))),
     loadTemplates(db),
     loadSettings(db),
+    d.select({ scopeId: populationEstimates.scopeId, estimatedOn: populationEstimates.estimatedOn }).from(populationEstimates).where(isNull(populationEstimates.voidedAt)),
   ]);
   const tasks = templates.flatMap((t) => t.tasks);
   const ind = indicator111(
     attrs.map((b: any) => ({
-      borehole: { siteId: b.scopeId, code: b.code, pumpRatingKw: b.pumpRatingKw, commissionedOn: b.commissionedOn, waterQuality: b.waterQuality, caretakersTrained: b.caretakersTrained, sopHandedOver: b.sopHandedOver },
-      visits: vs.filter((v: any) => v.scopeId === b.scopeId).map((v: any) => ({ id: v.id, visitedOn: v.visitedOn, operational: v.operational, deviceTime: v.deviceTime, serverTime: v.serverTime, voidedAt: v.voidedAt, lateAccepted: admitted.has(v.id) })),
+      borehole: {
+        siteId: b.scopeId, code: b.code, pumpRatingKw: b.pumpRatingKw, commissionedOn: b.commissionedOn, waterQuality: b.waterQuality, caretakersTrained: b.caretakersTrained, sopHandedOver: b.sopHandedOver,
+        hasTaps: b.hasTaps !== false, gpsLat: b.gpsLat, gpsLng: b.gpsLng, handedOverOn: b.handedOverOn,
+        populationOn: pops.filter((p: any) => p.scopeId === b.scopeId).map((p: any) => String(p.estimatedOn)),
+      },
+      visits: vs.filter((v: any) => v.scopeId === b.scopeId).map((v: any) => ({ id: v.id, visitedOn: v.visitedOn, operational: v.operational, deviceTime: v.deviceTime, serverTime: v.serverTime, voidedAt: v.voidedAt, lateAccepted: admitted.has(v.id),
+        photoCount: (v.photos?.length ?? 0) + (v.results ?? []).filter((r: any) => r.photoFileId).length })),
     })),
     asAt, mode, settings,
   );
@@ -213,4 +219,77 @@ export async function buildPublicLayer(db: Db, asAt: string) {
       peopleServed: operational.reduce((s, f) => s + (f.properties.populationServed ?? 0), 0),
     },
   };
+}
+
+/** A water flow test logged on the web: stored as a technician visit (kind "inspection"), so it syncs and counts like a phone check. */
+export interface FlowTestInput {
+  testedOn: string;
+  flowLpm: number;
+  pumpDelivers: boolean;
+  /** null = the borehole has no taps. */
+  tankFillsTapsOk: boolean | null;
+  undertaker: string;
+  notes?: string | null;
+}
+
+const flowFields = (t: FlowTestInput) => ({
+  visitedOn: t.testedOn, kind: "inspection", results: [], partsUsed: [], faultsClosed: [], photos: [],
+  operational: { pumpDelivers: t.pumpDelivers, flowLpm: t.flowLpm, tankFillsTapsOk: t.tankFillsTapsOk },
+  flowLpm: t.flowLpm, undertaker: t.undertaker, notes: t.notes ?? null,
+});
+
+type Done = { ok: true; id: string } | { ok: false; reason: string };
+const outcome = (r: { status: string; reason?: string }, id: string): Done =>
+  r.status === "applied" || r.status === "duplicate" ? { ok: true, id } : { ok: false, reason: r.reason ?? r.status };
+
+export async function addFlowTest(ctx: ServerCtx, siteId: string, t: FlowTestInput): Promise<Done> {
+  const now = ctx.now?.() ?? new Date();
+  const id = randomUUID();
+  const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [mut("boreholes.visit", siteId, flowFields(t), now, id)] });
+  return outcome(res.results[0]!, id);
+}
+
+/** Only flow tests (visits without a maintenance checklist) can be edited or deleted on the web. */
+async function flowTestRow(ctx: ServerCtx, siteId: string, id: string) {
+  const [row] = await (ctx.db as AnyDb).select().from(visits).where(and(eq(visits.id, id), eq(visits.scopeId, siteId), isNull(visits.voidedAt)));
+  if (!row) return null;
+  return (row.results ?? []).length === 0 && row.flowLpm != null ? row : null;
+}
+
+/**
+ * Edit a flow test. Visits are append-only (a phone never rewrites one), so an edit records the
+ * corrected test and voids the old one, with the reason in the audit log.
+ */
+export async function editFlowTest(ctx: ServerCtx, siteId: string, id: string, t: FlowTestInput): Promise<Done> {
+  if (!ctx.permissions.can(ctx.user, "boreholes.record.void", { stream: "boreholes", siteId })) return { ok: false, reason: "forbidden" };
+  if (!(await flowTestRow(ctx, siteId, id))) return { ok: false, reason: "not_found" };
+  const added = await addFlowTest(ctx, siteId, t);
+  if (!added.ok) return added;
+  const now = ctx.now?.() ?? new Date();
+  const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [{ mutationId: randomUUID(), entity: "boreholes.visit", recordId: id, op: "void", scopeId: siteId, voidReason: `Corrected on the web (replaced by ${added.id})`, deviceTime: now.toISOString() }] });
+  return outcome(res.results[0]!, added.id);
+}
+
+export async function deleteFlowTest(ctx: ServerCtx, siteId: string, id: string, reason = "Deleted on the web"): Promise<Done> {
+  if (!(await flowTestRow(ctx, siteId, id))) return { ok: false, reason: "not_found" };
+  const now = ctx.now?.() ?? new Date();
+  const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [{ mutationId: randomUUID(), entity: "boreholes.visit", recordId: id, op: "void", scopeId: siteId, voidReason: reason, deviceTime: now.toISOString() }] });
+  return outcome(res.results[0]!, id);
+}
+
+/**
+ * Save module settings (stream-wide record, scope "boreholes"): creates the record the first time,
+ * otherwise updates only the fields given. Which 1.1.1 checks apply (`criteria`) needs
+ * boreholes.criteria.write (system administrators); the entity enforces it.
+ */
+export async function saveSettings(ctx: ServerCtx, fields: Partial<Settings>): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const d = ctx.db as AnyDb;
+  const [row] = await d.select().from(boreholeSettings).where(isNull(boreholeSettings.voidedAt));
+  const now = ctx.now?.() ?? new Date();
+  const m = row
+    ? mut("boreholes.settings", "boreholes", fields, now, row.id, "update")
+    : mut("boreholes.settings", "boreholes", { ...defaultSettings, ...fields }, now);
+  const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [m] });
+  const r = res.results[0]!;
+  return r.status === "applied" || r.status === "duplicate" ? { ok: true } : { ok: false, reason: r.reason ?? r.status };
 }

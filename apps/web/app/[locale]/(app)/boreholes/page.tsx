@@ -20,6 +20,8 @@ import { fmtEur, fmtNum } from "@/lib/format";
 import { titled } from "@/lib/meta";
 import { INDICATORS } from "@/lib/indicator-defs";
 import { loadPeriods, milestone, pickPeriods } from "@/lib/periods";
+import { canDeleteSites } from "@/lib/site-delete";
+import { ArchiveNotice, ArchivedList, deleteLabels } from "@/components/archived";
 
 const BH = INDICATORS.find((i) => i.code === "1.1.1")!;
 
@@ -28,11 +30,11 @@ export const generateMetadata = titled("boreholes.title");
 
 const LIFECYCLE = ["planned", "drilled", "equipped", "commissioned", "handed_over", "operational", "needs_repair", "non_functional"];
 const DUE = ["ok", "due_soon", "due", "overdue"];
-const FAILS = ["commissioned", "pump_delivers", "flow_min", "tank_taps", "water_quality", "caretaker", "sop", "no_recent_check"];
+const FAILS = ["commissioned", "pump_delivers", "flow_min", "tank_taps", "water_quality", "caretaker", "sop", "no_recent_check", "gps", "photo", "population", "handover"];
 
 export default async function BoreholesPage({ params, searchParams }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ asAt?: string; mode?: string }>;
+  searchParams: Promise<{ asAt?: string; mode?: string; deleted?: string; restored?: string; n?: string }>;
 }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
@@ -47,6 +49,7 @@ export default async function BoreholesPage({ params, searchParams }: {
   const periods = await loadPeriods(db());
   const { next } = pickPeriods(periods);
   const canWrite = permissions.can(me.user, "boreholes.write", { stream: "boreholes" });
+  const canDelete = canDeleteSites(permissions, me.user);
   const canTemplates = permissions.can(me.user, "boreholes.template.write", { stream: "boreholes" });
   const pub = canPublish(me.user, "boreholes") ? await publishLabels(locale, "boreholes") : null;
   const errors = Object.fromEntries(["already_exists", "invalid_request", "forbidden", "network", "unknown", "coords"].map((k) => [k, t(locale, `boreholes.err.${k}`)]));
@@ -58,10 +61,12 @@ export default async function BoreholesPage({ params, searchParams }: {
         title={t(locale, "boreholes.title")}
         subtitle={t(locale, "ui.home.boreholes.sub")}
         actions={<>
+          {permissions.can(me.user, "boreholes.settings.write", { stream: "boreholes" }) && <Link className="btn secondary" href={`/${locale}/boreholes/settings`}><Icon name="wrench" size={16} />{t(locale, "boreholes.cfg.link")}</Link>}
           {canTemplates && <Link className="btn secondary" href={`/${locale}/boreholes/templates`}><Icon name="wrench" size={16} />{t(locale, "boreholes.template.edit")}</Link>}
           {pub && <PublishButton layer="boreholes" locale={locale} labels={pub} />}
         </>}
       />
+      <ArchiveNotice locale={locale} sp={sp} />
       <form className="filterbar" method="get">
         <label className="tb-field">{t(locale, "boreholes.as_at")}<input className="ctl" type="date" name="asAt" defaultValue={asAt} /></label>
         <label className="tb-field">{t(locale, "ui.form.mode")}
@@ -84,6 +89,7 @@ export default async function BoreholesPage({ params, searchParams }: {
       {rows.length === 0 ? <div className="empty-state"><div className="es-icon"><Icon name="drop" size={28} /></div><p>{t(locale, "boreholes.no_boreholes")}</p></div> : (
         <BoreholesView
           locale={locale}
+          del={canDelete ? deleteLabels(locale) : undefined}
           rows={rows.map((r) => ({ siteId: r.siteId, code: r.code, village: r.village, lifecycle: r.lifecycle, lat: r.lat, lng: r.lng, lastVisitOn: r.lastVisitOn, worstDue: r.worstDue, openFaults: r.openFaults, counted: r.indicator.counted, fails: r.indicator.fails,
             population: extras.get(r.siteId)?.population ?? null, flowLpm: extras.get(r.siteId)?.flowLpm ?? null }))}
           labels={{
@@ -99,6 +105,7 @@ export default async function BoreholesPage({ params, searchParams }: {
           }}
         />
       )}
+      {canDelete && <ArchivedList locale={locale} kind="borehole" back={`/${locale}/boreholes`} />}
       {canWrite && (
         <Section id="new" icon="plus" title={t(locale, "boreholes.new")}>
           <NewBoreholeForm locale={locale} labels={{

@@ -13,5 +13,7 @@ export const boreholeActions = {
   "boreholes.record.void": { stream: "boreholes", roles: [...lead] },
   "boreholes.template.write": { stream: "boreholes", roles: [...lead] },
   "boreholes.settings.write": { stream: "boreholes", roles: ["system_admin", "programme_manager"] },
+  /** Which checks count for indicator 1.1.1: system administrators only. */
+  "boreholes.criteria.write": { stream: "boreholes", roles: ["system_admin"] },
   "boreholes.publish": { stream: "boreholes", roles: ["system_admin", "programme_manager"] },
 } satisfies ActionMap;

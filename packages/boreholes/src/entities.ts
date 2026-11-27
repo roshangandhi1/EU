@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineEntity } from "./platform";
 import * as t from "./db/schema";
 import * as v from "./validation";
+import { CRITERIA_KEYS } from "./operational";
 
 export const boreholeEntities = [
   defineEntity({ name: "boreholes.borehole", stream: "boreholes", siteKinds: ["borehole"], table: t.boreholes, schema: v.boreholeSchema, policy: "field_merge",
@@ -20,6 +21,12 @@ export const boreholeEntities = [
     actions: { read: "boreholes.read", write: "boreholes.population.write", void: "boreholes.record.void" }, label: { en: "Population served", fr: "Population desservie" } }),
   defineEntity({ name: "boreholes.template", stream: "boreholes", table: t.maintenanceTemplates, schema: v.templateSchema, policy: "server_authoritative",
     actions: { read: "boreholes.read", write: "boreholes.template.write", configure: "boreholes.template.write" }, label: { en: "Maintenance template", fr: "Modèle d'entretien" } }),
-  defineEntity({ name: "boreholes.settings", stream: "boreholes", table: t.boreholeSettings, schema: z.object({ minFlowLpmByPumpKw: z.record(z.string(), z.number().positive().nullable()), maxCheckAgeDays: z.number().int().positive().max(36_500), dueSoonDays: z.number().int().min(0).max(36_500), overdueGraceDays: z.number().int().min(0).max(36_500) }), policy: "server_authoritative",
-    actions: { read: "boreholes.read", write: "boreholes.settings.write", configure: "boreholes.settings.write" }, label: { en: "Borehole settings", fr: "Paramètres forages" } }),
+  defineEntity({ name: "boreholes.settings", stream: "boreholes", table: t.boreholeSettings, schema: z.object({ minFlowLpmByPumpKw: z.record(z.string(), z.number().positive().nullable()), maxCheckAgeDays: z.number().int().positive().max(36_500), dueSoonDays: z.number().int().min(0).max(36_500), overdueGraceDays: z.number().int().min(0).max(36_500),
+      criteria: z.object({ on: z.partialRecord(z.enum(CRITERIA_KEYS), z.boolean()), waterQualityMaxAgeDays: z.number().int().positive().max(36_500).nullable().optional() }).nullable().optional() }), policy: "server_authoritative",
+    actions: { read: "boreholes.read", write: "boreholes.settings.write", configure: "boreholes.settings.write" }, label: { en: "Borehole settings", fr: "Paramètres forages" },
+    // Which checks count for 1.1.1 is for system administrators only (Roshan, 27 Nov 2026).
+    validate: async (ctx, change) => {
+      if (!("criteria" in change.fields) || ctx.can("boreholes.criteria.write")) return undefined;
+      return JSON.stringify(change.fields.criteria ?? null) === JSON.stringify(change.existing?.criteria ?? null) ? undefined : "forbidden_field";
+    } }),
 ];

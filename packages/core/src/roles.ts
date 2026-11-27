@@ -123,6 +123,8 @@ export const platformActions: ActionMap = {
     roles: ["system_admin", "programme_manager", "stream_lead", "field_officer", "viewer", "headteacher", "school_admin"],
   },
   "sites.manage": { stream: "platform", roles: ["system_admin", "programme_manager"] },
+  /** Deleting a borehole, plot or school (and everything recorded under it): system administrators only. */
+  "sites.delete": { stream: "platform", roles: ["system_admin"] },
   "devices.manage": { stream: "platform", roles: ["system_admin", "programme_manager"] },
   "audit.read": { stream: "platform", roles: ["system_admin", "programme_manager"] },
   "evidence.manage": { stream: "platform", roles: ["system_admin", "programme_manager"] },

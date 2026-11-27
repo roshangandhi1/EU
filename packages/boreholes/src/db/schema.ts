@@ -46,6 +46,8 @@ export const boreholes = pgTable("borehole_attributes", {
   waterCommittee: text("water_committee"),
   caretakersTrained: jsonb("caretakers_trained").$type<{ name: string; phone?: string; trainedOn: string }[]>(),
   sopHandedOver: boolean("sop_handed_over").notNull().default(false),
+  /** False for boreholes with no taps (e.g. grazing clusters): the tank/taps check does not apply. */
+  hasTaps: boolean("has_taps").notNull().default(true),
   // Attachments (platform file ids) keyed by evidence type: drilling_log, commissioning_report, handover_report, ...
   attachments: jsonb("attachments").$type<Record<string, string[]>>().notNull().default({}),
   publicVisible: boolean("public_visible").notNull().default(false),
@@ -101,6 +103,8 @@ export const visits = pgTable("borehole_visits", {
   partsUsed: jsonb("parts_used").$type<{ part: string; qty: number; fromStore: string }[]>().notNull().default([]),
   faultsClosed: jsonb("faults_closed").$type<string[]>().notNull().default([]),
   photos: jsonb("photos").$type<string[]>().notNull().default([]),
+  /** Who carried out the test or visit (person or organisation), e.g. for a flow test logged on the web. */
+  undertaker: text("undertaker"),
   notes: text("notes"),
 }, (t) => [index("borehole_visits_site_idx").on(t.scopeId, t.visitedOn)]);
 
@@ -126,4 +130,6 @@ export const boreholeSettings = pgTable("borehole_settings", {
   maxCheckAgeDays: integer("max_check_age_days").notNull(),
   dueSoonDays: integer("due_soon_days").notNull(),
   overdueGraceDays: integer("overdue_grace_days").notNull(),
+  /** Which checks count for 1.1.1 (system administrators only). Null = the defaults (DEFAULT_CRITERIA). */
+  criteria: jsonb("criteria").$type<{ on?: Partial<Record<string, boolean>>; waterQualityMaxAgeDays?: number | null }>(),
 });

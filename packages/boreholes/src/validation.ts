@@ -63,6 +63,8 @@ export const boreholeSchema = z.object({
   handedOverOn: isoDate.nullable().optional(),
   waterCommittee: z.string().nullable().optional(),
   sopHandedOver: z.boolean().default(false),
+  /** False for boreholes with no taps (e.g. grazing clusters). */
+  hasTaps: z.boolean().default(true),
   casing: z.string().nullable().optional(),
   serials: z.record(z.string(), z.string()).nullable().optional(),
   drawdownM: z.number().min(0).max(1000).nullable().optional(),
@@ -89,7 +91,9 @@ export const visitSchema = z.object({
   templateKey: z.string().nullable().optional(),
   templateVersion: z.number().int().min(0).max(1_000_000).nullable().optional(),
   results: z.array(taskResultSchema).default([]),
-  operational: z.object({ pumpDelivers: z.boolean(), flowLpm: z.number().min(0).max(2000).nullable(), tankFillsTapsOk: z.boolean() }).nullable().optional(),
+  operational: z.object({ pumpDelivers: z.boolean(), flowLpm: z.number().min(0).max(2000).nullable(), tankFillsTapsOk: z.boolean().nullable() }).nullable().optional(),
+  /** Who carried out the test or visit (person or organisation), when it was not the signed-in user. */
+  undertaker: z.string().max(200).nullable().optional(),
   flowLpm: z.number().min(0).max(2000).nullable().optional(),
   tankLevelPct: z.number().int().min(0).max(100).nullable().optional(),
   panelCondition: z.string().nullable().optional(),

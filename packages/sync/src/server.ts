@@ -464,3 +464,31 @@ export async function checkScope(tx: AnyDb, entity: EntityDef, scopeId: string):
   if (entity.siteKinds && !entity.siteKinds.includes(site.kind)) return "scope_wrong_kind";
   return undefined;
 }
+
+/**
+ * Restores voided records (server-side only; there is no phone op for it). Used to restore an
+ * archived site: clears the void, bumps the version so phones take the record back on their next
+ * pull, and logs an audit "restore". The caller checks permissions.
+ */
+export async function restoreVoided(ctx: SyncContext, items: { entity: string; recordId: string }[], note: string): Promise<number> {
+  const now = ctx.now?.() ?? new Date();
+  let n = 0;
+  await (ctx.db as AnyDb).transaction(async (tx: AnyDb) => {
+    for (const it of items) {
+      const entity = ctx.entities.get(it.entity);
+      if (!entity) continue;
+      const table = entity.table as AnyDb;
+      const cols = getTableColumns(entity.table) as Record<string, AnyDb>;
+      const [row] = (await tx.select().from(table).where(eq(cols.id, it.recordId)).for("update")) as Row[];
+      if (!row || !row.voidedAt) continue;
+      await tx.update(table).set({ voidedAt: null, voidReason: null, version: Number(row.version) + 1, updatedServerTime: now }).where(eq(cols.id, it.recordId));
+      await tx.insert(auditLog).values({
+        entity: it.entity, recordId: it.recordId, scopeId: String(row.scopeId), op: "restore", userId: ctx.user.id, deviceId: ctx.deviceId,
+        deviceTime: now, clockSuspect: false, mutationId: null, oldValues: { voidReason: row.voidReason ?? null }, newValues: null, note,
+      });
+      await logChange(tx, it.entity, it.recordId, String(row.scopeId), now);
+      n++;
+    }
+  });
+  return n;
+}
