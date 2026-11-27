@@ -83,6 +83,7 @@ export default async function Students({ params, searchParams }: { params: Promi
         </form>
         <span className="list-count">{plural(locale, tr, "pupil.count", rows.length)}</span>
         {rows.length > 0 && <PrintButton target="pupil-list" label={tr("print.list")} />}
+        {canWrite && classes.length > 0 && <Link className="btn secondary no-print" href={`${base}/import`}><Icon name="upload" size={17} />{tr("pimport.open")}</Link>}
         {canWrite && classes.length > 0 && (
           <EnrolForms locale={locale} siteId={p.siteId} classes={classes.map((c) => ({ id: c.id, label: classLabel(c, tr) }))} today={date} l={l} defaultOpen={nActive === 0} />
         )}
