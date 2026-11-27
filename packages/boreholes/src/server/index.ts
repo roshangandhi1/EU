@@ -261,7 +261,7 @@ async function flowTestRow(ctx: ServerCtx, siteId: string, id: string) {
  * corrected test and voids the old one, with the reason in the audit log.
  */
 export async function editFlowTest(ctx: ServerCtx, siteId: string, id: string, t: FlowTestInput): Promise<Done> {
-  if (!ctx.permissions.can(ctx.user, "boreholes.record.void", { stream: "boreholes", siteId })) return { ok: false, reason: "forbidden" };
+  if (!ctx.permissions.can(ctx.user, "boreholes.flowtest.fix", { stream: "boreholes", siteId })) return { ok: false, reason: "forbidden" };
   if (!(await flowTestRow(ctx, siteId, id))) return { ok: false, reason: "not_found" };
   const added = await addFlowTest(ctx, siteId, t);
   if (!added.ok) return added;
@@ -271,6 +271,7 @@ export async function editFlowTest(ctx: ServerCtx, siteId: string, id: string, t
 }
 
 export async function deleteFlowTest(ctx: ServerCtx, siteId: string, id: string, reason = "Deleted on the web"): Promise<Done> {
+  if (!ctx.permissions.can(ctx.user, "boreholes.flowtest.fix", { stream: "boreholes", siteId })) return { ok: false, reason: "forbidden" };
   if (!(await flowTestRow(ctx, siteId, id))) return { ok: false, reason: "not_found" };
   const now = ctx.now?.() ?? new Date();
   const res = await handlePush(ctx, { deviceNow: now.toISOString(), mutations: [{ mutationId: randomUUID(), entity: "boreholes.visit", recordId: id, op: "void", scopeId: siteId, voidReason: reason, deviceTime: now.toISOString() }] });

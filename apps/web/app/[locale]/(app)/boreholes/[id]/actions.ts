@@ -144,7 +144,7 @@ export async function addFlowTestAction(fd: FormData) {
 /** Correct a flow test (stream leads, managers, system administrators). */
 export async function editFlowTestAction(fd: FormData) {
   const { siteId, me, path, back, ctx } = await ctxFor(fd);
-  if (!permissions.can(me.user, "boreholes.record.void", { stream: "boreholes", siteId })) back({ error: "forbidden" }, "#flow");
+  if (!permissions.can(me.user, "boreholes.flowtest.fix", { stream: "boreholes", siteId })) back({ error: "forbidden" }, "#flow");
   const input = flowInput(fd);
   if (!input) back({ error: "flow_invalid" }, "#flow");
   const r = await editFlowTest(ctx, siteId, str(fd, "testId"), input!);
@@ -156,7 +156,7 @@ export async function editFlowTestAction(fd: FormData) {
 /** Delete a flow test (stream leads, managers, system administrators). */
 export async function deleteFlowTestAction(fd: FormData) {
   const { siteId, me, path, back, ctx } = await ctxFor(fd);
-  if (!permissions.can(me.user, "boreholes.record.void", { stream: "boreholes", siteId })) back({ error: "forbidden" }, "#flow");
+  if (!permissions.can(me.user, "boreholes.flowtest.fix", { stream: "boreholes", siteId })) back({ error: "forbidden" }, "#flow");
   const r = await deleteFlowTest(ctx, siteId, str(fd, "testId"));
   revalidatePath(path);
   if (r.ok) back({ ok: "flow_deleted" }, "#flow");

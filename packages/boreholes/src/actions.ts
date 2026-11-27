@@ -15,5 +15,7 @@ export const boreholeActions = {
   "boreholes.settings.write": { stream: "boreholes", roles: ["system_admin", "programme_manager"] },
   /** Which checks count for indicator 1.1.1: system administrators only. */
   "boreholes.criteria.write": { stream: "boreholes", roles: ["system_admin"] },
+  /** Edit or delete a logged water flow test on the web: system administrators only. */
+  "boreholes.flowtest.fix": { stream: "boreholes", roles: ["system_admin"] },
   "boreholes.publish": { stream: "boreholes", roles: ["system_admin", "programme_manager"] },
 } satisfies ActionMap;
