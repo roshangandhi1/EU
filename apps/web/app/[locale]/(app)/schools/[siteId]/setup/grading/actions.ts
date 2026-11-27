@@ -1,6 +1,6 @@
 "use server";
 import {
-  DRC_SCHEME, LEVELS, defaultSubjects, domainsOf, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
+  DRC_SCHEME, LEVELS, defaultSubjects, gradingScheme, insertMutation, live, planSubjects, schemeChanges, schemeLevelClash, subject, subjectCode, updateMutation, voidMutation,
   type GradingScheme, type MentionBand, type Subject,
 } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
@@ -87,7 +87,7 @@ export async function saveScheme(fd: FormData) {
   if (letters.length < 2 || new Set(letters).size !== letters.length) back(c.path, { error: "scheme_letters" });
   // Domains have no editor yet: a scheme keeps its own, a new one starts from the DRC domains.
   const own = live(c.d.gradingSchemes).find((s) => s.id === c.schemeId);
-  const next = { name: str(fd, "name"), levels: levelsOf(fd), terms, examFactor: decimal(str(fd, "examFactor")), passPercent: Number(str(fd, "passPercent")), mentions, letters, domains: domainsOf(own ?? {}) };
+  const next = { name: str(fd, "name"), levels: levelsOf(fd), terms, examFactor: decimal(str(fd, "examFactor")), passPercent: Number(str(fd, "passPercent")), mentions, letters, domains: own?.domains ?? [] };
   const parsed = gradingScheme.safeParse(next);
   if (!parsed.success) back(c.path, { error: parsed.error.issues[0]?.path[0] === "mentions" ? "scheme_mentions" : "scheme_invalid" });
   await writeScheme(c, parsed.data!);

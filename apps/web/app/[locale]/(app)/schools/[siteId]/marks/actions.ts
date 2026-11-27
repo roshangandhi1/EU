@@ -1,5 +1,5 @@
 "use server";
-import { insertMutation, isBehaviour, lettersOf, maxFor, planMarks, readLetter, readScore, updateMutation, voidMutation, type ScoreInput } from "@eu/schools";
+import { FINAL, insertMutation, isBehaviour, isFinal, lettersOf, maxFor, planMarks, readLetter, readScore, updateMutation, voidMutation, type ScoreInput } from "@eu/schools";
 import type { Mutation } from "@eu/sync";
 import { revalidatePath } from "next/cache";
 import { back, can, firstRejection, newId, push, schoolFor, signedIn, str, today } from "@/lib/schools";
@@ -17,8 +17,9 @@ export async function saveMarks(fd: FormData) {
   if (!can(me, "marks.write", siteId)) back(path, { error: "forbidden" });
   const d = await schoolFor(me, siteId);
   const ctx = marksContext(d, siteId, today(), classId, locale);
+  const final = period === FINAL.period && ctx.cls?.level === FINAL.level;
   const p = ctx.periods.find((x) => x.key === period);
-  if (!ctx.cls || !p) back(path, { error: "invalid" });
+  if (!ctx.cls || (!p && !final)) back(path, { error: "invalid" });
   const subjects = new Map(ctx.subjectsOf(ctx.cls!.level).subjects.map((s) => [s.code, s]));
   const pupils = new Set(ctx.pupilsOf(classId).map((s) => s.id));
 
@@ -28,6 +29,14 @@ export async function saveMarks(fd: FormData) {
     if (!name.startsWith("m:") || typeof raw !== "string") continue;
     const [studentId, code, per] = name.slice(2).split("|");
     if (!studentId || per !== period || !pupils.has(studentId)) continue;
+    if (final) {
+      // Résultat final: school average and ENAFEP, each out of 50.
+      if (!isFinal(code ?? "")) continue;
+      const input = readScore(raw, FINAL.max);
+      if (input.kind === "error") { bad++; continue; }
+      cells.push({ studentId, subject: code!, period, input });
+      continue;
+    }
     if (isBehaviour(code ?? "")) {
       // Application / Conduite: a letter per period, never on an exam.
       if (p!.kind !== "period") continue;

@@ -211,7 +211,7 @@ export default async function GradingSetup({ params, searchParams }: { params: P
                     <td>
                       <select className="ctl" name={`domain:${i}`} defaultValue={s?.domain ?? ""} aria-label={`${tr("marks.domain")} ${i + 1}`}>
                         <option value="">—</option>
-                        {domainsOf(levelScheme).map((x) => <option key={x.key} value={x.key}>{x[locale]}</option>)}
+                        {domainsOf(levelScheme, level).map((x) => <option key={x.key} value={x.key}>{x[locale]}</option>)}
                       </select>
                     </td>
                     <td><input className="ctl" name={`branch:${i}`} maxLength={60} defaultValue={s?.branch ?? ""} placeholder={tr("marks.branchPh")} aria-label={`${tr("marks.branch")} ${i + 1}`} /></td>

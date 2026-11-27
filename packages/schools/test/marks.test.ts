@@ -5,7 +5,7 @@ import { EntityRegistry } from "@eu/sync";
 import { handlePush } from "@eu/sync/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  DRC_SCHEME, bulletinLayout, classResults, createSchoolSite, defaultSubjects, formatScore, loadSchool, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
+  DRC_SCHEME, FINAL, bulletinLayout, classResults, createSchoolSite, defaultSubjects, domainsOf, formatScore, loadSchool, mark, markIndex, maxFor, mentionFor, parseSpan, periodsIn, periodsOf,
   planMarks, planSubjects, readLetter, readScore, resolveScheme, resolveSubjects, schemeChanges, schemeLevelClash, schoolsActions, schoolsEntities, subjectCode,
   type GradingScheme, type Mark, type Subject, type Synced,
 } from "../src";
@@ -303,11 +303,28 @@ describe("ministry bulletin subjects and layout", () => {
     expect(defaultSubjects(1).find((s) => s.name === "Religion")?.optional).toBe(true);
   });
   it("puts sub-totals per branch in the language domain and per domain elsewhere", () => {
-    const lines = bulletinLayout(defaultSubjects(1), DRC_SCHEME.domains);
+    const lines = bulletinLayout(defaultSubjects(1), domainsOf(DRC_SCHEME, 1));
     const subtotals = lines.filter((l) => l.type === "subtotal").map((l) => (l as { codes: string[] }).codes.length);
     expect(subtotals).toEqual([2, 2, 7, 2, 2, 3]);
     expect(lines.filter((l) => l.type === "domain")).toHaveLength(5);
     expect(lines.filter((l) => l.type === "branch").map((l) => (l as { label: string }).label)).toEqual(["Langues congolaises", "Français", "Mathématiques", "Sciences", "Technologie"]);
+  });
+  it("lays out the 5e and 6e forms: sub-totals for each language and MST branch, Technologie included", () => {
+    const subs = defaultSubjects(6);
+    const lines = bulletinLayout(subs, domainsOf(DRC_SCHEME, 6));
+    const max = (codes: string[]) => codes.reduce((n, c) => n + subs.find((s) => s.code === c)!.maxPoints, 0);
+    const totals = lines.filter((l) => l.type === "subtotal").map((l) => max((l as { codes: string[] }).codes));
+    // LC 30, Français 50, Maths 60, Sciences 30, Technologie 10, Univers social 40, Arts 20, Dév. personnel 30.
+    expect(totals).toEqual([30, 50, 60, 30, 10, 40, 20, 30]);
+    expect(defaultSubjects(5).map((s) => [s.code, s.maxPoints])).toEqual(subs.map((s) => [s.code, s.maxPoints]));
+    expect(new Set(subs.map((s) => s.code)).size).toBe(subs.length);
+    expect(subs.reduce((n, s) => n + s.maxPoints, 0)).toBe(310);
+    // A scheme saved with a copy of the old DRC domains still gets the 5e-6e layout.
+    expect(domainsOf({ domains: domainsOf({}, 1) }, 6).find((d) => d.key === "mst")?.subtotal).toBe("branch");
+    expect(domainsOf({}, 3).find((d) => d.key === "mst")?.subtotal).toBe("domain");
+    // The 6e Résultat final is kept as marks in the pseudo-period FIN.
+    expect(mark.safeParse({ studentId: "00000000-0000-4000-8000-000000000001", classId: "00000000-0000-4000-8000-000000000002", subject: FINAL.exam, period: FINAL.period, score: 33.5, absent: false }).success).toBe(true);
+    expect(mark.safeParse({ studentId: "00000000-0000-4000-8000-000000000001", classId: "00000000-0000-4000-8000-000000000002", subject: FINAL.exam, period: "FINAL", score: 33.5, absent: false }).success).toBe(false);
   });
   it("leaves an optional subject a pupil does not take out of their maximum", () => {
     const subjects = [{ level: 1, code: "a", name: "A", maxPoints: 10, position: 0 }, { level: 1, code: "rel", name: "Religion", maxPoints: 10, position: 1, optional: true }];

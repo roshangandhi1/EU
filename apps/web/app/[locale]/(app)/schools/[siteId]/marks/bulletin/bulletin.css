@@ -46,3 +46,7 @@
   .bulletin-root .b-table tr.b-domain th, .bulletin-root .b-table td.b-max, .bulletin-root .b-table th.b-max { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 .b-table td { white-space: nowrap; }
+.b-final { border-collapse: collapse; margin-bottom: 6px; font-size: 10px; }
+.b-final th, .b-final td { border: 1px solid #000; padding: 1px 6px; text-align: center; }
+.b-final tbody th { text-align: left; font-weight: 600; }
+.b-final .b-strong td, .b-final .b-strong th { font-weight: 700; }

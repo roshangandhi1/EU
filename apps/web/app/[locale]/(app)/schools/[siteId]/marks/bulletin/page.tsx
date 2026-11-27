@@ -1,4 +1,4 @@
-import { BEHAVIOUR, bulletinLayout, classResults, degreeOf, domainsOf, formatScore, maxFor, periodsIn, type ClassResults, type PeriodDef, type Span, type Subject } from "@eu/schools";
+import { BEHAVIOUR, FINAL, bulletinLayout, classResults, degreeOf, domainsOf, formatScore, maxFor, periodsIn, type ClassResults, type PeriodDef, type Span, type Subject } from "@eu/schools";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyRow, Notice } from "@/components/ui";
@@ -14,11 +14,13 @@ import "./bulletin.css";
 const DEGREE = {
   elementaire: "DEGRÉ ÉLÉMENTAIRE (1re, 2e ANNÉE)",
   moyen: "DEGRÉ MOYEN (3e, 4e ANNÉE)",
-  terminal: "DEGRÉ TERMINAL (5e, 6e ANNÉE)",
+  terminal: "DEGRÉ TERMINAL",
   cteb: "ÉDUCATION DE BASE (7e, 8e ANNÉE)",
 } as const;
 const ordP = (n: number) => (n === 1 ? "1re P." : `${n}e P.`);
 const levelFr = (n: number) => (n === 1 ? "1re année" : `${n}e année`);
+/** The terminal forms are printed per year ("DEGRÉ TERMINAL (6e ANNÉE)"); the others cover two years. */
+const degreeTitle = (lvl: number) => (degreeOf(lvl) === "terminal" ? `${DEGREE.terminal} (${lvl}e ANNÉE)` : DEGREE[degreeOf(lvl)]);
 
 /**
  * The report card ("bulletin") laid out like the ministry form, as a working copy ("copie de
@@ -40,7 +42,7 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
   const { scheme } = ctx;
   // Report cards print subject names in French, as the school entered them.
   const subjects: Subject[] = ctx.subjectsOf(cls.level).subjects;
-  const lines = bulletinLayout(subjects, domainsOf(scheme), "fr");
+  const lines = bulletinLayout(subjects, domainsOf(scheme, cls.level), "fr");
   const pupils = ctx.pupilsOf(cls.id);
   const only = param(sp, "student");
   const shown = only ? pupils.filter((s) => s.id === only) : pupils;
@@ -106,6 +108,13 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
     const yr = row("Y");
     const decided = yr.percent != null && yr.missing === 0;
     const pass = decided && yr.passed;
+    // 6e année: Résultat final. A blank school average falls back to the year percentage halved.
+    const fin = (code: string) => idx.get(`${sid}|${code}|${FINAL.period}`);
+    const ecoleMark = fin(FINAL.school);
+    const ecole = ecoleMark?.score ?? (decided && yr.percent != null ? Math.round(yr.percent * 5) / 10 : null);
+    const ecoleComputed = ecoleMark?.score == null && ecole != null;
+    const enafep = fin(FINAL.exam)?.score ?? null;
+    const dec = (n: number | null) => (n == null ? "" : new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(n));
 
     return (
       <article key={sid} className="bulletin">
@@ -128,7 +137,7 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
             <div><span>CODE :</span><b>{school?.ministryCode || ""}</b></div>
             <div><span>N° PERM. :</span><b>{s.permNumber || ""}</b></div>
           </div>
-          <div className="b-heading"><strong>BULLETIN DE L&apos;ÉLÈVE : {DEGREE[degreeOf(cls.level)]}</strong><strong>ANNÉE SCOLAIRE {year}</strong></div>
+          <div className="b-heading"><strong>BULLETIN DE L&apos;ÉLÈVE : {degreeTitle(cls.level)}</strong><strong>ANNÉE SCOLAIRE {year}</strong></div>
         </header>
         <table className="b-table">
           <thead>
@@ -176,9 +185,20 @@ export default async function Bulletin({ params, searchParams }: { params: Promi
         </table>
         <footer className="b-end">
           <div>
+            {cls.level === FINAL.level && (
+              <table className="b-final">
+                <thead><tr><th>RÉSULTAT FINAL</th><th>POINTS OBT.</th><th>MAX</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">MOYENNE ÉCOLE{ecoleComputed ? " **" : ""}</th><td>{dec(ecole)}</td><td>{FINAL.max}</td></tr>
+                  <tr><th scope="row">ENAFEP</th><td>{dec(enafep)}</td><td>{FINAL.max}</td></tr>
+                  <tr className="b-strong"><th scope="row">TOTAL</th><td>{ecole != null && enafep != null ? dec(Math.round((ecole + enafep) * 10) / 10) : ""}</td><td>{FINAL.max * 2}</td></tr>
+                </tbody>
+              </table>
+            )}
             <p className={decided && !pass ? "b-struck" : undefined}>– L&apos;élève passe dans la classe supérieure</p>
             <p className={decided && pass ? "b-struck" : undefined}>– L&apos;élève double la classe</p>
             {subjects.some((x) => x.optional) && <p className="b-note">* Branche facultative.</p>}
+            {cls.level === FINAL.level && ecoleComputed && <p className="b-note">** Pourcentage de l&apos;année divisé par 2 (pas de moyenne école saisie).</p>}
           </div>
           <div className="b-sign">
             <p>Fait à ........................................, le ..... / ..... / ..........</p>
