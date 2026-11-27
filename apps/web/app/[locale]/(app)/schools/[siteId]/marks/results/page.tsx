@@ -1,4 +1,4 @@
-import { classResults, formatScore, maxFor, parseSpan, periodsIn, spanKey, type Span } from "@eu/schools";
+import { classResults, formatScore, maxFor, parseSpan, periodsIn, spanKey, type Span, levelsOf } from "@eu/schools";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { EmptyRow, Notice, Section } from "@/components/ui";
@@ -17,6 +17,7 @@ export default async function Results({ params, searchParams }: { params: Promis
   const { me, locale } = await signedIn(p.locale);
   const tr = trFor(locale);
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const ctx = marksContext(d, p.siteId, today(), param(sp, "class"), locale);
   const base = `/${locale}/schools/${p.siteId}/marks`;
   const canConfigure = can(me, "school.configure", p.siteId);
@@ -49,7 +50,7 @@ export default async function Results({ params, searchParams }: { params: Promis
   const num = (n: number) => formatScore(Math.round(n * 2) / 2, locale);
   const pct = (n: number | null) => (n == null ? "—" : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(n)} %`);
   const mention = (m: { en: string; fr: string } | null) => (m ? m[locale] : "—");
-  const title = `${classLabel(cls, tr)} · ${spanLabel(span, ctx.periods, locale, tr, ctx.sem)}`;
+  const title = `${classLabel(cls, tr, LV)} · ${spanLabel(span, ctx.periods, locale, tr, ctx.sem)}`;
   const sep = locale === "fr" ? " : " : ": ";
   const terms = [...new Set(ctx.periods.map((x) => x.term))];
 
@@ -59,7 +60,7 @@ export default async function Results({ params, searchParams }: { params: Promis
       <form method="get" className="filterbar inset marks-filter no-print">
         <label className="tb-field">{tr("common.class")}
           <select className="ctl" name="class" defaultValue={cls.id}>
-            {ctx.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr)}</option>)}
+            {ctx.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr, LV)}</option>)}
           </select>
         </label>
         <label className="tb-field">{tr("marks.span")}

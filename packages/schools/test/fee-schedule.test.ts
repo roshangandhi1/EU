@@ -79,8 +79,8 @@ describe("copying into a year without terms", () => {
       { terms: [], yearId: "y2", yearStart: "2027-09-06" },
     );
     expect(out).toEqual([
-      { academicYearId: "y2", number: 1, startsOn: "2027-09-06", endsOn: "2027-12-25" },
-      { academicYearId: "y2", number: 2, startsOn: "2028-01-09", endsOn: "2028-03-30" },
+      { academicYearId: "y2", kind: "trimester", number: 1, startsOn: "2027-09-06", endsOn: "2027-12-25" },
+      { academicYearId: "y2", kind: "trimester", number: 2, startsOn: "2028-01-09", endsOn: "2028-03-30" },
     ]);
   });
 });

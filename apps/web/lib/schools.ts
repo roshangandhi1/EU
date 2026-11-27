@@ -84,9 +84,9 @@ export function parseLevels(s: string): number[] {
     const [a, b] = part.split("-").map((x) => Number(x.trim()));
     if (a === undefined || !Number.isInteger(a)) continue;
     const end = b !== undefined && Number.isInteger(b) ? b : a;
-    for (let i = Math.min(a, end); i <= Math.max(a, end); i++) if (i >= 1 && i <= 8) out.add(i);
+    for (let i = Math.min(a, end); i <= Math.max(a, end); i++) if (i >= 1 && i <= 20) out.add(i);
   }
-  return [...out].sort();
+  return [...out].sort((x, y) => x - y);
 }
 
 /** Redirect back with a message code shown by <Flash>. */

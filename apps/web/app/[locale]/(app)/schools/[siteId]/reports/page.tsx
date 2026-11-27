@@ -1,4 +1,4 @@
-import { activeOn, LEVELS, attendanceRate, classDay, clockAnomalies, enrolmentBreakdown, live, placesAsAt, splitAsAt, type ClassDay } from "@eu/schools";
+import { activeOn, attendanceRate, classDay, clockAnomalies, enrolmentBreakdown, live, placesAsAt, splitAsAt, type ClassDay, levelsOf } from "@eu/schools";
 import Link from "next/link";
 import { ButtonLink, Notice, Section, Stat, Stats, Table } from "@/components/ui";
 import { can, schoolFor, signedIn, today, tr as trFor } from "@/lib/schools";
@@ -14,6 +14,7 @@ export default async function Reports({ params, searchParams }: { params: Promis
   const tr = trFor(locale);
   const C = tr("common.colon");
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const now = today();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(param(sp, "date")) ? param(sp, "date") : now;
   // Evidence mode is for assessors and programme staff; school staff see what is recorded.
@@ -61,14 +62,14 @@ export default async function Reports({ params, searchParams }: { params: Promis
           <Stat label={tr("shift.afternoon")} value={b.byShift.afternoon} />
         </Stats>
         <Section flush icon="users" title={tr("reports.byLevel")}>
-          <Table flush rows={LEVELS.filter((n) => n <= 6 || live(d.classes).some((c) => c.level === n))} rowKey={(n) => String(n)} empty="" columns={[
-            { key: "l", header: tr("common.level"), render: (n) => levelLabel(n, tr) },
+          <Table flush rows={LV.map((l) => l.level).filter((n) => n <= 6 || live(d.classes).some((c) => c.level === n))} rowKey={(n) => String(n)} empty="" columns={[
+            { key: "l", header: tr("common.level"), render: (n) => levelLabel(n, tr, LV) },
             { key: "c", header: tr("overview.enrolled"), numeric: true, render: (n) => b.byLevel[n] ?? 0 },
           ]} />
         </Section>
         <Section flush icon="check" title={tr("rep.monthly", { month: fmtMonth(month, locale) })} description={tr("rep.monthlyHint")}>
           <Table flush rows={monthly} rowKey={(r) => r.c.id} empty={tr("rep.noRegisters")} emptyIcon="check" columns={[
-            { key: "c", header: tr("common.class"), render: (r) => <strong>{classLabel(r.c, tr)}</strong> },
+            { key: "c", header: tr("common.class"), render: (r) => <strong>{classLabel(r.c, tr, LV)}</strong> },
             { key: "d", header: tr("rep.registerDays"), numeric: true, render: (r) => r.days },
             { key: "a", header: tr("rep.absences"), numeric: true, render: (r) => r.absent },
             { key: "r", header: tr("attendance.rate"), numeric: true, render: (r) => (r.rate === null ? "—" : `${Math.round(r.rate * 100)} %`) },

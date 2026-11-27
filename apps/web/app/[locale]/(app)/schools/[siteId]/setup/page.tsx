@@ -1,4 +1,4 @@
-import { activeOn, formatCdf, LEVELS, live, placesAsAt } from "@eu/schools";
+import { activeOn, formatCdf, levelsOf, live, placesAsAt } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
@@ -15,7 +15,7 @@ async function siteRow(id: string): Promise<{ lat: number | null; lng: number | 
   return r ?? { lat: null, lng: null };
 }
 import { Flash, param, type SP } from "../../flash";
-import { byLevel, classLabel, levelLabel, studentName } from "../labels";
+import { byLevel, classLabel, studentName } from "../labels";
 import { fmtDate } from "../format";
 import * as A from "./actions";
 import { PlanPeriodFields, SetupForm, YearAndTerm } from "./setup-form";
@@ -32,6 +32,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
   const f = (k: string) => t(locale, `ui.form.${k}`);
   if (!can(me, "school.configure", p.siteId)) return <Notice tone="warning">{tr("setup.configureOnly")}</Notice>;
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const site = await siteRow(p.siteId);
   const staff = await schoolStaff(p.siteId);
   const phones = await schoolDevices(p.siteId);
@@ -92,7 +93,12 @@ export default async function Setup({ params, searchParams }: { params: Promise<
 
   const years = live(d.years).sort((a, b) => (a.startsOn < b.startsOn ? 1 : -1));
   const yearOpts = years.map((y) => <option key={y.id} value={y.id}>{y.label}</option>);
-  const terms = live(d.terms).sort((a, b) => a.number - b.number);
+  // Trimesters first, then semesters.
+  const terms = live(d.terms).sort((a, b) => (a.kind ?? "trimester").localeCompare(b.kind ?? "trimester") * -1 || a.number - b.number);
+  const levels = levelsOf(d.school);
+  const anySemesters = levels.some((l) => l.semesters);
+  const anyTrimesters = levels.some((l) => !l.semesters);
+  const termName = (tm: { kind?: string | null; number: number }) => tr(tm.kind === "semester" ? "feeGrid.semester" : "feeGrid.term", { n: tm.number });
   const rooms = live(d.classrooms);
   const classes = live(d.classes).sort(byLevel);
   const items = live(d.feeItems);
@@ -103,11 +109,12 @@ export default async function Setup({ params, searchParams }: { params: Promise<
   const students = new Map(d.students.map((s) => [s.id, s]));
   const enrolled = activeOn(d.enrolments, date, d.years).map((e) => students.get(e.studentId)).filter((s): s is NonNullable<typeof s> => !!s);
   const yearLabel = (id: string) => years.find((y) => y.id === id)?.label ?? "";
-  const termLabel = (id: string) => { const tm = terms.find((x) => x.id === id); return tm ? tr("feeGrid.term", { n: tm.number }) : ""; };
+  const termLabel = (id: string) => { const tm = terms.find((x) => x.id === id); return tm ? termName(tm) : ""; };
   const needYear = <EmptyRow icon="calendar" title={tr("ux.needYear")} />;
 
   const index = [
     { id: "school", label: tr("setup.school"), n: d.school?.shiftsRunning.length ?? 0 },
+    { id: "levels", label: tr("ux.levelsTitle"), n: levels.length },
     { id: "years", label: tr("setup.year"), n: years.length },
     { id: "terms", label: tr("setup.term"), n: terms.length },
     { id: "rooms", label: tr("capacity.title"), n: rooms.length },
@@ -158,6 +165,27 @@ export default async function Setup({ params, searchParams }: { params: Promise<
           </SetupForm>
         </Section>
 
+        <Section id="levels" icon="list" title={tr("ux.levelsTitle")} description={tr("ux.levelsDesc")} count={levels.length}>
+          <SetupForm action={A.saveLevels} hidden={{ locale, siteId: p.siteId, returnTo: "levels" }} submit={tr("ux.levelsSave")} busy={saving} icon="check">
+            <table className="grid levels-grid">
+              <thead><tr><th>{tr("ux.levelNumber")}</th><th>{tr("ux.levelNameCol")}</th><th>{tr("ux.levelSemesters")}</th><th>{tr("ux.levelRemove")}</th></tr></thead>
+              <tbody>
+                {[...levels, null, null, null].map((l, i) => {
+                  const used = !!l && classes.some((k) => k.level === l.level);
+                  return (
+                    <tr key={l ? `l${l.level}` : `new${i}`}>
+                      <td><input name={`lv_${i}`} type="number" min={1} max={20} step={1} inputMode="numeric" defaultValue={l?.level ?? ""} aria-label={tr("ux.levelNumber")} style={{ width: 70 }} /></td>
+                      <td><input name={`nm_${i}`} maxLength={40} defaultValue={l?.name ?? ""} placeholder={l ? undefined : tr("ux.levelsAddHint")} aria-label={tr("ux.levelNameCol")} /></td>
+                      <td><input name={`sm_${i}`} type="checkbox" value="1" defaultChecked={l ? l.semesters : true} aria-label={tr("ux.levelSemesters")} /></td>
+                      <td>{l && <input name={`rm_${i}`} type="checkbox" value="1" disabled={used} title={used ? tr("err.setup.levelInUse", { n: l.name }) : undefined} aria-label={tr("ux.levelRemove")} />}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </SetupForm>
+        </Section>
+
         <Section id="years" flush icon="calendar" title={tr("setup.year")} description={tr("ux.yearsDesc")} count={years.length}>
           <Flash sp={sp} tr={tr} section="years" />
           <Table flush rows={years} rowKey={(r) => r.id} empty={tr("ux.noneYet")} emptyIcon="calendar" columns={[
@@ -180,7 +208,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
         <Section id="terms" flush icon="calendar" title={tr("setup.term")} description={tr("ux.termsDesc")} count={terms.length}>
           <Flash sp={sp} tr={tr} section="terms" />
           <Table flush rows={terms} rowKey={(r) => r.id} empty={tr("ux.noneYet")} emptyIcon="calendar" columns={[
-            { key: "n", header: tr("setup.termNumber"), render: (r) => <strong>{tr("feeGrid.term", { n: r.number })}</strong> },
+            { key: "n", header: tr("setup.termNumber"), render: (r) => <strong>{termName(r)}</strong> },
             { key: "y", header: tr("feeGrid.year"), render: (r) => years.find((y) => y.id === r.academicYearId)?.label ?? "" },
             { key: "s", header: tr("setup.startsOn"), render: (r) => dt(r.startsOn) },
             { key: "e", header: tr("setup.endsOn"), render: (r) => dt(r.endsOn) },
@@ -189,23 +217,27 @@ export default async function Setup({ params, searchParams }: { params: Promise<
           {years.length === 0 ? needYear : (() => {
             const fields = (r?: (typeof terms)[number]) => <>
               <Field span={3} label={tr("feeGrid.year")}>{r ? <input readOnly value={yearLabel(r.academicYearId)} /> : <select name="academicYearId" required>{yearOpts}</select>}</Field>
-              <Field span={3} label={tr("setup.termNumber")}><select name="number" defaultValue={r?.number}>{[1, 2, 3].map((n) => <option key={n} value={n}>{tr("feeGrid.term", { n })}</option>)}</select></Field>
-              <Field span={3} label={tr("setup.startsOn")}><input name="startsOn" type="date" required defaultValue={r?.startsOn} /></Field>
+              <Field span={2} label={tr("ux.termKind")}>{r ? <input readOnly value={termName(r).replace(/\s*\d+$/, "")} /> : <select name="kind" defaultValue={anyTrimesters ? "trimester" : "semester"}><option value="trimester">{tr("feeGrid.term", { n: "" }).trim()}</option><option value="semester">{tr("feeGrid.semester", { n: "" }).trim()}</option></select>}</Field>
+              <Field span={2} label="N°"><select name="number" defaultValue={r?.number}>{[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}</select></Field>
+              <Field span={2} label={tr("setup.startsOn")}><input name="startsOn" type="date" required defaultValue={r?.startsOn} /></Field>
               <Field span={3} label={tr("setup.endsOn")}><input name="endsOn" type="date" required defaultValue={r?.endsOn} /></Field>
             </>;
             const r = under(terms);
             if (r) return editForm("terms", r.id, A.editTerm, fields(r));
             // A year with no trimesters yet: offer the usual three in one click (dates can be edited after).
-            const bare = years.filter((y) => !terms.some((t) => t.academicYearId === y.id));
+            const has = (y: { id: string }, kind: string) => terms.some((t) => t.academicYearId === y.id && (t.kind ?? "trimester") === kind);
+            const quick = (y: (typeof years)[number], kind: "trimester" | "semester") => (
+              <form key={`${y.id}:${kind}`} action={A.addThreeTerms} className="quick-terms">
+                {hidden("terms")}
+                <input type="hidden" name="academicYearId" value={y.id} />
+                <input type="hidden" name="kind" value={kind} />
+                <span className="muted small">{tr(kind === "semester" ? "ux.noSemestersYet" : "ux.noTermsYet", { year: y.label })}</span>
+                <SubmitButton variant="secondary" small icon="plus" pending={saving}>{tr(kind === "semester" ? "ux.addSemesters" : "ux.addThreeTerms")}</SubmitButton>
+              </form>
+            );
             return <>
-              {bare.map((y) => (
-                <form key={y.id} action={A.addThreeTerms} className="quick-terms">
-                  {hidden("terms")}
-                  <input type="hidden" name="academicYearId" value={y.id} />
-                  <span className="muted small">{tr("ux.noTermsYet", { year: y.label })}</span>
-                  <SubmitButton variant="secondary" small icon="plus" pending={saving}>{tr("ux.addThreeTerms")}</SubmitButton>
-                </form>
-              ))}
+              {anyTrimesters && years.filter((y) => !has(y, "trimester")).map((y) => quick(y, "trimester"))}
+              {anySemesters && years.filter((y) => !has(y, "semester")).map((y) => quick(y, "semester"))}
               {add("terms", tr("ux.addTerm"), false, A.addTerm, fields())}
             </>;
           })()}
@@ -241,7 +273,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
         <Section id="classes" flush icon="users" title={tr("setup.classes")} description={tr("ux.classesDesc")} count={classes.length}>
           <Flash sp={sp} tr={tr} section="classes" />
           <Table flush rows={classes} rowKey={(r) => r.id} empty={tr("ux.noneYet")} emptyIcon="users" columns={[
-            { key: "c", header: tr("common.class"), render: (r) => <strong>{classLabel(r, tr)}</strong> },
+            { key: "c", header: tr("common.class"), render: (r) => <strong>{classLabel(r, tr, LV)}</strong> },
             { key: "y", header: tr("feeGrid.year"), render: (r) => years.find((y) => y.id === r.academicYearId)?.label ?? "" },
             { key: "r", header: tr("setup.classroom"), render: (r) => rooms.find((x) => x.id === r.classroomId)?.name ?? <span className="muted">—</span> },
             { key: "x", header: "", shrink: true, render: (r) => rowActions("classes", "school.class", r.id) },
@@ -249,7 +281,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
           {years.length === 0 ? needYear : (() => {
             const fields = (r?: (typeof classes)[number]) => <>
               <Field span={4} label={tr("feeGrid.year")}>{r ? <input readOnly value={yearLabel(r.academicYearId)} /> : <select name="academicYearId" required>{yearOpts}</select>}</Field>
-              <Field span={4} label={tr("common.level")}><select name="level" defaultValue={r?.level}>{LEVELS.map((n) => <option key={n} value={n}>{levelLabel(n, tr)}</option>)}</select></Field>
+              <Field span={4} label={tr("common.level")}><select name="level" defaultValue={r?.level}>{levels.map((l) => <option key={l.level} value={l.level}>{l.name}</option>)}</select></Field>
               <Field span={4} label={tr("setup.section")} hint={tr("ux.sectionHint")} error={tr("err.setup.section")}><input name="section" defaultValue={r?.section ?? "A"} maxLength={2} pattern="[A-Za-z]{1,2}" required style={{ textTransform: "uppercase" }} /></Field>
               <Field span={4} label={tr("common.shift")}><select name="shift" defaultValue={r?.shift}><option value="morning">{tr("shift.morning")}</option><option value="afternoon">{tr("shift.afternoon")}</option></select></Field>
               <Field span={4} label={tr("setup.classroom")} optional={optional}><select name="classroomId" defaultValue={r?.classroomId ?? ""}><option value="">—</option>{rooms.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>
@@ -269,7 +301,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
           <Flash sp={sp} tr={tr} section="fees" />
           <Table flush rows={singleItems} rowKey={(r) => r.id} empty={tr("ux.noneYet")} emptyIcon="coins" columns={[
             { key: "n", header: tr("setup.feeName"), render: (r) => <strong>{r.name}</strong> },
-            { key: "t", header: tr("setup.termNumber"), render: (r) => { const tm = terms.find((x) => x.id === r.termId); return tm ? tr("feeGrid.term", { n: tm.number }) : tr("ux.allYear"); } },
+            { key: "t", header: tr("setup.termNumber"), render: (r) => { const tm = terms.find((x) => x.id === r.termId); return tm ? termName(tm) : tr("ux.allYear"); } },
             { key: "l", header: tr("setup.levels"), render: (r) => r.levels.join(", ") },
             { key: "y", header: tr("feeGrid.year"), render: (r) => years.find((y) => y.id === r.academicYearId)?.label ?? "" },
             { key: "a", header: tr("fees.amount"), numeric: true, render: (r) => formatCdf(r.amount, locale) },
@@ -277,7 +309,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
             { key: "x", header: "", shrink: true, render: (r) => rowActions("fees", "school.fee_item", r.id) },
           ]} rowClass={editRow} />
           {years.length === 0 ? needYear : (() => {
-            const termChoices = years.map((y) => ({ yearId: y.id, terms: terms.filter((tm) => tm.academicYearId === y.id).map((tm) => ({ id: tm.id, label: tr("feeGrid.term", { n: tm.number }) })) }));
+            const termChoices = years.map((y) => ({ yearId: y.id, terms: terms.filter((tm) => tm.academicYearId === y.id).map((tm) => ({ id: tm.id, label: termName(tm) })) }));
             const periodText = { whole: tr("ux.allYear"), none: tr("ux.noTermsForYear"), addTerms: tr("ux.addTermsLink"), termsHref: "#terms" };
             const fields = (r?: (typeof items)[number]) => <>
               <Field span={6} label={tr("setup.feeName")}><input name="name" required placeholder={tr("ph.fee")} defaultValue={r?.name} /></Field>
@@ -307,7 +339,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
             { key: "x", header: "", shrink: true, render: (r) => rowActions("plans", "school.fee_plan", r.id) },
           ]} />
           {years.length === 0 ? needYear : (() => {
-            const termsByYear = Object.fromEntries(years.map((y) => [y.id, terms.filter((tm) => tm.academicYearId === y.id).map((tm) => tm.number)]));
+            const termsByYear = Object.fromEntries(years.map((y) => [y.id, [...new Set(terms.filter((tm) => tm.academicYearId === y.id).map((tm) => tm.number))].sort()]));
             const planText = {
               year: tr("feeGrid.year"), frequency: tr("plan.frequency"),
               frequencies: { one_time: tr("plan.freq.one_time"), monthly: tr("plan.freq.monthly"), per_term: tr("plan.freq.per_term"), per_year: tr("plan.freq.per_year") },
@@ -322,7 +354,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
                 <Field span={4} label={tr("plan.amountEach")} hint={tr("ux.amountHint")} error={tr("ux.amountError")}><input name="amount" inputMode="numeric" pattern="[0-9 ]+" required className="num-input" defaultValue={r?.amount} /></Field>
                 <Field span={4} label={tr("setup.levels")} hint={tr("setup.levelsHint")}><input name="levels" defaultValue={r ? r.levels.join(",") : "1-6"} required /></Field>
                 <PlanPeriodFields years={years.map((y) => ({ id: y.id, label: y.label, startsOn: y.startsOn, endsOn: y.endsOn }))} termsByYear={termsByYear} fixedYear={r?.academicYearId}
-                  text={{ ...planText, terms: { 1: tr("feeGrid.term", { n: 1 }), 2: tr("feeGrid.term", { n: 2 }), 3: tr("feeGrid.term", { n: 3 }) }, preview: tr("plan.preview", { n: "{n}" }) }}
+                  text={{ ...planText, terms: { 1: anySemesters ? `${tr("feeGrid.term", { n: 1 })} / ${tr("feeGrid.semester", { n: 1 })}` : tr("feeGrid.term", { n: 1 }), 2: anySemesters ? `${tr("feeGrid.term", { n: 2 })} / ${tr("feeGrid.semester", { n: 2 })}` : tr("feeGrid.term", { n: 2 }), 3: tr("feeGrid.term", { n: 3 }) }, preview: tr("plan.preview", { n: "{n}" }) }}
                   value={r ? { frequency: r.frequency, dueDay: r.dueDay, dueOn: r.dueOn, startsOn: r.startsOn, endsOn: r.endsOn, terms: tStart && tEnd ? { start: tStart, end: tEnd } : undefined } : undefined} />
               </>;
             };

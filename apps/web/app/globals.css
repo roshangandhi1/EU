@@ -454,6 +454,7 @@ tr.inactive td { opacity: 0.6; }
 .fee-grid thead .fee-level { background: var(--surface-alt); z-index: 3; }
 .fee-grid td .field-input { width: 100%; min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
 .fee-grid tbody tr { cursor: default; }
+.fee-grid td.fee-na { background: var(--surface-alt); color: var(--muted); text-align: center; vertical-align: middle; }
 .fee-pupil-sub { display: none; font-size: 13px; margin-top: 2px; }
 @media (max-width: 640px) {
   .fee-pupils td.fee-wide { display: none; }

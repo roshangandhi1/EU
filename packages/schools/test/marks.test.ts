@@ -278,11 +278,11 @@ describe("marks on the sync engine", () => {
 });
 
 describe("levels 7 and 8", () => {
-  it("classes, fee items and subjects accept levels 1 to 8 and nothing beyond", async () => {
+  it("classes, fee items and subjects accept levels 1 to 20 (9 and up: humanités, set by the school)", async () => {
     const { level, LEVELS, schoolClass } = await import("../src");
-    expect(LEVELS).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(level.safeParse(8).success).toBe(true);
-    expect(level.safeParse(9).success).toBe(false);
+    expect(LEVELS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(level.safeParse(20).success).toBe(true);
+    expect(level.safeParse(21).success).toBe(false);
     expect(schoolClass.safeParse({ academicYearId: "00000000-0000-4000-8000-000000000001", level: 7, section: "A", shift: "morning", classroomId: null }).success).toBe(true);
     expect(defaultSubjects(8).length).toBeGreaterThan(0);
   });

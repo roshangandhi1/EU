@@ -1,4 +1,4 @@
-import { activeOn, live } from "@eu/schools";
+import { activeOn, live, levelsOf } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
@@ -21,6 +21,7 @@ export default async function Students({ params, searchParams }: { params: Promi
   const { me, locale } = await signedIn(p.locale);
   const tr = trFor(locale);
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const date = today();
   const classes = live(d.classes).sort(byLevel);
   const classById = new Map(d.classes.map((c) => [c.id, c]));
@@ -73,7 +74,7 @@ export default async function Students({ params, searchParams }: { params: Promi
           </label>
           <select className="ctl" name="class" defaultValue={cls} aria-label={tr("common.class")}>
             <option value="">{tr("feeGrid.allClasses")}</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr)}</option>)}
+            {classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr, LV)}</option>)}
           </select>
           <select className="ctl" name="status" defaultValue={status} aria-label={tr("common.status")}>
             {STATUSES.map((s) => <option key={s} value={s}>{tr(`pupil.filter.${s}`)}</option>)}
@@ -85,24 +86,24 @@ export default async function Students({ params, searchParams }: { params: Promi
         {rows.length > 0 && <PrintButton target="pupil-list" label={tr("print.list")} />}
         {canWrite && classes.length > 0 && <Link className="btn secondary no-print" href={`${base}/import`}><Icon name="upload" size={17} />{tr("pimport.open")}</Link>}
         {canWrite && classes.length > 0 && (
-          <EnrolForms locale={locale} siteId={p.siteId} classes={classes.map((c) => ({ id: c.id, label: classLabel(c, tr) }))} today={date} l={l} defaultOpen={nActive === 0} />
+          <EnrolForms locale={locale} siteId={p.siteId} classes={classes.map((c) => ({ id: c.id, label: classLabel(c, tr, LV) }))} today={date} l={l} defaultOpen={nActive === 0} />
         )}
       </div>
       <div id="pupil-list">
         <div className="print-only print-head">
-          <strong>{d.site.name}</strong> · {shownClass ? classLabel(shownClass, tr) : tr("feeGrid.allClasses")} · {tr(`pupil.filter.${status}`)} · {fmtDate(date, locale)}
+          <strong>{d.site.name}</strong> · {shownClass ? classLabel(shownClass, tr, LV) : tr("feeGrid.allClasses")} · {tr(`pupil.filter.${status}`)} · {fmtDate(date, locale)}
         </div>
         <Table
           rows={rows}
           rowKey={(r) => r.s.id}
-          empty={filtered ? tr("ux.noMatch", { q: q || (shownClass ? classLabel(shownClass, tr) : "") }) : status === "left" ? tr("pupil.noneLeft") : tr("ux.noPupils")}
+          empty={filtered ? tr("ux.noMatch", { q: q || (shownClass ? classLabel(shownClass, tr, LV) : "") }) : status === "left" ? tr("pupil.noneLeft") : tr("ux.noPupils")}
           emptyHint={filtered || status === "left" ? undefined : canWrite ? tr("ux.noPupilsHint") : undefined}
           emptyIcon={filtered ? "search" : "users"}
           rowClass={(r) => (r.active ? undefined : "row-left")}
           columns={[
             { key: "name", header: tr("common.name"), render: (r) => <><Link className="row-link" href={`${base}/${r.s.id}`}><strong>{studentName(r.s)}</strong></Link><div className="muted small">{r.s.studentNumber}</div></> },
             { key: "sex", header: tr("student.sex"), render: (r) => (r.s.sex === "F" ? tr("student.female") : tr("student.male")) },
-            { key: "class", header: tr("common.class"), render: (r) => (r.c ? classLabel(r.c, tr) : <span className="muted">—</span>) },
+            { key: "class", header: tr("common.class"), render: (r) => (r.c ? classLabel(r.c, tr, LV) : <span className="muted">—</span>) },
             ...(status !== "active" ? [{ key: "status", header: tr("common.status"), render: (r: (typeof rows)[number]) => (r.active
               ? <span className="pill good">{tr("student.statuses.active")}</span>
               : <span className="pill">{tr(`student.statuses.${r.e.status}`)}{r.e.leftOn ? ` · ${fmtDate(r.e.leftOn, locale)}` : ""}</span>) }] : []),

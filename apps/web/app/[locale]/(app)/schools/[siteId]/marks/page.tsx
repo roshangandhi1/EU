@@ -1,4 +1,4 @@
-import { BEHAVIOUR, FINAL, finalExam, formatScore, lettersOf, maxFor } from "@eu/schools";
+import { BEHAVIOUR, FINAL, finalExam, formatScore, lettersOf, maxFor, levelsOf } from "@eu/schools";
 import { t } from "@eu/core/i18n";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
@@ -19,6 +19,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
   const { me, locale } = await signedIn(p.locale);
   const tr = trFor(locale);
   const d = await schoolFor(me, p.siteId);
+  const LV = levelsOf(d.school);
   const ctx = marksContext(d, p.siteId, today(), param(sp, "class"), locale);
   const base = `/${locale}/schools/${p.siteId}/marks`;
   const canWrite = can(me, "marks.write", p.siteId);
@@ -57,7 +58,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
       <label className="tb-field">{tr("common.class")}
         <select className="ctl" name="class" defaultValue={cls?.id ?? ""}>
           <option value="">{tr("marks.chooseClass")}</option>
-          {ctx.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr)}</option>)}
+          {ctx.classes.map((c) => <option key={c.id} value={c.id}>{classLabel(c, tr, LV)}</option>)}
         </select>
       </label>
       <label className="tb-field">{tr("marks.period")}
@@ -101,7 +102,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
                   const idx = ctx.index(c.id);
                   return (
                     <tr key={c.id}>
-                      <th scope="row" className="mg-pupil"><Link href={`${base}?class=${c.id}&period=${period.key}`}>{classLabel(c, tr)}</Link><span className="muted small"> · {tr("ux.showing", { n: pupils.length })}</span></th>
+                      <th scope="row" className="mg-pupil"><Link href={`${base}?class=${c.id}&period=${period.key}`}>{classLabel(c, tr, LV)}</Link><span className="muted small"> · {tr("ux.showing", { n: pupils.length })}</span></th>
                       {ctx.periods.map((x) => {
                         const expected = pupils.length * subjects.length;
                         let got = 0;
@@ -155,7 +156,7 @@ export default async function Marks({ params, searchParams }: { params: Promise<
       <MarksNav base={base} active="entry" siteId={p.siteId} locale={locale} tr={tr} canConfigure={canConfigure} classId={cls.id} />
       {messages}
       {filter}
-      <Section className="marks-sec" id="sheet" flush icon="list" title={`${classLabel(cls, tr)} · ${final ? tr("marks.finalPeriod", { exam: exam ?? "" }) : period.key}`} description={final ? tr("marks.finalIntro", { exam: exam ?? "" }) : periodLong(period, locale, tr, ctx.sem)} count={pupils.length}
+      <Section className="marks-sec" id="sheet" flush icon="list" title={`${classLabel(cls, tr, LV)} · ${final ? tr("marks.finalPeriod", { exam: exam ?? "" }) : period.key}`} description={final ? tr("marks.finalIntro", { exam: exam ?? "" }) : periodLong(period, locale, tr, ctx.sem)} count={pupils.length}
         actions={<Link className="btn ghost sm" href={final ? `${base}/bulletin?class=${cls.id}` : `${base}/results?class=${cls.id}&span=${period.key}`}><Icon name="chart" size={15} />{final ? tr("marks.bulletins") : tr("marks.seeResults")}</Link>}>
         {pupils.length === 0 ? <EmptyRow icon="users" title={tr("ux.noRoster")} /> : !canWrite ? <Notice tone="warning">{tr("common.forbidden")}</Notice> : (
           <MarksGrid

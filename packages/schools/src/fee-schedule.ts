@@ -1,7 +1,7 @@
 import type { FeeItem, Synced, Term } from "./model";
 
-/** Every level a school can have: primary 1-6, then 7-8 (basic education). */
-export const LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+/** The DRC default level numbers (1re-6e année, 7e-8e EB, 4 years of humanités); schools set their own in Setup. */
+export const LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 /** Column key: a term id, or "year" for whole-year fees. */
 export const colKey = (termId: string | null) => termId ?? "year";
@@ -50,6 +50,7 @@ export function planFeeSchedule(
   name: string,
   columns: readonly (string | null)[],
   wanted: FeeGrid,
+  levels: readonly number[] = LEVELS,
 ): FeeOp[] {
   const ops: FeeOp[] = [];
   const mine = existing.filter((i) => !i.voidedAt && !i.planId && i.academicYearId === academicYearId && i.name === name);
@@ -84,7 +85,7 @@ export function planFeeSchedule(
       if (due && due !== item.dueOn) fields.dueOn = due;
       if (Object.keys(fields).length) ops.push({ op: "update", id: item.id, fields });
     }
-    for (const l of LEVELS) {
+    for (const l of levels) {
       const a = want(l);
       if (a !== null && !assigned.has(l)) queue(a, l);
     }
@@ -115,7 +116,7 @@ export interface CopyPlan {
 
 /**
  * Copy a year's fee structure into another year, at this school or another one.
- * Terms are matched by number; due dates move by the gap between the two years' start dates.
+ * Terms are matched by kind (trimester / semester) and number; due dates move by the gap between the two years' start dates.
  * Fee names the target year already uses are skipped, never merged.
  */
 export function planFeeCopy(
@@ -124,8 +125,9 @@ export function planFeeCopy(
 ): CopyPlan {
   const shift = dayDiff(source.yearStart, target.yearStart);
   const taken = new Set(feeNames(target.items, target.yearId));
-  const termNo = new Map(source.terms.filter((t) => !t.voidedAt).map((t) => [t.id, t.number]));
-  const targetTerm = new Map(target.terms.filter((t) => !t.voidedAt && t.academicYearId === target.yearId).map((t) => [t.number, t.id]));
+  const tkey = (t: Pick<Term, "kind" | "number">) => `${t.kind ?? "trimester"}:${t.number}`;
+  const termNo = new Map(source.terms.filter((t) => !t.voidedAt).map((t) => [t.id, tkey(t)]));
+  const targetTerm = new Map(target.terms.filter((t) => !t.voidedAt && t.academicYearId === target.yearId).map((t) => [tkey(t), t.id]));
   const plan: CopyPlan = { creates: [], skippedNames: [], skippedNoTerm: 0 };
   for (const i of source.items) {
     if (i.voidedAt || i.academicYearId !== source.yearId) continue;
@@ -148,7 +150,7 @@ export function planFeeCopy(
 }
 
 /**
- * Terms the target year lacks for a copy: source terms that fees use, by number,
+ * Terms the target year lacks for a copy: source terms that fees use, by kind and number,
  * with dates moved by the gap between the years. Create these before copying.
  */
 export function missingTermsForCopy(
@@ -156,10 +158,11 @@ export function missingTermsForCopy(
   target: { terms: readonly Synced<Term>[]; yearId: string; yearStart: string },
 ): Term[] {
   const shift = dayDiff(source.yearStart, target.yearStart);
-  const have = new Set(target.terms.filter((t) => !t.voidedAt && t.academicYearId === target.yearId).map((t) => t.number));
+  const tkey = (t: Pick<Term, "kind" | "number">) => `${t.kind ?? "trimester"}:${t.number}`;
+  const have = new Set(target.terms.filter((t) => !t.voidedAt && t.academicYearId === target.yearId).map(tkey));
   const used = new Set(source.items.filter((i) => !i.voidedAt && i.academicYearId === source.yearId && i.termId).map((i) => i.termId));
   return source.terms
-    .filter((t) => !t.voidedAt && used.has(t.id) && !have.has(t.number))
+    .filter((t) => !t.voidedAt && used.has(t.id) && !have.has(tkey(t)))
     .sort((a, b) => a.number - b.number)
-    .map((t) => ({ academicYearId: target.yearId, number: t.number, startsOn: addDays(t.startsOn, shift), endsOn: addDays(t.endsOn, shift) }));
+    .map((t) => ({ academicYearId: target.yearId, kind: t.kind ?? "trimester", number: t.number, startsOn: addDays(t.startsOn, shift), endsOn: addDays(t.endsOn, shift) }));
 }

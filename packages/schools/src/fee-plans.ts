@@ -1,4 +1,5 @@
-import type { AcademicYear, FeeItem, FeePlan, Synced, Term } from "./model";
+import { termKindFor, termShort } from "./levels";
+import type { AcademicYear, FeeItem, FeePlan, LevelDef, Synced, Term, TermKind } from "./model";
 
 /**
  * Recurring fees (fee plans). A plan generates ordinary fee items, one per period, so each period
@@ -36,13 +37,14 @@ export function monthLabel(ym: string, locale: "en" | "fr"): string {
  * - one-time: one item, due on `dueOn`, always charged (no period end);
  * - per year: one item for the year, due on `dueOn` (else the first day of the year);
  * - monthly: every month from the month of `startsOn` to the month of `endsOn`, due on `dueDay` of that month;
- * - per trimester: every trimester of the year starting in [startsOn, endsOn], due on `dueDay` of the
- *   trimester's first month (or its first day), never before the trimester starts.
+ * - per trimester (or semester): every term of the year starting in [startsOn, endsOn], due on
+ *   `dueDay` of the term's first month (or its first day), never before the term starts. Pass the
+ *   terms of the plan's kind only (see `planTermKind`).
  */
 export function planPeriods(
   plan: Pick<FeePlan, "frequency" | "dueDay" | "dueOn" | "startsOn" | "endsOn">,
   year: Pick<AcademicYear, "startsOn" | "endsOn">,
-  terms: readonly Pick<Synced<Term>, "id" | "number" | "startsOn" | "endsOn" | "voidedAt">[],
+  terms: readonly (Pick<Synced<Term>, "id" | "number" | "startsOn" | "endsOn" | "voidedAt"> & { kind?: TermKind | null })[],
   locale: "en" | "fr" = "fr",
 ): PlanPeriod[] {
   const from = plan.startsOn > year.startsOn ? plan.startsOn : year.startsOn;
@@ -67,7 +69,7 @@ export function planPeriods(
         .sort((a, b) => a.number - b.number)
         .map((t) => {
           const due = plan.dueDay ? atDay(monthStart(t.startsOn), plan.dueDay) : t.startsOn;
-          return { key: t.endsOn, label: `T${t.number}`, termId: t.id, dueOn: due < t.startsOn ? t.startsOn : due, periodEndsOn: t.endsOn };
+          return { key: t.endsOn, label: termShort(t), termId: t.id, dueOn: due < t.startsOn ? t.startsOn : due, periodEndsOn: t.endsOn };
         });
   }
 }
@@ -75,6 +77,15 @@ export function planPeriods(
 function nextMonth(ym: string): string {
   const [y, m] = ym.split("-").map(Number) as [number, number];
   return m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`;
+}
+
+/**
+ * Whether a plan's levels charge per trimester or per semester: all its levels must agree, else
+ * "mixed" (a per-term fee must then be split in two).
+ */
+export function planTermKind(levels: readonly number[], defs: readonly LevelDef[]): TermKind | "mixed" {
+  const kinds = new Set(levels.map((l) => termKindFor(defs, l)));
+  return kinds.size > 1 ? "mixed" : ([...kinds][0] ?? "trimester");
 }
 
 /** The name a generated item carries: the plan name and its period. */

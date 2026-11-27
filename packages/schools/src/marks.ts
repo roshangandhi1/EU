@@ -123,8 +123,8 @@ export const CTEB_SCHEME: GradingScheme = {
   levels: [7, 8],
   terms: [{ periods: 2, exam: true }, { periods: 2, exam: true }],
 };
-/** The ministry default scheme for a level: semesters for the CTEB (7e-8e), trimesters before. */
-export const defaultScheme = (lvl?: number): GradingScheme => ((lvl ?? 0) >= 7 ? CTEB_SCHEME : DRC_SCHEME);
+/** The ministry default scheme for a level: semesters for secondary levels (7e and up by default), trimesters before. */
+export const defaultScheme = (lvl?: number, semesters = (lvl ?? 0) >= 7): GradingScheme => (semesters ? CTEB_SCHEME : DRC_SCHEME);
 /** Whether a scheme's terms are semesters (two of them) rather than trimesters, for labels. */
 export const isSemesters = (s: Pick<GradingScheme, "terms">) => s.terms.length === 2;
 
@@ -386,21 +386,23 @@ export type SchemeSource = "school" | "programme" | "default";
  * The scheme in force at a school for a class level. In each scope (the school, then the
  * programme) the scheme that lists the level wins, then the scope's fallback scheme (no levels).
  * `rows` may mix school and programme ("schools") records. Without a level, only fallbacks count.
- * Levels 7-8 skip the fallbacks and default to the CTEB semesters.
+ * Semester levels (the school's choice in Setup; 7e and up by default) skip a fallback that runs
+ * on trimesters and default to two semesters.
  */
-export function resolveScheme(rows: readonly Rec<GradingScheme>[], siteId: string, lvl?: number): { scheme: GradingScheme; source: SchemeSource; record?: Rec<GradingScheme> } {
+export function resolveScheme(rows: readonly Rec<GradingScheme>[], siteId: string, lvl?: number, semesters = (lvl ?? 0) >= 7): { scheme: GradingScheme; source: SchemeSource; record?: Rec<GradingScheme> } {
   const live = rows.filter((r) => !r.voidedAt);
   const pick = (scopeId: string) => {
     const mine = live.filter((r) => r.scopeId === scopeId);
     const exact = lvl !== undefined ? latest(mine.filter((r) => (r.levels ?? []).includes(lvl))) : undefined;
-    // 7e-8e (CTEB) run on semesters: a primary school's catch-all scheme does not apply to them.
-    return exact ?? ((lvl ?? 0) >= 7 ? undefined : latest(mine.filter((r) => (r.levels ?? []).length === 0)));
+    // Semester levels: a catch-all scheme on trimesters (the primary one) does not apply to them.
+    const fallback = latest(mine.filter((r) => (r.levels ?? []).length === 0));
+    return exact ?? (fallback && (!semesters || isSemesters(fallback)) ? fallback : undefined);
   };
   const own = pick(siteId);
   if (own) return { scheme: own, source: "school", record: own };
   const prog = pick("schools");
   if (prog) return { scheme: prog, source: "programme", record: prog };
-  return { scheme: defaultScheme(lvl), source: "default" };
+  return { scheme: defaultScheme(lvl, semesters), source: "default" };
 }
 
 /**

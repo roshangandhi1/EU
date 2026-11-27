@@ -99,6 +99,13 @@
       "when": 1795748640000,
       "tag": "0013_bulletin_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795748700000,
+      "tag": "0014_levels_semesters",
+      "breakpoints": true
     }
   ]
 }

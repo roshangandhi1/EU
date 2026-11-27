@@ -24,8 +24,10 @@ export function checkTerm(f: Term, years: readonly Synced<AcademicYear>[], terms
   if (f.endsOn <= f.startsOn) return p("endBeforeStart", ["endsOn"]);
   const y = years.find((x) => x.id === f.academicYearId);
   if (y && (f.startsOn < y.startsOn || f.endsOn > y.endsOn)) return p("termOutsideYear", ["startsOn", "endsOn"], { label: y.label });
-  const same = liveRows(terms, self).filter((t) => t.academicYearId === f.academicYearId);
-  if (same.some((t) => t.number === f.number)) return p("termTaken", ["number"], { n: f.number });
+  // Trimesters and semesters are two separate sets of dates in the same year.
+  const kind = f.kind ?? "trimester";
+  const same = liveRows(terms, self).filter((t) => t.academicYearId === f.academicYearId && (t.kind ?? "trimester") === kind);
+  if (same.some((t) => t.number === f.number)) return p(kind === "semester" ? "semesterTaken" : "termTaken", ["number"], { n: f.number });
   const overlap = same.find((t) => t.startsOn <= f.endsOn && f.startsOn <= t.endsOn);
   return overlap ? p("termOverlap", ["startsOn", "endsOn"], { n: overlap.number }) : null;
 }
