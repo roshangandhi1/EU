@@ -8,7 +8,7 @@ const b: BoreholeForCheck = {
 };
 const visit = (id: string, on: string, flow: number | null, received = on) => ({
   id, visitedOn: on, deviceTime: new Date(`${on}T10:00:00Z`), serverTime: new Date(`${received}T10:00:00Z`),
-  operational: { pumpDelivers: true, flowLpm: flow, tankFillsTapsOk: true },
+  operational: { pumpDelivers: true, flowLpm: flow, tankFillsTapsOk: true as boolean | null },
 });
 const s = { minFlowLpmByPumpKw: { "1.1": 15 }, maxCheckAgeDays: 90 };
 
